@@ -473,7 +473,6 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [sonido, setSonido] = useState(false)
-  const [sonido, setSonido] = useState(false)
 
   useEffect(() => {
     let vivo = true
