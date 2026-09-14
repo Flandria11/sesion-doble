@@ -395,3 +395,5 @@ h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: upperc
 @media (prefers-reduced-motion: reduce) {
   .mandos { transition: none; }
 }
+
+.rotulo.marcado i { color: var(--ambar); font-weight: 700; }

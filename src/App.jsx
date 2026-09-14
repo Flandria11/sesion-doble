@@ -255,7 +255,7 @@ function Principal({ sesion, pareja }) {
       <main>
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
-            {vista === 'buscar' && <Anadir yaPuesto={mios} onAdd={anadir} />}
+            {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres} onAdd={anadir} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar} onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
@@ -275,7 +275,7 @@ function Principal({ sesion, pareja }) {
 }
 
 /* ======================= añadir ======================= */
-function Anadir({ yaPuesto, onAdd }) {
+function Anadir({ titulos, yo, nombres, onAdd }) {
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('tendencias')
   const [pagina, setPagina] = useState(1)
@@ -318,7 +318,13 @@ function Anadir({ yaPuesto, onAdd }) {
     return () => { vivo = false }
   }, [filtro, pagina, q])
 
-  const puesto = p => yaPuesto.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+  // devuelve null, 'mio' o el nombre de quien lo propuso
+  const estado = p => {
+    const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
+    if (!x) return null
+    return x.propuesto_por === yo ? 'mio' : (nombres[x.propuesto_por] || 'tu pareja')
+  }
+  const puesto = p => estado(p) !== null
 
   async function proponer(p) {
     if (puesto(p) || anadiendo) return
@@ -358,28 +364,35 @@ function Anadir({ yaPuesto, onAdd }) {
       {error && <div className="error">{error}</div>}
 
       <div className="catalogo">
-        {res.map(p => (
-          <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
-            <button className={`lamina${puesto(p) ? ' puesta' : ''}`}
-              onClick={() => setFicha(p)}
-              aria-label={`Ver información de ${p.titulo}`}>
-              <img src={p.cartel} alt="" loading="lazy" />
-              <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
-              {p.voto && <span className="nota">★ {p.voto}</span>}
-              {puesto(p) && <span className="check">✓</span>}
-            </button>
-            <button className={`mas${puesto(p) ? ' ya' : ''}`}
-              onClick={() => proponer(p)}
-              disabled={puesto(p) || anadiendo === p.tmdb_id}
-              aria-label={puesto(p) ? 'Ya está en tu lista' : `Proponer ${p.titulo}`}>
-              {puesto(p) ? '✓' : anadiendo === p.tmdb_id ? '·' : '+'}
-            </button>
-            <div className="rotulo">
-              {p.titulo}
-              <i>{[p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')}</i>
+        {res.map(p => {
+          const e = estado(p)
+          return (
+            <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
+              <button className={`lamina${e ? ' puesta' : ''}`}
+                onClick={() => setFicha(p)}
+                aria-label={`Ver información de ${p.titulo}`}>
+                <img src={p.cartel} alt="" loading="lazy" />
+                <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+                {p.voto && !e && <span className="nota">★ {p.voto}</span>}
+                {e && <span className="check">✓</span>}
+              </button>
+              <button className={`mas${e ? ' ya' : ''}`}
+                onClick={() => proponer(p)}
+                disabled={!!e || anadiendo === p.tmdb_id}
+                aria-label={e ? 'Ya está propuesta' : `Proponer ${p.titulo}`}>
+                {e ? '✓' : anadiendo === p.tmdb_id ? '·' : '+'}
+              </button>
+              <div className={`rotulo${e ? ' marcado' : ''}`}>
+                {p.titulo}
+                <i>
+                  {e === 'mio' ? 'Ya la propusiste tú'
+                    : e ? `Ya la propuso ${e}`
+                    : [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')}
+                </i>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {cargando && <div className="cargando">Cargando…</div>}
@@ -394,6 +407,9 @@ function Anadir({ yaPuesto, onAdd }) {
 
       {ficha && (
         <Ficha p={ficha} puesta={puesto(ficha)}
+          etiquetaPuesta={estado(ficha) === 'mio'
+            ? 'Ya la propusiste tú'
+            : `Ya la propuso ${estado(ficha)}`}
           onCerrar={() => setFicha(null)}
           onProponer={async () => { await proponer(ficha); setFicha(null) }} />
       )}
@@ -402,7 +418,7 @@ function Anadir({ yaPuesto, onAdd }) {
 }
 
 /* ---- ficha con tráiler ---- */
-function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
+function Ficha({ p, puesta, etiquetaPuesta, ocultarBoton, acciones, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
 
@@ -443,7 +459,7 @@ function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
           {!ocultarBoton && (
             <button className={`btn${puesta ? ' suave' : ''}`}
               onClick={onProponer} disabled={puesta}>
-              {puesta ? 'Ya está en tu lista' : 'Proponer'}
+              {puesta ? (etiquetaPuesta || 'Ya está en tu lista') : 'Proponer'}
             </button>
           )}
           {acciones}
