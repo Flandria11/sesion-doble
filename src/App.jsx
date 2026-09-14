@@ -272,8 +272,8 @@ function Anadir({ yaPuesto, onAdd }) {
   const [error, setError] = useState('')
   const [flash, setFlash] = useState('')
   const [anadiendo, setAnadiendo] = useState(null)
+  const [ficha, setFicha] = useState(null)
 
-  // búsqueda por texto
   useEffect(() => {
     if (q.trim().length < 2) return
     let vivo = true
@@ -283,7 +283,7 @@ function Anadir({ yaPuesto, onAdd }) {
         const r = await buscar(q.trim())
         if (vivo) { setRes(r); setError('') }
       } catch (e) {
-        if (vivo) setError('No se ha podido consultar TMDB. Revisa la clave en .env.local.')
+        if (vivo) setError('No se ha podido consultar TMDB.')
       } finally {
         if (vivo) setCargando(false)
       }
@@ -291,7 +291,6 @@ function Anadir({ yaPuesto, onAdd }) {
     return () => { vivo = false; clearTimeout(t) }
   }, [q])
 
-  // catálogos de exploración
   useEffect(() => {
     if (q.trim().length >= 2) return
     let vivo = true
@@ -299,17 +298,17 @@ function Anadir({ yaPuesto, onAdd }) {
     catalogo(filtro, pagina)
       .then(r => {
         if (!vivo) return
-        setRes(anteriores => (pagina === 1 ? r : [...anteriores, ...r]))
+        setRes(ant => (pagina === 1 ? r : [...ant, ...r]))
         setError('')
       })
-      .catch(() => vivo && setError('No se ha podido consultar TMDB. Revisa la clave en .env.local.'))
+      .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
       .finally(() => vivo && setCargando(false))
     return () => { vivo = false }
   }, [filtro, pagina, q])
 
   const puesto = p => yaPuesto.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
 
-  async function pulsar(p) {
+  async function proponer(p) {
     if (puesto(p) || anadiendo) return
     setAnadiendo(p.tmdb_id)
     const ok = await onAdd(p)
@@ -321,9 +320,7 @@ function Anadir({ yaPuesto, onAdd }) {
   }
 
   function cambiarFiltro(id) {
-    setFiltro(id)
-    setPagina(1)
-    setRes([])
+    setFiltro(id); setPagina(1); setRes([])
   }
 
   const explorando = q.trim().length < 2
@@ -332,7 +329,7 @@ function Anadir({ yaPuesto, onAdd }) {
     <>
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
-      <div className="ayuda">Toca una carátula para proponerla. Le saldrá a la otra persona para votar.</div>
+      <div className="ayuda">Toca una carátula para ver el tráiler, o el + para proponerla directamente.</div>
 
       <input type="text" placeholder="Buscar una peli o serie…"
         value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
@@ -340,11 +337,8 @@ function Anadir({ yaPuesto, onAdd }) {
       {explorando && (
         <div className="filtros">
           {CATALOGOS.map(c => (
-            <button key={c.id}
-              className={filtro === c.id ? 'activo' : ''}
-              onClick={() => cambiarFiltro(c.id)}>
-              {c.nombre}
-            </button>
+            <button key={c.id} className={filtro === c.id ? 'activo' : ''}
+              onClick={() => cambiarFiltro(c.id)}>{c.nombre}</button>
           ))}
         </div>
       )}
@@ -353,18 +347,26 @@ function Anadir({ yaPuesto, onAdd }) {
 
       <div className="catalogo">
         {res.map(p => (
-          <button className={`ficha${puesto(p) ? ' puesta' : ''}`}
-            key={`${p.tipo}-${p.tmdb_id}`}
-            onClick={() => pulsar(p)}
-            disabled={puesto(p)}>
-            <img src={p.cartel} alt="" loading="lazy" />
-            <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
-            {p.voto && <span className="nota">★ {p.voto}</span>}
-            <span className="marcaje">
-              {puesto(p) ? '✓ En tu lista' : anadiendo === p.tmdb_id ? 'Añadiendo…' : '+ Proponer'}
-            </span>
-            <span className="rotulo">{p.titulo}<i>{p.anio}</i></span>
-          </button>
+          <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
+            <button className={`lamina${puesto(p) ? ' puesta' : ''}`}
+              onClick={() => setFicha(p)}
+              aria-label={`Ver información de ${p.titulo}`}>
+              <img src={p.cartel} alt="" loading="lazy" />
+              <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+              {p.voto && <span className="nota">★ {p.voto}</span>}
+              {puesto(p) && <span className="check">✓</span>}
+            </button>
+            <button className={`mas${puesto(p) ? ' ya' : ''}`}
+              onClick={() => proponer(p)}
+              disabled={puesto(p) || anadiendo === p.tmdb_id}
+              aria-label={puesto(p) ? 'Ya está en tu lista' : `Proponer ${p.titulo}`}>
+              {puesto(p) ? '✓' : anadiendo === p.tmdb_id ? '·' : '+'}
+            </button>
+            <div className="rotulo">
+              {p.titulo}
+              <i>{[p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')}</i>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -377,7 +379,67 @@ function Anadir({ yaPuesto, onAdd }) {
       {!cargando && !explorando && res.length === 0 && (
         <div className="vacio"><b>Sin resultados</b>Prueba con otro título.</div>
       )}
+
+      {ficha && (
+        <Ficha p={ficha} puesta={puesto(ficha)}
+          onCerrar={() => setFicha(null)}
+          onProponer={async () => { await proponer(ficha); setFicha(null) }} />
+      )}
     </>
+  )
+}
+
+/* ---- ficha con tráiler ---- */
+function Ficha({ p, puesta, onCerrar, onProponer }) {
+  const [trailer, setTrailer] = useState(null)
+  const [gen, setGen] = useState('')
+
+  useEffect(() => {
+    let vivo = true
+    buscarTrailer(p.tmdb_id, p.tipo).then(t => vivo && setTrailer(t || ''))
+    generos(p.tmdb_id, p.tipo).then(g => vivo && setGen(g))
+    return () => { vivo = false }
+  }, [p.tmdb_id, p.tipo])
+
+  useEffect(() => {
+    const esc = e => e.key === 'Escape' && onCerrar()
+    document.addEventListener('keydown', esc)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', esc)
+      document.body.style.overflow = ''
+    }
+  }, [onCerrar])
+
+  return (
+    <div className="telon" onClick={onCerrar}>
+      <div className="panel" onClick={e => e.stopPropagation()}>
+        <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
+        <div className="pantallita">
+          {trailer === null && <div className="cargando">Buscando tráiler…</div>}
+          {trailer === '' && (p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
+          {trailer && (
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0`}
+              title={`Tráiler de ${p.titulo}`}
+              allow="autoplay; encrypted-media" allowFullScreen />
+          )}
+        </div>
+        <div className="detalle">
+          <h3>{p.titulo}</h3>
+          <div className="meta">
+            {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, gen, p.voto && `★ ${p.voto}`]
+              .filter(Boolean).join(' · ')}
+          </div>
+          <p>{p.sinopsis || 'Sin sinopsis disponible en español.'}</p>
+          {trailer === '' && <div className="aviso">No hay tráiler disponible para este título.</div>}
+          <button className={`btn${puesta ? ' suave' : ''}`}
+            onClick={onProponer} disabled={puesta}>
+            {puesta ? 'Ya está en tu lista' : 'Proponer'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
