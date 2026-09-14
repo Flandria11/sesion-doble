@@ -286,6 +286,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   const [flash, setFlash] = useState('')
   const [anadiendo, setAnadiendo] = useState(null)
   const [ficha, setFicha] = useState(null)
+  const [fiesta, setFiesta] = useState(null)
 
   useEffect(() => {
     if (q.trim().length < 2) return
@@ -338,28 +339,26 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   }
   const puesto = p => estado(p) !== null
 
-  // si la propuso la otra persona, el botón vota que sí en vez de proponer
+  /**
+   * Para el usuario solo existe un gesto: proponer.
+   * Por dentro, si la otra persona ya la había propuesto, lo que hacemos es
+   * votar que sí. Eso genera la coincidencia, y ahí es cuando se revela.
+   */
   async function actuar(p) {
     const e = estado(p)
-    if (anadiendo) return
-    if (!e) return proponer(p)
-    if (e.tipo === 'suyo' || e.tipo === 'descartado') {
-      setAnadiendo(p.tmdb_id)
+    if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
+    setAnadiendo(p.tmdb_id)
+    if (e) {
       await onVotar(e.t.id, 'si')
       setAnadiendo(null)
-      setFlash(`Coincidís en ${p.titulo}`)
-      setTimeout(() => setFlash(''), 2600)
-    }
-  }
-
-  async function proponer(p) {
-    if (anadiendo) return
-    setAnadiendo(p.tmdb_id)
-    const ok = await onAdd(p)
-    setAnadiendo(null)
-    if (ok) {
-      setFlash(`${p.titulo} está en tu lista`)
-      setTimeout(() => setFlash(''), 2600)
+      setFiesta(p)
+    } else {
+      const ok = await onAdd(p)
+      setAnadiendo(null)
+      if (ok) {
+        setFlash(`${p.titulo} está en tu lista`)
+        setTimeout(() => setFlash(''), 2600)
+      }
     }
   }
 
@@ -392,33 +391,28 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
       <div className="catalogo">
         {res.map(p => {
           const e = estado(p)
-          const cerrado = e && (e.tipo === 'mio' || e.tipo === 'coincide')
-          const icono = !e ? '+'
-            : e.tipo === 'coincide' ? '★'
-            : e.tipo === 'mio' ? '✓'
-            : '♥'
-          const nota = !e ? [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
-            : e.tipo === 'mio' ? 'La propusiste tú'
-            : e.tipo === 'coincide' ? '¡Coincidís!'
-            : e.tipo === 'descartado' ? `La propuso ${e.de} · la descartaste`
-            : `La propuso ${e.de} · ¿te apetece?`
+          // solo se revela lo tuyo y lo ya coincidido; lo suyo va camuflado
+          const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
+          const nota = visible === 'mio' ? 'La propusiste tú'
+            : visible === 'coincide' ? '¡Coincidís!'
+            : [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
           return (
             <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
-              <button className={`lamina${cerrado ? ' puesta' : ''}`}
+              <button className={`lamina${visible ? ' puesta' : ''}`}
                 onClick={() => setFicha(p)}
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
                 <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
-                {p.voto && !e && <span className="nota">★ {p.voto}</span>}
-                {cerrado && <span className="check">{e.tipo === 'coincide' ? '★' : '✓'}</span>}
+                {p.voto && !visible && <span className="nota">★ {p.voto}</span>}
+                {visible && <span className="check">{visible === 'coincide' ? '★' : '✓'}</span>}
               </button>
-              <button className={`mas${cerrado ? ' ya' : ''}${e && !cerrado ? ' invita' : ''}`}
+              <button className={`mas${visible ? ' ya' : ''}`}
                 onClick={() => actuar(p)}
-                disabled={cerrado || anadiendo === p.tmdb_id}
-                aria-label={nota}>
-                {anadiendo === p.tmdb_id ? '·' : icono}
+                disabled={!!visible || anadiendo === p.tmdb_id}
+                aria-label={visible ? nota : `Proponer ${p.titulo}`}>
+                {anadiendo === p.tmdb_id ? '·' : visible === 'coincide' ? '★' : visible ? '✓' : '+'}
               </button>
-              <div className={`rotulo${e ? ' marcado' : ''}`}>
+              <div className={`rotulo${visible ? ' marcado' : ''}`}>
                 {p.titulo}
                 <i>{nota}</i>
               </div>
@@ -439,16 +433,39 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
 
       {ficha && (() => {
         const e = estado(ficha)
-        const cerrado = e && (e.tipo === 'mio' || e.tipo === 'coincide')
+        const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
         return (
-          <Ficha p={ficha} puesta={!!cerrado}
-            etiquetaPuesta={e && e.tipo === 'coincide' ? '¡Ya coincidís en esta!' : 'Ya la propusiste tú'}
-            etiquetaBoton={e && !cerrado ? `Me apetece (la propuso ${e.de})` : 'Proponer'}
+          <Ficha p={ficha} puesta={!!visible}
+            etiquetaPuesta={visible === 'coincide' ? '¡Ya coincidís en esta!' : 'Ya la propusiste tú'}
             onCerrar={() => setFicha(null)}
-            onProponer={async () => { await actuar(ficha); setFicha(null) }} />
+            onProponer={async () => { setFicha(null); await actuar(ficha) }} />
         )
       })()}
+
+      {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
     </>
+  )
+}
+
+/* ---- celebración de coincidencia ---- */
+function Fiesta({ p, onCerrar }) {
+  useEffect(() => {
+    const esc = e => e.key === 'Escape' && onCerrar()
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [onCerrar])
+
+  return (
+    <div className="telon fiesta" onClick={onCerrar}>
+      <div className="confeti" onClick={e => e.stopPropagation()}>
+        <div className="chispa">★</div>
+        <h2>¡Habéis coincidido!</h2>
+        <div className="lead">A los dos os apetece</div>
+        <img src={p.cartel} alt="" />
+        <div className="titulo-fiesta">{p.titulo}</div>
+        <button className="btn" onClick={onCerrar}>Seguir mirando</button>
+      </div>
+    </div>
   )
 }
 
