@@ -472,6 +472,8 @@ function Fiesta({ p, onCerrar }) {
 function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
+  const [sonido, setSonido] = useState(false)
+  const [sonido, setSonido] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -498,11 +500,17 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           {trailer === null && <div className="cargando">Buscando tráiler…</div>}
           {trailer === '' && (p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
           {trailer && (
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
+            <iframe key={sonido ? 'con' : 'sin'}
+              src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
+                   `&controls=0&playsinline=1&rel=0&modestbranding=1`}
               title={`Tráiler de ${p.titulo}`}
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen />
+              allow="autoplay; encrypted-media" />
+          )}
+          {trailer && (
+            <button className="altavoz" onClick={() => setSonido(x => !x)}
+              aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
+              {sonido ? '🔊' : '🔇'}
+            </button>
           )}
         </div>
         <div className="detalle">
@@ -648,21 +656,24 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
       <div className="velo" />
       <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
       {!detras && (
-        <div className="chip der mandos-carta">
+        <div className="chip der mandos-carta"
+          onPointerDown={e => e.stopPropagation()}
+          onPointerUp={e => e.stopPropagation()}>
           {p.trailer && (
-            <button onClick={() => { setSonido(x => !x); setVideo(true) }}
+            <button onPointerUp={e => { e.stopPropagation(); setSonido(x => !x); setVideo(true) }}
               aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
               {sonido ? '🔊' : '🔇'}
             </button>
           )}
           {p.trailer && (
-            <button onClick={() => setVideo(v => !v)}
+            <button onPointerUp={e => { e.stopPropagation(); setVideo(v => !v) }}
               aria-label={video ? 'Parar el tráiler' : 'Reproducir el tráiler'}>
               {video ? '❚❚' : '▶'}
             </button>
           )}
           {onFicha && (
-            <button onClick={onFicha} aria-label={`Ver la ficha de ${p.titulo}`}>ⓘ</button>
+            <button onPointerUp={e => { e.stopPropagation(); onFicha() }}
+              aria-label={`Ver la ficha de ${p.titulo}`}>ⓘ</button>
           )}
         </div>
       )}
