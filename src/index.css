@@ -397,3 +397,5 @@ h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: upperc
 }
 
 .rotulo.marcado i { color: var(--ambar); font-weight: 700; }
+
+.mas.invita { background: var(--si); color: var(--noche); font-size: 15px; }
