@@ -573,18 +573,7 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
   const el = useRef(null)
   const si = useRef(null)
   const no = useRef(null)
-  const [video, setVideo] = useState(false)
-  const [sonido, setSonido] = useState(false)
   const [abierto, setAbierto] = useState(false)
-
-  // El tráiler de la carta es solo ambiente: va mudo y sin controles, para
-  // que no estorbe al deslizar. Para verlo con sonido se abre la ficha.
-  useEffect(() => {
-    if (detras || !p.trailer) return
-    setSonido(false)
-    const t = setTimeout(() => setVideo(true), 900)
-    return () => clearTimeout(t)
-  }, [p.trailer, detras])
 
   useEffect(() => {
     const c = el.current
@@ -623,9 +612,8 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
         c.style.transform = ''
         if (si.current) si.current.style.opacity = 0
         if (no.current) no.current.style.opacity = 0
-        // no llegó a ser arrastre: fue un toque, así que paramos o
-        // arrancamos el tráiler, como en Instagram
-        if (!hubo) setVideo(v => !v)
+        // fue un toque, no un arrastre: abrimos la ficha con el tráiler
+        if (!hubo && onFicha) onFicha()
       }
       activo = false
     }
@@ -640,7 +628,7 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
       c.removeEventListener('pointerup', soltar)
       c.removeEventListener('pointercancel', soltar)
     }
-  }, [p.id, detras, onVotar])
+  }, [p.id, detras, onVotar, onFicha])
 
   const largo = (p.sinopsis || '').length > 150
 
@@ -648,36 +636,15 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
     <article ref={el} className={`carta${detras ? ' detras' : ''}${abierto ? ' leyendo' : ''}`}>
       <div className="lienzo">
         {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-        {video && p.trailer && (
-          <iframe key={sonido ? 'con' : 'sin'}
-            src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
-                 `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
-            title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
-        )}
-        <div className="capucha" />
       </div>
       <div className="velo" />
       <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-      {!detras && (
+      {!detras && onFicha && (
         <div className="chip der mandos-carta"
           onPointerDown={e => e.stopPropagation()}
           onPointerUp={e => e.stopPropagation()}>
-          {p.trailer && (
-            <button onPointerUp={e => { e.stopPropagation(); setSonido(x => !x); setVideo(true) }}
-              aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
-              {sonido ? '🔊' : '🔇'}
-            </button>
-          )}
-          {p.trailer && (
-            <button onPointerUp={e => { e.stopPropagation(); setVideo(v => !v) }}
-              aria-label={video ? 'Parar el tráiler' : 'Reproducir el tráiler'}>
-              {video ? '❚❚' : '▶'}
-            </button>
-          )}
-          {onFicha && (
-            <button onPointerUp={e => { e.stopPropagation(); onFicha() }}
-              aria-label={`Ver la ficha de ${p.titulo}`}>ⓘ</button>
-          )}
+          <button onPointerUp={e => { e.stopPropagation(); onFicha() }}
+            aria-label={`Ver el tráiler de ${p.titulo}`}>▶</button>
         </div>
       )}
       <div ref={si} className="marca mSi">SÍ</div>
@@ -689,7 +656,8 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
         </div>
         {p.sinopsis && <div className="sin">{p.sinopsis}</div>}
         {largo && (
-          <button className="leer" onClick={() => setAbierto(a => !a)}>
+          <button className="leer"
+            onPointerUp={e => { e.stopPropagation(); setAbierto(a => !a) }}>
             {abierto ? 'Leer menos' : 'Leer más'}
           </button>
         )}
