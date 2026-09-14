@@ -383,8 +383,14 @@ h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: upperc
 /* capa transparente sobre el vídeo: capta el toque y tapa el logo de YouTube */
 .tapa {
   position: absolute; inset: 0; z-index: 4;
-  background: linear-gradient(to bottom, rgba(8,4,16,.55) 0%, transparent 18%);
+  background: linear-gradient(to bottom, rgba(8,4,16,.5) 0%, rgba(8,4,16,.18) 14%, transparent 26%);
   border: 0; padding: 0; width: 100%; height: 100%;
+  transition: background .5s ease;
+}
+/* mientras YouTube muestra su rótulo, la franja de arriba va opaca */
+.tapa.arranque {
+  background: linear-gradient(to bottom,
+    #0B0517 0%, #0B0517 22%, rgba(11,5,23,.86) 30%, rgba(11,5,23,.3) 40%, transparent 52%);
 }
 
 .mandos {
@@ -428,3 +434,33 @@ h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: upperc
 
 /* el botón de cerrar va siempre por encima del vídeo y de sus controles */
 .panel .cerrar { z-index: 9; }
+
+/* ---------- carta de votar: sinopsis desplegable ---------- */
+.carta .marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* franja oscura que disimula el título y el logo de YouTube */
+.carta .capucha, .pantallita .capucha {
+  position: absolute; top: 0; left: 0; right: 0; height: 22%;
+  background: linear-gradient(to bottom, rgba(8,4,16,.92), rgba(8,4,16,.55) 55%, transparent);
+  pointer-events: none; z-index: 2;
+}
+.tapa {
+  background: linear-gradient(to bottom, rgba(8,4,16,.92) 0%, rgba(8,4,16,.5) 12%, transparent 26%);
+}
+
+.carta .sin {
+  -webkit-line-clamp: 3;
+  transition: none;
+}
+.carta.leyendo .sin {
+  -webkit-line-clamp: unset;
+  display: block;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+.carta.leyendo .velo { background: rgba(8,4,16,.93); }
+
+.leer {
+  margin-top: 9px; font-size: 12px; font-weight: 800;
+  color: var(--ambar); text-decoration: underline; padding: 4px 0;
+}

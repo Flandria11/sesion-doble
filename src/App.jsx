@@ -532,6 +532,8 @@ function Reproductor({ clave, titulo }) {
   const [t, setT] = useState(0)
   const [total, setTotal] = useState(0)
   const [visible, setVisible] = useState(true)
+  // durante los primeros segundos tapamos el rótulo que YouTube muestra al arrancar
+  const [arranque, setArranque] = useState(true)
 
   // la barra se esconde sola a los 3 segundos
   const reiniciarOcultado = useCallback(() => {
@@ -542,7 +544,8 @@ function Reproductor({ clave, titulo }) {
 
   useEffect(() => {
     reiniciarOcultado()
-    return () => clearTimeout(ocultador.current)
+    const t = setTimeout(() => setArranque(false), 4000)
+    return () => { clearTimeout(ocultador.current); clearTimeout(t) }
   }, [reiniciarOcultado])
 
   useEffect(() => {
@@ -610,7 +613,8 @@ function Reproductor({ clave, titulo }) {
     <>
       <div ref={hueco} className="marco" />
       {/* capa que tapa el logo y el título de YouTube, y capta el toque */}
-      <button className="tapa" onClick={() => visible ? setVisible(false) : reiniciarOcultado()}
+      <button className={`tapa${arranque ? ' arranque' : ''}`}
+        onClick={() => visible ? setVisible(false) : reiniciarOcultado()}
         aria-label="Mostrar u ocultar los controles" />
       {listo && (
         <div className={`mandos${visible ? '' : ' fuera'}`} onClick={e => e.stopPropagation()}>
