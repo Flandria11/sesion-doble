@@ -612,9 +612,10 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
     }
     const soltar = () => {
       if (x0 === null) return
-      const d = dx; x0 = null; dx = 0
+      const d = dx, hubo = activo
+      x0 = null; dx = 0
       c.classList.add('suave')
-      if (activo && Math.abs(d) > 95) {
+      if (hubo && Math.abs(d) > 95) {
         c.style.transform = `translateX(${d > 0 ? 700 : -700}px) rotate(${d / 11}deg)`
         c.style.opacity = '0'
         setTimeout(() => onVotar(p.id, d > 0 ? 'si' : 'no'), 190)
@@ -622,6 +623,9 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
         c.style.transform = ''
         if (si.current) si.current.style.opacity = 0
         if (no.current) no.current.style.opacity = 0
+        // no llegó a ser arrastre: fue un toque, así que paramos o
+        // arrancamos el tráiler, como en Instagram
+        if (!hubo) setVideo(v => !v)
       }
       activo = false
     }
