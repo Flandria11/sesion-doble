@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { buscar, tendencias, buscarTrailer, generos } from './lib/tmdb'
+import { buscar, catalogo, CATALOGOS, buscarTrailer, generos } from './lib/tmdb'
 
 /* ======================= raíz ======================= */
 export default function App() {
@@ -265,18 +265,18 @@ function Principal({ sesion, pareja }) {
 /* ======================= añadir ======================= */
 function Anadir({ yaPuesto, onAdd }) {
   const [q, setQ] = useState('')
+  const [filtro, setFiltro] = useState('tendencias')
+  const [pagina, setPagina] = useState(1)
   const [res, setRes] = useState([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
   const [flash, setFlash] = useState('')
   const [anadiendo, setAnadiendo] = useState(null)
 
+  // búsqueda por texto
   useEffect(() => {
+    if (q.trim().length < 2) return
     let vivo = true
-    if (q.trim().length < 2) {
-      tendencias().then(r => vivo && setRes(r)).catch(() => {})
-      return () => { vivo = false }
-    }
     setCargando(true)
     const t = setTimeout(async () => {
       try {
@@ -291,46 +291,92 @@ function Anadir({ yaPuesto, onAdd }) {
     return () => { vivo = false; clearTimeout(t) }
   }, [q])
 
+  // catálogos de exploración
+  useEffect(() => {
+    if (q.trim().length >= 2) return
+    let vivo = true
+    setCargando(true)
+    catalogo(filtro, pagina)
+      .then(r => {
+        if (!vivo) return
+        setRes(anteriores => (pagina === 1 ? r : [...anteriores, ...r]))
+        setError('')
+      })
+      .catch(() => vivo && setError('No se ha podido consultar TMDB. Revisa la clave en .env.local.'))
+      .finally(() => vivo && setCargando(false))
+    return () => { vivo = false }
+  }, [filtro, pagina, q])
+
   const puesto = p => yaPuesto.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
 
   async function pulsar(p) {
+    if (puesto(p) || anadiendo) return
     setAnadiendo(p.tmdb_id)
     const ok = await onAdd(p)
     setAnadiendo(null)
-    if (ok) setFlash(`${p.titulo} está en tu lista`)
+    if (ok) {
+      setFlash(`${p.titulo} está en tu lista`)
+      setTimeout(() => setFlash(''), 2600)
+    }
   }
+
+  function cambiarFiltro(id) {
+    setFiltro(id)
+    setPagina(1)
+    setRes([])
+  }
+
+  const explorando = q.trim().length < 2
 
   return (
     <>
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
-      <div className="ayuda">Películas y series. Lo que añadas le sale a la otra persona para votar.</div>
-      <input type="text" placeholder="Dune, The Last of Us, Parásitos…"
+      <div className="ayuda">Toca una carátula para proponerla. Le saldrá a la otra persona para votar.</div>
+
+      <input type="text" placeholder="Buscar una peli o serie…"
         value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
-      {error && <div className="error">{error}</div>}
-      {cargando && <div className="cargando">Buscando…</div>}
-      <div style={{ marginTop: 14 }}>
-        {!q.trim() && res.length > 0 && (
-          <div className="ayuda" style={{ marginBottom: 4 }}>Lo más visto esta semana</div>
-        )}
-        {res.map(p => (
-          <div className="res" key={`${p.tipo}-${p.tmdb_id}`}>
-            <img src={p.cartel} alt="" loading="lazy" />
-            <div className="txt">
-              <div className="n">{p.titulo}</div>
-              <div className="d">
-                {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.voto && `★ ${p.voto}`]
-                  .filter(Boolean).join(' · ')}
-              </div>
-            </div>
-            <button className={`add${puesto(p) ? ' hecho' : ''}`}
-              disabled={puesto(p) || anadiendo === p.tmdb_id}
-              onClick={() => pulsar(p)}>
-              {puesto(p) ? 'Ya está' : anadiendo === p.tmdb_id ? '…' : 'Añadir'}
+
+      {explorando && (
+        <div className="filtros">
+          {CATALOGOS.map(c => (
+            <button key={c.id}
+              className={filtro === c.id ? 'activo' : ''}
+              onClick={() => cambiarFiltro(c.id)}>
+              {c.nombre}
             </button>
-          </div>
+          ))}
+        </div>
+      )}
+
+      {error && <div className="error">{error}</div>}
+
+      <div className="catalogo">
+        {res.map(p => (
+          <button className={`ficha${puesto(p) ? ' puesta' : ''}`}
+            key={`${p.tipo}-${p.tmdb_id}`}
+            onClick={() => pulsar(p)}
+            disabled={puesto(p)}>
+            <img src={p.cartel} alt="" loading="lazy" />
+            <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+            {p.voto && <span className="nota">★ {p.voto}</span>}
+            <span className="marcaje">
+              {puesto(p) ? '✓ En tu lista' : anadiendo === p.tmdb_id ? 'Añadiendo…' : '+ Proponer'}
+            </span>
+            <span className="rotulo">{p.titulo}<i>{p.anio}</i></span>
+          </button>
         ))}
       </div>
+
+      {cargando && <div className="cargando">Cargando…</div>}
+
+      {!cargando && explorando && res.length > 0 && (
+        <button className="btn suave" onClick={() => setPagina(n => n + 1)}>Ver más</button>
+      )}
+
+      {!cargando && !explorando && res.length === 0 && (
+        <div className="vacio"><b>Sin resultados</b>Prueba con otro título.</div>
+      )}
     </>
   )
 }

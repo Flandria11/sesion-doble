@@ -204,3 +204,60 @@ nav .num {
 @media (prefers-reduced-motion: reduce) {
   .carta.suave { transition: none; }
 }
+
+/* ---------- exploración: filtros y rejilla de carátulas ---------- */
+.filtros {
+  display: flex; gap: 8px; margin: 14px -16px 4px; padding: 0 16px 4px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.filtros::-webkit-scrollbar { display: none; }
+.filtros button {
+  flex-shrink: 0; background: var(--terciopelo); color: #D6CCF2;
+  border-radius: 20px; padding: 9px 15px; font-size: 13px; font-weight: 600;
+  white-space: nowrap; border: 1px solid transparent;
+}
+.filtros button.activo { background: var(--ambar); color: var(--noche); font-weight: 800; }
+
+.catalogo {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin-top: 16px;
+}
+@media (min-width: 620px) { .catalogo { grid-template-columns: repeat(4, 1fr); } }
+
+.ficha {
+  position: relative; aspect-ratio: 2/3; border-radius: 11px; overflow: hidden;
+  background: var(--terciopelo); padding: 0; display: block; text-align: left;
+}
+.ficha img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ficha .tag {
+  position: absolute; top: 7px; left: 7px; z-index: 2;
+  background: rgba(8,4,16,.78); color: var(--papel);
+  font-size: 9.5px; font-weight: 800; letter-spacing: .04em;
+  padding: 3px 7px; border-radius: 5px;
+}
+.ficha .nota {
+  position: absolute; top: 7px; right: 7px; z-index: 2;
+  background: rgba(8,4,16,.78); color: var(--ambar);
+  font-size: 9.5px; font-weight: 800; padding: 3px 6px; border-radius: 5px;
+}
+.ficha .rotulo {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 26px 8px 8px;
+  background: linear-gradient(to top, rgba(8,4,16,.96), transparent);
+  font-size: 11.5px; font-weight: 600; line-height: 1.25; color: var(--papel);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ficha .rotulo i { display: block; font-style: normal; font-size: 10px; color: var(--apagado); margin-top: 2px; }
+.ficha .marcaje {
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,6,22,.82); color: var(--ambar);
+  font-size: 12px; font-weight: 800; opacity: 0; transition: opacity .16s ease;
+}
+.ficha:hover .marcaje, .ficha:focus-visible .marcaje { opacity: 1; }
+.ficha.puesta .marcaje { opacity: 1; background: rgba(10,6,22,.72); color: var(--si); }
+.ficha.puesta img { filter: grayscale(.5); }
+
+@media (hover: none) {
+  .ficha .marcaje { opacity: 0; }
+  .ficha.puesta .marcaje { opacity: 1; }
+}

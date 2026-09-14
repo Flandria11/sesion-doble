@@ -11,26 +11,9 @@ async function pedir(ruta, params = {}) {
   return r.json()
 }
 
-/** Busca películas y series a la vez. */
-export async function buscar(texto) {
-  const d = await pedir('/search/multi', { query: texto, include_adult: 'false' })
-  return (d.results || [])
-    .filter(x => x.media_type === 'movie' || x.media_type === 'tv')
-    .filter(x => x.poster_path)
-    .map(normalizar)
-}
-
-/** Lo que está de moda ahora mismo, para cuando no sabes qué buscar. */
-export async function tendencias() {
-  const d = await pedir('/trending/all/week')
-  return (d.results || [])
-    .filter(x => x.media_type === 'movie' || x.media_type === 'tv')
-    .filter(x => x.poster_path)
-    .map(normalizar)
-}
-
-function normalizar(x) {
-  const esPeli = x.media_type === 'movie'
+function normalizar(x, tipoForzado) {
+  const tipo = tipoForzado || x.media_type
+  const esPeli = tipo === 'movie'
   return {
     tmdb_id: x.id,
     tipo: esPeli ? 'movie' : 'tv',
@@ -43,9 +26,70 @@ function normalizar(x) {
   }
 }
 
+const limpiar = (lista, tipo) =>
+  (lista || [])
+    .filter(x => tipo || x.media_type === 'movie' || x.media_type === 'tv')
+    .filter(x => x.poster_path)
+    .map(x => normalizar(x, tipo))
+
+/** Busca peliculas y series a la vez. */
+export async function buscar(texto) {
+  const d = await pedir('/search/multi', { query: texto, include_adult: 'false' })
+  return limpiar(d.results)
+}
+
 /**
- * Busca el tráiler en YouTube. Prioriza España; si no lo hay,
- * cae al original en vez de dejarlo vacío.
+ * Catalogos de exploracion. Cada uno es un filtro de la pestana Anadir.
+ * region / watch_region = ES para que los estrenos sean los de aqui.
+ */
+export const CATALOGOS = [
+  { id: 'tendencias', nombre: 'Tendencias' },
+  { id: 'cines', nombre: 'En cines' },
+  { id: 'plataformas', nombre: 'En streaming' },
+  { id: 'peliculas', nombre: 'Pelis populares' },
+  { id: 'series', nombre: 'Series populares' },
+  { id: 'joyas', nombre: 'Mejor valoradas' }
+]
+
+export async function catalogo(id, pagina = 1) {
+  const p = { page: String(pagina) }
+  switch (id) {
+    case 'cines': {
+      const d = await pedir('/movie/now_playing', { ...p, region: 'ES' })
+      return limpiar(d.results, 'movie')
+    }
+    case 'peliculas': {
+      const d = await pedir('/movie/popular', { ...p, region: 'ES' })
+      return limpiar(d.results, 'movie')
+    }
+    case 'series': {
+      const d = await pedir('/tv/popular', p)
+      return limpiar(d.results, 'tv')
+    }
+    case 'joyas': {
+      const d = await pedir('/movie/top_rated', { ...p, region: 'ES' })
+      return limpiar(d.results, 'movie')
+    }
+    case 'plataformas': {
+      const d = await pedir('/discover/movie', {
+        ...p,
+        watch_region: 'ES',
+        with_watch_monetization_types: 'flatrate',
+        sort_by: 'popularity.desc',
+        'vote_count.gte': '80'
+      })
+      return limpiar(d.results, 'movie')
+    }
+    default: {
+      const d = await pedir('/trending/all/week', p)
+      return limpiar(d.results)
+    }
+  }
+}
+
+/**
+ * Busca el trailer en YouTube. Prioriza Espana; si no lo hay,
+ * cae al original en vez de dejarlo vacio.
  */
 export async function buscarTrailer(tmdbId, tipo) {
   const ruta = `/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/videos`
@@ -63,7 +107,7 @@ export async function buscarTrailer(tmdbId, tipo) {
   return ''
 }
 
-/** Géneros legibles, para la ficha. */
+/** Generos legibles, para la ficha. */
 export async function generos(tmdbId, tipo) {
   try {
     const d = await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`)
