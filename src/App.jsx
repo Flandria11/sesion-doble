@@ -596,11 +596,18 @@ function Carta({ p, detras, nombres, onVotar }) {
 
 /* ======================= mis pelis ======================= */
 function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
-  const etiqueta = v =>
-    v === 'si' ? <span className="sello">Le gusta</span>
-    : v === 'vista' ? <span className="sello frio">Ya vista</span>
-    : v === 'no' ? <span className="sello frio">Descartada</span>
-    : <span className="sello frio">Sin votar</span>
+  const [ficha, setFicha] = useState(null)
+
+  const texto = v =>
+    v === 'si' ? 'Le gusta'
+    : v === 'vista' ? 'Ya la ha visto'
+    : v === 'no' ? 'Descartada'
+    : 'Sin votar'
+
+  async function retirar() {
+    await onQuitar(ficha.id)
+    setFicha(null)
+  }
 
   return (
     <>
@@ -608,21 +615,39 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
       <div className="ayuda">Lo que has propuesto y qué ha dicho la otra persona.</div>
       {lista.length === 0
         ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
-        : lista.map(p => (
-          <div className="res" key={p.id}>
-            <img src={p.cartel} alt="" loading="lazy" />
-            <div className="txt">
-              <div className="n">{p.titulo}</div>
-              <div className="d">{[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio].filter(Boolean).join(' · ')}</div>
-            </div>
-            {etiqueta(suVoto(p.id))}
-            <button className="quitar" onClick={() => onQuitar(p.id)} aria-label="Quitar">×</button>
+        : (
+          <div className="catalogo">
+            {lista.map(p => {
+              const v = suVoto(p.id)
+              return (
+                <div className="tarjeta" key={p.id}>
+                  <button className={`lamina${v === 'no' ? ' puesta' : ''}`}
+                    onClick={() => setFicha(p)}
+                    aria-label={`Ver información de ${p.titulo}`}>
+                    <img src={p.cartel} alt="" loading="lazy" />
+                    <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+                    {v === 'si' && <span className="nota">Le gusta</span>}
+                  </button>
+                  <div className="rotulo">{p.titulo}<i>{texto(v)}</i></div>
+                </div>
+              )
+            })}
           </div>
-        ))}
+        )}
       <div className="pie">
         Código de pareja: <b>{codigo}</b><br />
         <button onClick={onSalir}>Cerrar sesión</button>
       </div>
+      {ficha && (
+        <Ficha p={ficha} puesta ocultarBoton
+          onCerrar={() => setFicha(null)}
+          onProponer={() => setFicha(null)}
+          acciones={
+            <div className="rectificar">
+              <button onClick={retirar}>Retirar mi propuesta</button>
+            </div>
+          } />
+      )}
     </>
   )
 }

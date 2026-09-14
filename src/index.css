@@ -320,14 +320,16 @@ nav { background: var(--sala); }
 .detalle p { font-size: 14px; line-height: 1.55; }
 
 .altavoz {
-  position: absolute; right: 10px; bottom: 10px; z-index: 4;
-  width: 40px; height: 40px; border-radius: 50%;
-  background: rgba(8,4,16,.6); backdrop-filter: blur(6px);
-  border: 1px solid rgba(247,242,233,.2);
-  font-size: 17px; line-height: 1;
+  position: absolute; right: 9px; bottom: 9px; z-index: 4;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(8,4,16,.34); backdrop-filter: blur(4px);
+  border: none; opacity: .5;
+  font-size: 14px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
+  transition: opacity .18s ease;
 }
-.altavoz.activo { background: rgba(245,196,81,.92); border-color: transparent; }
+.altavoz:hover, .altavoz:focus-visible { opacity: .95; }
+.altavoz.activo { background: rgba(245,196,81,.82); opacity: .9; }
 .cerrar { width: 38px; height: 38px; font-size: 24px; }
 
 /* botones de rectificar dentro de la ficha */
@@ -341,3 +343,6 @@ nav { background: var(--sala); }
 .rectificar button:last-child { color: var(--no); border-color: rgba(240,96,126,.4); }
 
 h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: uppercase; }
+
+.lamina .nota { font-size: 8.5px; letter-spacing: .02em; }
+.rectificar button { padding: 13px 8px; }
