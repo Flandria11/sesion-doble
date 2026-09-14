@@ -457,15 +457,29 @@ function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
 function Reproductor({ clave, titulo }) {
   const hueco = useRef(null)
   const player = useRef(null)
+  const ocultador = useRef(null)
   const [listo, setListo] = useState(false)
   const [sonando, setSonando] = useState(true)
   const [mudo, setMudo] = useState(true)
   const [t, setT] = useState(0)
   const [total, setTotal] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  // la barra se esconde sola a los 3 segundos
+  const reiniciarOcultado = useCallback(() => {
+    setVisible(true)
+    clearTimeout(ocultador.current)
+    ocultador.current = setTimeout(() => setVisible(false), 3000)
+  }, [])
+
+  useEffect(() => {
+    reiniciarOcultado()
+    return () => clearTimeout(ocultador.current)
+  }, [reiniciarOcultado])
 
   useEffect(() => {
     let vivo = true
-    let reloj = null
+    let tic = null
 
     cargarYT().then(YT => {
       if (!vivo || !hueco.current) return
@@ -480,47 +494,58 @@ function Reproductor({ clave, titulo }) {
             if (!vivo) return
             setListo(true)
             setTotal(e.target.getDuration() || 0)
-            reloj = setInterval(() => {
-              if (!player.current || !player.current.getCurrentTime) return
-              setT(player.current.getCurrentTime() || 0)
-              const d = player.current.getDuration() || 0
+            tic = setInterval(() => {
+              const pl = player.current
+              if (!pl || !pl.getCurrentTime) return
+              setT(pl.getCurrentTime() || 0)
+              const d = pl.getDuration() || 0
               if (d) setTotal(d)
             }, 400)
           },
-          onStateChange: e => {
-            if (!vivo) return
-            setSonando(e.data === 1)
-          }
+          onStateChange: e => vivo && setSonando(e.data === 1)
         }
       })
     }).catch(() => {})
 
     return () => {
       vivo = false
-      if (reloj) clearInterval(reloj)
+      if (tic) clearInterval(tic)
       if (player.current && player.current.destroy) player.current.destroy()
       player.current = null
     }
   }, [clave])
 
   const p = player.current
-  const saltar = seg => p && p.seekTo(Math.max(0, Math.min(total, (p.getCurrentTime() || 0) + seg)), true)
-  const play = () => { if (!p) return; sonando ? p.pauseVideo() : p.playVideo() }
+  const saltar = seg => {
+    if (!p) return
+    p.seekTo(Math.max(0, Math.min(total, (p.getCurrentTime() || 0) + seg)), true)
+    reiniciarOcultado()
+  }
+  const play = () => {
+    if (!p) return
+    sonando ? p.pauseVideo() : p.playVideo()
+    reiniciarOcultado()
+  }
   const volumen = () => {
     if (!p) return
     if (mudo) { p.unMute(); p.setVolume(70); setMudo(false) }
     else { p.mute(); setMudo(true) }
+    reiniciarOcultado()
   }
   const irA = e => {
     if (!p || !total) return
     p.seekTo(total * (Number(e.target.value) / 100), true)
+    reiniciarOcultado()
   }
 
   return (
     <>
       <div ref={hueco} className="marco" />
+      {/* capa que tapa el logo y el título de YouTube, y capta el toque */}
+      <button className="tapa" onClick={() => visible ? setVisible(false) : reiniciarOcultado()}
+        aria-label="Mostrar u ocultar los controles" />
       {listo && (
-        <div className="mandos" onClick={e => e.stopPropagation()}>
+        <div className={`mandos${visible ? '' : ' fuera'}`} onClick={e => e.stopPropagation()}>
           <button onClick={() => saltar(-10)} aria-label="Retroceder 10 segundos">↺</button>
           <button onClick={play} aria-label={sonando ? 'Pausar' : 'Reproducir'}>
             {sonando ? '❚❚' : '▶'}

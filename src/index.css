@@ -378,3 +378,20 @@ h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: upperc
 .mandos input[type=range]::-moz-range-thumb {
   width: 11px; height: 11px; border-radius: 50%; background: var(--ambar); border: none;
 }
+
+/* capa transparente sobre el vídeo: capta el toque y tapa el logo de YouTube */
+.tapa {
+  position: absolute; inset: 0; z-index: 4;
+  background: linear-gradient(to bottom, rgba(8,4,16,.55) 0%, transparent 18%);
+  border: 0; padding: 0; width: 100%; height: 100%;
+}
+
+.mandos {
+  transition: opacity .22s ease, transform .22s ease;
+}
+.mandos.fuera {
+  opacity: 0; transform: translateY(6px); pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mandos { transition: none; }
+}
