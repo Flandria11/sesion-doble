@@ -189,15 +189,15 @@ function Principal({ sesion, pareja }) {
   const miVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id === yo)?.voto
   const suVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id !== yo)?.voto
   const cola = suyos.filter(t => !miVoto(t.id))
-  const matches = [
-    ...mios.filter(t => suVoto(t.id) === 'si').map(t => ({ ...t, quien: `Le gusta a ${nombres[otro()] || 'tu pareja'}` })),
-    ...suyos.filter(t => miVoto(t.id) === 'si').map(t => ({ ...t, quien: `De ${nombres[t.propuesto_por] || 'tu pareja'}` }))
-  ]
+  // quién votó que sí a una propuesta mía (puede haber más de un miembro)
+  const quienDijoSi = id => votos.find(v => v.titulo_id === id && v.usuario_id !== yo && v.voto === 'si')?.usuario_id
 
-  function otro() {
-    const ids = [...new Set(titulos.map(t => t.propuesto_por))].filter(i => i !== yo)
-    return ids[0] || ''
-  }
+  const matches = [
+    ...mios.filter(t => suVoto(t.id) === 'si')
+      .map(t => ({ ...t, quien: `Le gusta a ${nombres[quienDijoSi(t.id)] || 'tu pareja'}` })),
+    ...suyos.filter(t => miVoto(t.id) === 'si')
+      .map(t => ({ ...t, quien: `De ${nombres[t.propuesto_por] || 'tu pareja'}` }))
+  ]
 
   async function votar(tituloId, voto) {
     setVotos(v => [...v.filter(x => !(x.titulo_id === tituloId && x.usuario_id === yo)),
@@ -390,7 +390,7 @@ function Anadir({ yaPuesto, onAdd }) {
 }
 
 /* ---- ficha con tráiler ---- */
-function Ficha({ p, puesta, onCerrar, onProponer }) {
+function Ficha({ p, puesta, ocultarBoton, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [sonido, setSonido] = useState(false)
@@ -446,10 +446,12 @@ function Ficha({ p, puesta, onCerrar, onProponer }) {
           </div>
           <p>{p.sinopsis || 'Sin sinopsis disponible en español.'}</p>
           {trailer === '' && <div className="aviso">No hay tráiler disponible para este título.</div>}
-          <button className={`btn${puesta ? ' suave' : ''}`}
-            onClick={onProponer} disabled={puesta}>
-            {puesta ? 'Ya está en tu lista' : 'Proponer'}
-          </button>
+          {!ocultarBoton && (
+            <button className={`btn${puesta ? ' suave' : ''}`}
+              onClick={onProponer} disabled={puesta}>
+              {puesta ? 'Ya está en tu lista' : 'Proponer'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -615,6 +617,8 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
 
 /* ======================= coincidencias ======================= */
 function Matches({ lista }) {
+  const [ficha, setFicha] = useState(null)
+
   if (!lista.length) {
     return (
       <div className="vacio">
@@ -627,17 +631,26 @@ function Matches({ lista }) {
     <>
       <h2>Coincidencias</h2>
       <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
-      <div className="rejilla">
+      <div className="catalogo">
         {lista.map(p => (
-          <a className="joya" key={p.id} target="_blank" rel="noopener noreferrer"
-            href={p.trailer
-              ? `https://www.youtube.com/watch?v=${p.trailer}`
-              : `https://www.youtube.com/results?search_query=${encodeURIComponent(p.titulo + ' trailer')}`}>
-            <img src={p.cartel} alt="" loading="lazy" />
-            <div className="pie2">{p.titulo}<span>{p.quien}</span></div>
-          </a>
+          <div className="tarjeta" key={p.id}>
+            <button className="lamina" onClick={() => setFicha(p)}
+              aria-label={`Ver información de ${p.titulo}`}>
+              <img src={p.cartel} alt="" loading="lazy" />
+              <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+            </button>
+            <div className="rotulo">
+              {p.titulo}
+              <i>{p.quien}</i>
+            </div>
+          </div>
         ))}
       </div>
+      {ficha && (
+        <Ficha p={ficha} puesta ocultarBoton
+          onCerrar={() => setFicha(null)}
+          onProponer={() => setFicha(null)} />
+      )}
     </>
   )
 }
