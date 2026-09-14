@@ -217,16 +217,19 @@ input::placeholder { color: #61539A; }
   border-radius: 20px; padding: 7px 13px; font-size: 12px; font-weight: 800;
 }
 .chip.izq { left: 15px; color: var(--ambar); }
-/* altavoz discreto: abre la ficha, donde el sonido sí se puede manejar */
+/* mandos discretos de la carta: sonido, parar y ficha */
 .chip.der {
-  right: 15px; color: var(--papel);
-  background: rgba(8, 4, 16, .38); backdrop-filter: blur(4px);
-  width: 34px; height: 34px; padding: 0; border-radius: 50%;
-  font-size: 13px; line-height: 1; opacity: .5;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity .18s ease;
+  right: 12px; background: none; backdrop-filter: none; padding: 0;
+  display: flex; gap: 6px;
 }
-.chip.der:hover, .chip.der:focus-visible { opacity: .9; }
+.mandos-carta button {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(8, 4, 16, .4); backdrop-filter: blur(4px);
+  color: var(--papel); font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  opacity: .45; transition: opacity .18s ease;
+}
+.mandos-carta button:hover, .mandos-carta button:focus-visible { opacity: .9; }
 
 .marca {
   position: absolute; top: 42%; z-index: 4; font-family: 'Anton', sans-serif;

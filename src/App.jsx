@@ -567,12 +567,14 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
   const si = useRef(null)
   const no = useRef(null)
   const [video, setVideo] = useState(false)
+  const [sonido, setSonido] = useState(false)
   const [abierto, setAbierto] = useState(false)
 
   // El tráiler de la carta es solo ambiente: va mudo y sin controles, para
   // que no estorbe al deslizar. Para verlo con sonido se abre la ficha.
   useEffect(() => {
     if (detras || !p.trailer) return
+    setSonido(false)
     const t = setTimeout(() => setVideo(true), 900)
     return () => clearTimeout(t)
   }, [p.trailer, detras])
@@ -636,17 +638,33 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
       <div className="lienzo">
         {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
         {video && p.trailer && (
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=1&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
+          <iframe key={sonido ? 'con' : 'sin'}
+            src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
+                 `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
             title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
         )}
         <div className="capucha" />
       </div>
       <div className="velo" />
       <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-      {!detras && onFicha && (
-        <button className="chip der" onClick={onFicha}
-          aria-label={`Ver la ficha de ${p.titulo} con sonido`}>🔊</button>
+      {!detras && (
+        <div className="chip der mandos-carta">
+          {p.trailer && (
+            <button onClick={() => { setSonido(x => !x); setVideo(true) }}
+              aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
+              {sonido ? '🔊' : '🔇'}
+            </button>
+          )}
+          {p.trailer && (
+            <button onClick={() => setVideo(v => !v)}
+              aria-label={video ? 'Parar el tráiler' : 'Reproducir el tráiler'}>
+              {video ? '❚❚' : '▶'}
+            </button>
+          )}
+          {onFicha && (
+            <button onClick={onFicha} aria-label={`Ver la ficha de ${p.titulo}`}>ⓘ</button>
+          )}
+        </div>
       )}
       <div ref={si} className="marca mSi">SÍ</div>
       <div ref={no} className="marca mNo">NO</div>
