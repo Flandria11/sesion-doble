@@ -645,7 +645,8 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
       <div className="velo" />
       <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
       {!detras && onFicha && (
-        <button className="chip der" onClick={onFicha}>Ficha</button>
+        <button className="chip der" onClick={onFicha}
+          aria-label={`Ver la ficha de ${p.titulo} con sonido`}>🔊</button>
       )}
       <div ref={si} className="marca mSi">SÍ</div>
       <div ref={no} className="marca mNo">NO</div>
