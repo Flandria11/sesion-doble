@@ -393,6 +393,7 @@ function Anadir({ yaPuesto, onAdd }) {
 function Ficha({ p, puesta, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
+  const [sonido, setSonido] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -411,6 +412,11 @@ function Ficha({ p, puesta, onCerrar, onProponer }) {
     }
   }, [onCerrar])
 
+  const src = trailer
+    ? `https://www.youtube-nocookie.com/embed/${trailer}` +
+      `?autoplay=1&mute=${sonido ? 0 : 1}&playsinline=1&modestbranding=1&rel=0&fs=1`
+    : ''
+
   return (
     <div className="telon" onClick={onCerrar}>
       <div className="panel" onClick={e => e.stopPropagation()}>
@@ -419,16 +425,22 @@ function Ficha({ p, puesta, onCerrar, onProponer }) {
           {trailer === null && <div className="cargando">Buscando tráiler…</div>}
           {trailer === '' && (p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
           {trailer && (
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0`}
+            <iframe key={sonido ? 'con' : 'sin'} src={src}
               title={`Tráiler de ${p.titulo}`}
-              allow="autoplay; encrypted-media" allowFullScreen />
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen />
+          )}
+          {trailer && (
+            <button className={`altavoz${sonido ? ' activo' : ''}`}
+              onClick={() => setSonido(s => !s)}>
+              {sonido ? '🔊 Sonido activado' : '🔇 Tocar para oír'}
+            </button>
           )}
         </div>
         <div className="detalle">
           <h3>{p.titulo}</h3>
           <div className="meta">
-            {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, gen, p.voto && `★ ${p.voto}`]
+            {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, gen, p.voto && `★ ${p.voto} en TMDB`]
               .filter(Boolean).join(' · ')}
           </div>
           <p>{p.sinopsis || 'Sin sinopsis disponible en español.'}</p>
