@@ -432,8 +432,9 @@ function Ficha({ p, puesta, onCerrar, onProponer }) {
           )}
           {trailer && (
             <button className={`altavoz${sonido ? ' activo' : ''}`}
-              onClick={() => setSonido(s => !s)}>
-              {sonido ? '🔊 Sonido activado' : '🔇 Tocar para oír'}
+              onClick={() => setSonido(s => !s)}
+              aria-label={sonido ? 'Silenciar tráiler' : 'Activar sonido del tráiler'}>
+              {sonido ? '🔊' : '🔇'}
             </button>
           )}
         </div>

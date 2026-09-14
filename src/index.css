@@ -305,13 +305,13 @@ nav { background: var(--sala); }
 .pantallita { aspect-ratio: 16/9; min-height: 210px; }
 
 .altavoz {
-  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
-  z-index: 4; background: rgba(8,4,16,.86); backdrop-filter: blur(8px);
-  color: var(--papel); border: 1px solid rgba(247,242,233,.28);
-  border-radius: 22px; padding: 11px 20px;
-  font-size: 13.5px; font-weight: 800; white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  position: absolute; right: 10px; bottom: 10px; z-index: 4;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(8,4,16,.6); backdrop-filter: blur(6px);
+  border: 1px solid rgba(247,242,233,.2);
+  font-size: 17px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
 }
-.altavoz.activo { background: var(--ambar); color: var(--noche); border-color: transparent; }
+.altavoz.activo { background: rgba(245,196,81,.92); border-color: transparent; }
 
 .cerrar { width: 38px; height: 38px; font-size: 24px; }
