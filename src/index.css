@@ -322,14 +322,15 @@ nav { background: var(--sala); }
 .altavoz {
   position: absolute; right: 9px; bottom: 9px; z-index: 4;
   width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(8,4,16,.34); backdrop-filter: blur(4px);
-  border: none; opacity: .5;
-  font-size: 14px; line-height: 1;
+  background: rgba(8,4,16,.28); backdrop-filter: blur(4px);
+  border: none; opacity: .4;
+  font-size: 13px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
   transition: opacity .18s ease;
 }
-.altavoz:hover, .altavoz:focus-visible { opacity: .95; }
-.altavoz.activo { background: rgba(245,196,81,.82); opacity: .9; }
+.altavoz:hover, .altavoz:focus-visible { opacity: .7; }
+.altavoz.activo { background: rgba(8,4,16,.34); opacity: .4; }
+.altavoz.activo:hover, .altavoz.activo:focus-visible { opacity: .7; }
 .cerrar { width: 38px; height: 38px; font-size: 24px; }
 
 /* botones de rectificar dentro de la ficha */
