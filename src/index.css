@@ -319,18 +319,6 @@ nav { background: var(--sala); }
 .detalle .meta { margin: 6px 0 10px; }
 .detalle p { font-size: 14px; line-height: 1.55; }
 
-.altavoz {
-  position: absolute; right: 9px; bottom: 9px; z-index: 4;
-  width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(8,4,16,.28); backdrop-filter: blur(4px);
-  border: none; opacity: .4;
-  font-size: 13px; line-height: 1;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity .18s ease;
-}
-.altavoz:hover, .altavoz:focus-visible { opacity: .7; }
-.altavoz.activo { background: rgba(8,4,16,.34); opacity: .4; }
-.altavoz.activo:hover, .altavoz.activo:focus-visible { opacity: .7; }
 .cerrar { width: 38px; height: 38px; font-size: 24px; }
 
 /* botones de rectificar dentro de la ficha */
@@ -347,3 +335,46 @@ h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: upperc
 
 .lamina .nota { font-size: 8.5px; letter-spacing: .02em; }
 .rectificar button { padding: 13px 8px; }
+
+/* ---------- reproductor con barra propia ---------- */
+.pantallita .marco, .pantallita iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+}
+
+.mandos {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; align-items: center; gap: 4px;
+  padding: 18px 10px 8px;
+  background: linear-gradient(to top, rgba(8,4,16,.88), transparent);
+}
+.mandos button {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  color: var(--papel); font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  opacity: .72; transition: opacity .15s ease;
+}
+.mandos button:hover, .mandos button:focus-visible { opacity: 1; background: rgba(247,242,233,.14); }
+
+.mandos .tiempo {
+  font-size: 10.5px; color: rgba(247,242,233,.72);
+  font-variant-numeric: tabular-nums; flex-shrink: 0; padding: 0 2px;
+}
+
+.mandos input[type=range] {
+  flex: 1; min-width: 40px; height: 22px; margin: 0 4px;
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+.mandos input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px; background: rgba(247,242,233,.3);
+}
+.mandos input[type=range]::-moz-range-track {
+  height: 3px; border-radius: 2px; background: rgba(247,242,233,.3);
+}
+.mandos input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 11px; height: 11px; border-radius: 50%; background: var(--ambar);
+  margin-top: -4px; border: none;
+}
+.mandos input[type=range]::-moz-range-thumb {
+  width: 11px; height: 11px; border-radius: 50%; background: var(--ambar); border: none;
+}

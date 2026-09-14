@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
 import { buscar, catalogo, CATALOGOS, buscarTrailer, generos } from './lib/tmdb'
+import { cargarYT, reloj } from './lib/youtube'
 
 /* ======================= raíz ======================= */
 export default function App() {
@@ -404,7 +405,6 @@ function Anadir({ yaPuesto, onAdd }) {
 function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
-  const [sonido, setSonido] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -423,11 +423,6 @@ function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
     }
   }, [onCerrar])
 
-  const src = trailer
-    ? `https://www.youtube-nocookie.com/embed/${trailer}` +
-      `?autoplay=1&mute=${sonido ? 0 : 1}&playsinline=1&modestbranding=1&rel=0&fs=1`
-    : ''
-
   return (
     <div className="telon" onClick={onCerrar}>
       <div className="panel" onClick={e => e.stopPropagation()}>
@@ -435,19 +430,7 @@ function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
         <div className="pantallita">
           {trailer === null && <div className="cargando">Buscando tráiler…</div>}
           {trailer === '' && (p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-          {trailer && (
-            <iframe key={sonido ? 'con' : 'sin'} src={src}
-              title={`Tráiler de ${p.titulo}`}
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen />
-          )}
-          {trailer && (
-            <button className={`altavoz${sonido ? ' activo' : ''}`}
-              onClick={() => setSonido(s => !s)}
-              aria-label={sonido ? 'Silenciar tráiler' : 'Activar sonido del tráiler'}>
-              {sonido ? '🔊' : '🔇'}
-            </button>
-          )}
+          {trailer && <Reproductor clave={trailer} titulo={p.titulo} />}
         </div>
         <div className="detalle">
           <h3>{p.titulo}</h3>
@@ -470,127 +453,90 @@ function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
   )
 }
 
-/* ======================= votar ======================= */
-function Votar({ cola, nombres, onVotar }) {
-  if (!cola.length) {
-    return (
-      <div className="vacio">
-        <b>Nada que votar</b>
-        Cuando la otra persona añada algo, aparecerá aquí automáticamente.
-      </div>
-    )
+/* ---- reproductor con barra propia ---- */
+function Reproductor({ clave, titulo }) {
+  const hueco = useRef(null)
+  const player = useRef(null)
+  const [listo, setListo] = useState(false)
+  const [sonando, setSonando] = useState(true)
+  const [mudo, setMudo] = useState(true)
+  const [t, setT] = useState(0)
+  const [total, setTotal] = useState(0)
+
+  useEffect(() => {
+    let vivo = true
+    let reloj = null
+
+    cargarYT().then(YT => {
+      if (!vivo || !hueco.current) return
+      player.current = new YT.Player(hueco.current, {
+        videoId: clave,
+        playerVars: {
+          autoplay: 1, mute: 1, controls: 0, rel: 0,
+          modestbranding: 1, playsinline: 1, disablekb: 1, iv_load_policy: 3
+        },
+        events: {
+          onReady: e => {
+            if (!vivo) return
+            setListo(true)
+            setTotal(e.target.getDuration() || 0)
+            reloj = setInterval(() => {
+              if (!player.current || !player.current.getCurrentTime) return
+              setT(player.current.getCurrentTime() || 0)
+              const d = player.current.getDuration() || 0
+              if (d) setTotal(d)
+            }, 400)
+          },
+          onStateChange: e => {
+            if (!vivo) return
+            setSonando(e.data === 1)
+          }
+        }
+      })
+    }).catch(() => {})
+
+    return () => {
+      vivo = false
+      if (reloj) clearInterval(reloj)
+      if (player.current && player.current.destroy) player.current.destroy()
+      player.current = null
+    }
+  }, [clave])
+
+  const p = player.current
+  const saltar = seg => p && p.seekTo(Math.max(0, Math.min(total, (p.getCurrentTime() || 0) + seg)), true)
+  const play = () => { if (!p) return; sonando ? p.pauseVideo() : p.playVideo() }
+  const volumen = () => {
+    if (!p) return
+    if (mudo) { p.unMute(); p.setVolume(70); setMudo(false) }
+    else { p.mute(); setMudo(true) }
   }
-  const p = cola[0]
+  const irA = e => {
+    if (!p || !total) return
+    p.seekTo(total * (Number(e.target.value) / 100), true)
+  }
+
   return (
     <>
-      <div className="baraja">
-        {cola[1] && <Carta key={cola[1].id} p={cola[1]} detras nombres={nombres} />}
-        <Carta key={p.id} p={p} nombres={nombres} onVotar={onVotar} />
-      </div>
-      <div className="votos">
-        <button className="vNo" onClick={() => onVotar(p.id, 'no')}>No me llama</button>
-        <button className="vVista" onClick={() => onVotar(p.id, 'vista')}>Ya vista</button>
-        <button className="vSi" onClick={() => onVotar(p.id, 'si')}>Me apetece</button>
-      </div>
-      <div className="contador">Quedan {cola.length} · desliza la tarjeta o usa los botones</div>
-    </>
-  )
-}
-
-function Carta({ p, detras, nombres, onVotar }) {
-  const el = useRef(null)
-  const si = useRef(null)
-  const no = useRef(null)
-  const [video, setVideo] = useState(false)
-  const [sonido, setSonido] = useState(false)
-
-  // el tráiler arranca solo, mudo, pasado un segundo sobre la carátula
-  useEffect(() => {
-    if (detras || !p.trailer) return
-    const t = setTimeout(() => setVideo(true), 1000)
-    return () => clearTimeout(t)
-  }, [p.trailer, detras])
-
-  useEffect(() => {
-    const c = el.current
-    if (!c || detras || !onVotar) return
-    let x0 = null, y0 = 0, dx = 0, activo = false
-
-    const abajo = e => {
-      if (e.target.closest('button')) return
-      x0 = e.clientX; y0 = e.clientY; activo = false
-      c.classList.remove('suave')
-    }
-    const mover = e => {
-      if (x0 === null) return
-      const ax = e.clientX - x0, ay = e.clientY - y0
-      if (!activo) {
-        if (Math.abs(ax) < 8 && Math.abs(ay) < 8) return
-        if (Math.abs(ay) > Math.abs(ax)) { x0 = null; return }
-        activo = true
-        try { c.setPointerCapture(e.pointerId) } catch { /* da igual */ }
-      }
-      dx = ax
-      c.style.transform = `translateX(${dx}px) rotate(${dx / 24}deg)`
-      if (si.current) si.current.style.opacity = dx > 0 ? Math.min(dx / 90, 1) : 0
-      if (no.current) no.current.style.opacity = dx < 0 ? Math.min(-dx / 90, 1) : 0
-    }
-    const soltar = () => {
-      if (x0 === null) return
-      const d = dx; x0 = null; dx = 0
-      c.classList.add('suave')
-      if (activo && Math.abs(d) > 95) {
-        c.style.transform = `translateX(${d > 0 ? 700 : -700}px) rotate(${d / 11}deg)`
-        c.style.opacity = '0'
-        setTimeout(() => onVotar(p.id, d > 0 ? 'si' : 'no'), 190)
-      } else {
-        c.style.transform = ''
-        if (si.current) si.current.style.opacity = 0
-        if (no.current) no.current.style.opacity = 0
-      }
-      activo = false
-    }
-
-    c.addEventListener('pointerdown', abajo)
-    c.addEventListener('pointermove', mover)
-    c.addEventListener('pointerup', soltar)
-    c.addEventListener('pointercancel', soltar)
-    return () => {
-      c.removeEventListener('pointerdown', abajo)
-      c.removeEventListener('pointermove', mover)
-      c.removeEventListener('pointerup', soltar)
-      c.removeEventListener('pointercancel', soltar)
-    }
-  }, [p.id, detras, onVotar])
-
-  const src = p.trailer
-    ? `https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
-      `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&modestbranding=1&rel=0`
-    : ''
-
-  return (
-    <article ref={el} className={`carta${detras ? ' detras' : ''}`}>
-      <div className="lienzo">
-        {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-        {video && src && <iframe src={src} title={p.titulo} allow="autoplay; encrypted-media" />}
-      </div>
-      <div className="velo" />
-      <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-      {video && (
-        <button className="chip der" onClick={() => setSonido(s => !s)}>
-          {sonido ? 'Silenciar' : 'Con sonido'}
-        </button>
-      )}
-      <div ref={si} className="marca mSi">SÍ</div>
-      <div ref={no} className="marca mNo">NO</div>
-      <div className="cuerpo">
-        <div className="tit">{p.titulo}</div>
-        <div className="meta">
-          {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero].filter(Boolean).join(' · ')}
+      <div ref={hueco} className="marco" />
+      {listo && (
+        <div className="mandos" onClick={e => e.stopPropagation()}>
+          <button onClick={() => saltar(-10)} aria-label="Retroceder 10 segundos">↺</button>
+          <button onClick={play} aria-label={sonando ? 'Pausar' : 'Reproducir'}>
+            {sonando ? '❚❚' : '▶'}
+          </button>
+          <button onClick={() => saltar(10)} aria-label="Avanzar 10 segundos">↻</button>
+          <input type="range" min="0" max="100" step="0.1"
+            value={total ? (t / total) * 100 : 0}
+            onChange={irA}
+            aria-label={`Posición del tráiler de ${titulo}`} />
+          <span className="tiempo">{reloj(t)}</span>
+          <button onClick={volumen} aria-label={mudo ? 'Activar sonido' : 'Silenciar'}>
+            {mudo ? '🔇' : '🔊'}
+          </button>
         </div>
-        {p.sinopsis && <div className="sin">{p.sinopsis}</div>}
-      </div>
-    </article>
+      )}
+    </>
   )
 }
 
