@@ -294,3 +294,5 @@ nav .num {
 /* deja aire para que la barra inferior no tape nada */
 .app { padding-bottom: 108px; }
 nav { background: var(--sala); }
+
+h2, h1, .detalle h3, .vacio b, .carta .tit, .joya .pie2 { text-transform: uppercase; }
