@@ -221,6 +221,17 @@ function Principal({ sesion, pareja }) {
     return !error
   }
 
+  // Rectificar desde coincidencias: si la propuse yo, cambio el voto de la
+  // otra persona no puedo, asi que retiro mi propuesta; si la propuso ella,
+  // cambio mi voto.
+  async function rectificar(p, voto) {
+    if (p.propuesto_por === yo) {
+      await quitar(p.id)
+    } else {
+      await votar(p.id, voto)
+    }
+  }
+
   async function quitar(id) {
     setTitulos(t => t.filter(x => x.id !== id))
     await supabase.from('titulos').delete().eq('id', id)
@@ -246,7 +257,7 @@ function Principal({ sesion, pareja }) {
             {vista === 'buscar' && <Anadir yaPuesto={mios} onAdd={anadir} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar} onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
-            {vista === 'match' && <Matches lista={matches} />}
+            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
           </>
         )}
       </main>
@@ -390,7 +401,7 @@ function Anadir({ yaPuesto, onAdd }) {
 }
 
 /* ---- ficha con tráiler ---- */
-function Ficha({ p, puesta, ocultarBoton, onCerrar, onProponer }) {
+function Ficha({ p, puesta, ocultarBoton, acciones, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [sonido, setSonido] = useState(false)
@@ -452,6 +463,7 @@ function Ficha({ p, puesta, ocultarBoton, onCerrar, onProponer }) {
               {puesta ? 'Ya está en tu lista' : 'Proponer'}
             </button>
           )}
+          {acciones}
         </div>
       </div>
     </div>
@@ -616,7 +628,7 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista }) {
+function Matches({ lista, onRectificar }) {
   const [ficha, setFicha] = useState(null)
 
   if (!lista.length) {
@@ -627,6 +639,12 @@ function Matches({ lista }) {
       </div>
     )
   }
+
+  async function marcar(voto) {
+    await onRectificar(ficha, voto)
+    setFicha(null)
+  }
+
   return (
     <>
       <h2>Coincidencias</h2>
@@ -639,17 +657,20 @@ function Matches({ lista }) {
               <img src={p.cartel} alt="" loading="lazy" />
               <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
             </button>
-            <div className="rotulo">
-              {p.titulo}
-              <i>{p.quien}</i>
-            </div>
+            <div className="rotulo">{p.titulo}<i>{p.quien}</i></div>
           </div>
         ))}
       </div>
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
           onCerrar={() => setFicha(null)}
-          onProponer={() => setFicha(null)} />
+          onProponer={() => setFicha(null)}
+          acciones={
+            <div className="rectificar">
+              <button onClick={() => marcar('vista')}>Ya la hemos visto</button>
+              <button onClick={() => marcar('no')}>Ya no me apetece</button>
+            </div>
+          } />
       )}
     </>
   )
