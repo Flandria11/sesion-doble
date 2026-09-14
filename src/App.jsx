@@ -523,7 +523,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
 
 /* ---- reproductor con barra propia ---- */
 function Reproductor({ clave, titulo }) {
-  const hueco = useRef(null)
+  const caja = useRef(null)          // div que controla React
   const player = useRef(null)
   const ocultador = useRef(null)
   const [listo, setListo] = useState(false)
@@ -532,10 +532,8 @@ function Reproductor({ clave, titulo }) {
   const [t, setT] = useState(0)
   const [total, setTotal] = useState(0)
   const [visible, setVisible] = useState(true)
-  // durante los primeros segundos tapamos el rótulo que YouTube muestra al arrancar
   const [arranque, setArranque] = useState(true)
 
-  // la barra se esconde sola a los 3 segundos
   const reiniciarOcultado = useCallback(() => {
     setVisible(true)
     clearTimeout(ocultador.current)
@@ -544,21 +542,26 @@ function Reproductor({ clave, titulo }) {
 
   useEffect(() => {
     reiniciarOcultado()
-    const t = setTimeout(() => setArranque(false), 4000)
-    return () => { clearTimeout(ocultador.current); clearTimeout(t) }
+    const fin = setTimeout(() => setArranque(false), 3500)
+    return () => { clearTimeout(ocultador.current); clearTimeout(fin) }
   }, [reiniciarOcultado])
 
   useEffect(() => {
     let vivo = true
     let tic = null
+    // YouTube sustituye el elemento que le damos, así que le pasamos un hijo
+    // creado a mano. React solo conoce la caja de fuera y no hay conflicto.
+    const nido = document.createElement('div')
+    if (caja.current) caja.current.appendChild(nido)
 
     cargarYT().then(YT => {
-      if (!vivo || !hueco.current) return
-      player.current = new YT.Player(hueco.current, {
+      if (!vivo) return
+      player.current = new YT.Player(nido, {
         videoId: clave,
         playerVars: {
-          autoplay: 1, mute: 1, controls: 0, rel: 0,
-          modestbranding: 1, playsinline: 1, disablekb: 1, iv_load_policy: 3
+          autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1,
+          playsinline: 1, disablekb: 1, iv_load_policy: 3,
+          enablejsapi: 1, origin: window.location.origin
         },
         events: {
           onReady: e => {
@@ -567,11 +570,11 @@ function Reproductor({ clave, titulo }) {
             setTotal(e.target.getDuration() || 0)
             tic = setInterval(() => {
               const pl = player.current
-              if (!pl || !pl.getCurrentTime) return
+              if (!pl || typeof pl.getCurrentTime !== 'function') return
               setT(pl.getCurrentTime() || 0)
               const d = pl.getDuration() || 0
               if (d) setTotal(d)
-            }, 400)
+            }, 500)
           },
           onStateChange: e => vivo && setSonando(e.data === 1)
         }
@@ -583,48 +586,59 @@ function Reproductor({ clave, titulo }) {
       if (tic) clearInterval(tic)
       if (player.current && player.current.destroy) player.current.destroy()
       player.current = null
+      if (nido.parentNode) nido.parentNode.removeChild(nido)
     }
   }, [clave])
 
-  const p = player.current
-  const saltar = seg => {
-    if (!p) return
-    p.seekTo(Math.max(0, Math.min(total, (p.getCurrentTime() || 0) + seg)), true)
+  // Los mandos leen el reproductor en el momento del clic, nunca una copia
+  // guardada al dibujar: si no, se quedan apuntando a un reproductor que
+  // todavía no existía.
+  const mando = accion => () => {
+    const pl = player.current
+    if (!pl || typeof pl.getPlayerState !== 'function') return
+    accion(pl)
     reiniciarOcultado()
   }
-  const play = () => {
-    if (!p) return
-    sonando ? p.pauseVideo() : p.playVideo()
-    reiniciarOcultado()
-  }
-  const volumen = () => {
-    if (!p) return
-    if (mudo) { p.unMute(); p.setVolume(70); setMudo(false) }
-    else { p.mute(); setMudo(true) }
-    reiniciarOcultado()
-  }
+
+  const saltar = seg => mando(pl => {
+    const d = pl.getDuration() || 0
+    pl.seekTo(Math.max(0, Math.min(d, (pl.getCurrentTime() || 0) + seg)), true)
+  })
+
+  const play = mando(pl => {
+    // preguntamos el estado real al reproductor, no al nuestro
+    if (pl.getPlayerState() === 1) pl.pauseVideo()
+    else pl.playVideo()
+  })
+
+  const volumen = mando(pl => {
+    if (pl.isMuted()) { pl.unMute(); pl.setVolume(70); setMudo(false) }
+    else { pl.mute(); setMudo(true) }
+  })
+
   const irA = e => {
-    if (!p || !total) return
-    p.seekTo(total * (Number(e.target.value) / 100), true)
-    reiniciarOcultado()
+    const v = Number(e.target.value)
+    mando(pl => {
+      const d = pl.getDuration() || total
+      if (d) pl.seekTo(d * (v / 100), true)
+    })()
   }
 
   return (
     <>
-      <div ref={hueco} className="marco" />
-      {/* capa que tapa el logo y el título de YouTube, y capta el toque */}
+      <div ref={caja} className="marco" />
       <button className={`tapa${arranque ? ' arranque' : ''}`}
         onClick={() => visible ? setVisible(false) : reiniciarOcultado()}
         aria-label="Mostrar u ocultar los controles" />
       {listo && (
         <div className={`mandos${visible ? '' : ' fuera'}`} onClick={e => e.stopPropagation()}>
-          <button onClick={() => saltar(-10)} aria-label="Retroceder 10 segundos">↺</button>
+          <button onClick={saltar(-10)} aria-label="Retroceder 10 segundos">↺</button>
           <button onClick={play} aria-label={sonando ? 'Pausar' : 'Reproducir'}>
             {sonando ? '❚❚' : '▶'}
           </button>
-          <button onClick={() => saltar(10)} aria-label="Avanzar 10 segundos">↻</button>
+          <button onClick={saltar(10)} aria-label="Avanzar 10 segundos">↻</button>
           <input type="range" min="0" max="100" step="0.1"
-            value={total ? (t / total) * 100 : 0}
+            value={total ? Math.min(100, (t / total) * 100) : 0}
             onChange={irA}
             aria-label={`Posición del tráiler de ${titulo}`} />
           <span className="tiempo">{reloj(t)}</span>
@@ -668,15 +682,53 @@ function Carta({ p, detras, nombres, onVotar }) {
   const el = useRef(null)
   const si = useRef(null)
   const no = useRef(null)
-  const [video, setVideo] = useState(false)
-  const [sonido, setSonido] = useState(false)
+  const caja = useRef(null)
+  const player = useRef(null)
+  const [mudo, setMudo] = useState(true)
+  const [listo, setListo] = useState(false)
+  const [abierto, setAbierto] = useState(false)
 
   // el tráiler arranca solo, mudo, pasado un segundo sobre la carátula
   useEffect(() => {
     if (detras || !p.trailer) return
-    const t = setTimeout(() => setVideo(true), 1000)
-    return () => clearTimeout(t)
+    let vivo = true
+    // igual que en la ficha: YouTube sustituye el elemento que le pasamos,
+    // así que le damos un hijo creado a mano y React no se entera.
+    const nido = document.createElement('div')
+    const espera = setTimeout(() => {
+      if (!vivo || !caja.current) return
+      caja.current.appendChild(nido)
+      cargarYT().then(YT => {
+        if (!vivo) return
+        player.current = new YT.Player(nido, {
+          videoId: p.trailer,
+          playerVars: {
+            autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1,
+            playsinline: 1, disablekb: 1, iv_load_policy: 3,
+            loop: 1, playlist: p.trailer,
+            enablejsapi: 1, origin: window.location.origin
+          },
+          events: { onReady: () => vivo && setListo(true) }
+        })
+      }).catch(() => {})
+    }, 900)
+
+    return () => {
+      vivo = false
+      clearTimeout(espera)
+      if (player.current && player.current.destroy) player.current.destroy()
+      player.current = null
+      if (nido.parentNode) nido.parentNode.removeChild(nido)
+    }
   }, [p.trailer, detras])
+
+  // se consulta al reproductor en el momento del clic, nunca una copia guardada
+  function volumen() {
+    const pl = player.current
+    if (!pl || typeof pl.isMuted !== 'function') return
+    if (pl.isMuted()) { pl.unMute(); pl.setVolume(70); setMudo(false) }
+    else { pl.mute(); setMudo(true) }
+  }
 
   useEffect(() => {
     const c = el.current
@@ -730,26 +782,21 @@ function Carta({ p, detras, nombres, onVotar }) {
     }
   }, [p.id, detras, onVotar])
 
-  const src = p.trailer
-    ? `https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
-      `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&modestbranding=1&rel=0`
-    : ''
+  const largo = (p.sinopsis || '').length > 150
 
   return (
-    <article ref={el} className={`carta${detras ? ' detras' : ''}`}>
+    <article ref={el} className={`carta${detras ? ' detras' : ''}${abierto ? ' leyendo' : ''}`}>
       <div className="lienzo">
         {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-        {video && src && (
-          <iframe key={sonido ? 'con' : 'sin'} src={src} title={p.titulo}
-            allow="autoplay; encrypted-media" />
-        )}
+        {!detras && p.trailer && <div ref={caja} className="marco" />}
+        <div className="capucha" />
       </div>
       <div className="velo" />
       <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-      {video && (
-        <button className="chip der" onClick={() => setSonido(s => !s)}
-          aria-label={sonido ? 'Silenciar' : 'Activar sonido'}>
-          {sonido ? '🔊' : '🔇'}
+      {!detras && p.trailer && listo && (
+        <button className="chip der" onClick={volumen}
+          aria-label={mudo ? 'Activar sonido' : 'Silenciar'}>
+          {mudo ? '🔇' : '🔊'}
         </button>
       )}
       <div ref={si} className="marca mSi">SÍ</div>
@@ -760,6 +807,11 @@ function Carta({ p, detras, nombres, onVotar }) {
           {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero].filter(Boolean).join(' · ')}
         </div>
         {p.sinopsis && <div className="sin">{p.sinopsis}</div>}
+        {largo && (
+          <button className="leer" onClick={() => setAbierto(a => !a)}>
+            {abierto ? 'Leer menos' : 'Leer más'}
+          </button>
+        )}
       </div>
     </article>
   )
