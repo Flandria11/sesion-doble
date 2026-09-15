@@ -706,6 +706,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
   const [activo, setActivo] = useState(0)
   const [trailers, setTrailers] = useState({})
   const [sonido, alternarSonido] = useSonido()
+  const [parado, setParado] = useState(false)
   const [anadiendo, setAnadiendo] = useState(null)
   const [fiesta, setFiesta] = useState(null)
   const [abierta, setAbierta] = useState(null)
@@ -819,7 +820,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
               key={clave} data-i={i}>
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-                {i === activo && tr && (
+                {i === activo && tr && !parado && (
                   <iframe key={sonido ? 'con' : 'sin'}
                     src={`https://www.youtube-nocookie.com/embed/${tr}?autoplay=1&mute=${sonido ? 0 : 1}` +
                          `&controls=0&loop=1&playlist=${tr}&playsinline=1&rel=0&modestbranding=1`}
@@ -828,10 +829,18 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
               </div>
               <div className="velo" />
 
-              <button className="altavoz" onClick={alternarSonido}
-                aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
-                {sonido ? '🔊' : '🔇'}
-              </button>
+              <div className="mandos-video">
+                {tr && (
+                  <button onClick={() => setParado(v => !v)}
+                    aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'}>
+                    {parado ? '▶' : '❚❚'}
+                  </button>
+                )}
+                <button onClick={alternarSonido}
+                  aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
+                  {sonido ? '🔊' : '🔇'}
+                </button>
+              </div>
 
               <div className="cuerpo">
                 <div className="meta">
@@ -993,6 +1002,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
 function Votar({ cola, nombres, onVotar }) {
   const [activo, setActivo] = useState(0)
   const [sonido, alternarSonido] = useSonido()
+  const [parado, setParado] = useState(false)
   const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
 
@@ -1027,7 +1037,7 @@ function Votar({ cola, nombres, onVotar }) {
             key={clave} data-i={i}>
             <div className="lienzo">
               {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-              {i === activo && p.trailer && (
+              {i === activo && p.trailer && !parado && (
                 <iframe key={sonido ? 'con' : 'sin'}
                   src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
                        `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
@@ -1037,12 +1047,18 @@ function Votar({ cola, nombres, onVotar }) {
             <div className="velo" />
 
             <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-            {p.trailer && (
-              <button className="altavoz" onClick={alternarSonido}
+            <div className="mandos-video">
+              {p.trailer && (
+                <button onClick={() => setParado(v => !v)}
+                  aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'}>
+                  {parado ? '▶' : '❚❚'}
+                </button>
+              )}
+              <button onClick={alternarSonido}
                 aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
                 {sonido ? '🔊' : '🔇'}
               </button>
-            )}
+            </div>
 
             <div className="cuerpo">
               <div className="meta">
