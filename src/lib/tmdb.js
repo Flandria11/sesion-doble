@@ -44,12 +44,18 @@ export async function buscar(texto) {
  * Catálogos de exploración
  * ------------------------------------------------------------------ */
 
+/**
+ * `filtrable` marca los modos que TMDB puede combinar con plataforma o
+ * género. Tendencias y En cines son listas cerradas que no admiten
+ * filtros, así que se ocultan cuando hay alguno puesto en vez de
+ * devolver otra cosa por detrás.
+ */
 export const MODOS = [
-  { id: 'tendencias', nombre: 'Tendencias', ambos: true },
-  { id: 'cines', nombre: 'En cines', soloPelis: true },
-  { id: 'novedades', nombre: 'Novedades', ambos: true },
-  { id: 'populares', nombre: 'Populares', ambos: true },
-  { id: 'valoradas', nombre: 'Mejor valoradas', ambos: true }
+  { id: 'tendencias', nombre: 'Tendencias', filtrable: false },
+  { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: false, sinPlataforma: true },
+  { id: 'novedades', nombre: 'Novedades', filtrable: true },
+  { id: 'populares', nombre: 'Populares', filtrable: true },
+  { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true }
 ]
 
 /**

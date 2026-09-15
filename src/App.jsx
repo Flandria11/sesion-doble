@@ -380,15 +380,33 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
     setTipo(t); setProvs([]); setGenero('')
     if (t === 'tv' && modo === 'cines') setModo('tendencias')
   })
-  const cambiarModo = cambiar(setModo)
-  const cambiarGenero = cambiar(setGenero)
-  const alternarPlat = cambiar(id =>
+
+  // Al elegir "En cines" quitamos las plataformas: son cosas distintas,
+  // una es la sala y la otra el streaming.
+  const cambiarModo = cambiar(m => {
+    setModo(m)
+    if (m === 'cines') { setProvs([]); setGenero('') }
+  })
+
+  // Y al revés: si marcas una plataforma estando en un modo que no admite
+  // filtros, pasamos a Populares en vez de enseñarte algo que no es.
+  const saltarSiHaceFalta = () => {
+    const m = MODOS.find(x => x.id === modo)
+    if (m && !m.filtrable) setModo('populares')
+  }
+  const cambiarGenero = cambiar(g => { setGenero(g); if (g) saltarSiHaceFalta() })
+  const alternarPlat = cambiar(id => {
     setProvs(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]))
-  )
+    saltarSiHaceFalta()
+  })
 
   const explorando = q.trim().length < 2
-  const modosVisibles = MODOS.filter(m => tipo === 'movie' || !m.soloPelis)
   const hayFiltros = provs.length > 0 || genero
+  const modosVisibles = MODOS.filter(m =>
+    (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
+  )
+  const modoActual = MODOS.find(m => m.id === modo)
+  const ocultarPlataformas = !!(modoActual && modoActual.sinPlataforma)
 
   return (
     <>
@@ -415,7 +433,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
             ))}
           </div>
 
-          {plats.length > 0 && (
+          {plats.length > 0 && !ocultarPlataformas && (
             <div className="plataformas">
               {plats.map(pl => (
                 <button key={pl.id}
@@ -429,6 +447,13 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
             </div>
           )}
 
+          {ocultarPlataformas && (
+            <div className="ayuda" style={{ marginTop: 12, marginBottom: 0 }}>
+              Estrenos en salas de España. Aquí no aplican las plataformas.
+            </div>
+          )}
+
+          {!ocultarPlataformas && (
           <div className="barra-filtros">
             <select value={genero} onChange={e => cambiarGenero(e.target.value)}
               aria-label="Filtrar por género">
@@ -441,6 +466,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
               }}>Quitar filtros</button>
             )}
           </div>
+          )}
 
           {provs.length > 0 && (
             <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
