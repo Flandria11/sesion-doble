@@ -600,7 +600,6 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               title={`Tráiler de ${p.titulo}`}
               allow="autoplay; encrypted-media" />
           )}
-          {trailer && <div className="capucha" />}
           {trailer && (
             <button className="altavoz" onClick={() => setSonido(x => !x)}
               aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
