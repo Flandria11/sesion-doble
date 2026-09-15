@@ -835,6 +835,7 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
 /* ======================= coincidencias ======================= */
 function Matches({ lista, onRectificar }) {
   const [ficha, setFicha] = useState(null)
+  const [juego, setJuego] = useState('lista')
 
   async function marcar(voto) {
     await onRectificar(ficha, voto)
@@ -874,8 +875,17 @@ function Matches({ lista, onRectificar }) {
     <>
       <h2>Coincidencias</h2>
       <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
-      {bloque('Películas', pelis)}
-      {bloque('Series', series)}
+
+      <div className="pestanas">
+        <button className={juego === 'lista' ? 'activo' : ''} onClick={() => setJuego('lista')}>Lista</button>
+        <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
+        <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
+      </div>
+
+      {juego === 'lista' && <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+      {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
+      {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
+
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
           onCerrar={() => setFicha(null)}
@@ -888,5 +898,129 @@ function Matches({ lista, onRectificar }) {
           } />
       )}
     </>
+  )
+}
+
+/* ---- ruleta: que decida el azar ---- */
+function Ruleta({ lista, onFicha }) {
+  const [girando, setGirando] = useState(false)
+  const [actual, setActual] = useState(null)
+  const [elegida, setElegida] = useState(null)
+
+  function girar() {
+    if (girando) return
+    setElegida(null)
+    setGirando(true)
+    let vueltas = 0
+    const total = 18 + Math.floor(Math.random() * 8)
+    const paso = () => {
+      setActual(lista[Math.floor(Math.random() * lista.length)])
+      vueltas++
+      if (vueltas < total) {
+        // va frenando poco a poco, como una ruleta de verdad
+        setTimeout(paso, 60 + Math.pow(vueltas / total, 3) * 340)
+      } else {
+        const fin = lista[Math.floor(Math.random() * lista.length)]
+        setActual(fin)
+        setElegida(fin)
+        setGirando(false)
+      }
+    }
+    paso()
+  }
+
+  const p = actual
+  return (
+    <div className="ruleta">
+      <div className={`tambor${girando ? ' girando' : ''}`}>
+        {p
+          ? <img src={p.cartel} alt="" />
+          : <div className="hueco">Dale al botón y que decida la suerte</div>}
+      </div>
+      {elegida && (
+        <div className="veredicto">
+          <span>Esta noche toca</span>
+          <button onClick={() => onFicha(elegida)}>{elegida.titulo}</button>
+        </div>
+      )}
+      <button className="btn" onClick={girar} disabled={girando}>
+        {girando ? 'Girando…' : elegida ? 'Otra vez' : 'Girar'}
+      </button>
+      <div className="contador">{lista.length} en juego</div>
+    </div>
+  )
+}
+
+/* ---- torneo: eliminatorias hasta que quede una ---- */
+function Torneo({ lista, onFicha }) {
+  const [ronda, setRonda] = useState([])
+  const [pasan, setPasan] = useState([])
+  const [i, setI] = useState(0)
+  const [campeona, setCampeona] = useState(null)
+
+  const arrancar = useCallback(() => {
+    // como mucho 8, para que no se haga eterno
+    const mezcla = [...lista].sort(() => Math.random() - 0.5).slice(0, 8)
+    setRonda(mezcla); setPasan([]); setI(0); setCampeona(null)
+  }, [lista])
+
+  useEffect(() => { arrancar() }, [arrancar])
+
+  function elegir(ganadora) {
+    const siguientes = [...pasan, ganadora]
+    const resto = i + 2
+    if (resto < ronda.length) {
+      // si sobra una suelta, pasa directa
+      if (resto === ronda.length - 1) {
+        setPasan([...siguientes, ronda[resto]])
+        cerrarRonda([...siguientes, ronda[resto]])
+      } else {
+        setPasan(siguientes); setI(resto)
+      }
+    } else {
+      cerrarRonda(siguientes)
+    }
+  }
+
+  function cerrarRonda(siguientes) {
+    if (siguientes.length === 1) { setCampeona(siguientes[0]); return }
+    setRonda(siguientes); setPasan([]); setI(0)
+  }
+
+  if (lista.length < 2) {
+    return <div className="vacio"><b>Hacen falta dos</b>Con una sola coincidencia no hay torneo.</div>
+  }
+
+  if (campeona) {
+    return (
+      <div className="ruleta">
+        <div className="tambor"><img src={campeona.cartel} alt="" /></div>
+        <div className="veredicto">
+          <span>Ganadora del torneo</span>
+          <button onClick={() => onFicha(campeona)}>{campeona.titulo}</button>
+        </div>
+        <button className="btn" onClick={arrancar}>Jugar otra vez</button>
+      </div>
+    )
+  }
+
+  const a = ronda[i], b = ronda[i + 1]
+  if (!a || !b) return <div className="cargando">Preparando el cuadro…</div>
+
+  const fase = ronda.length > 4 ? 'Cuartos' : ronda.length > 2 ? 'Semifinal' : 'Final'
+
+  return (
+    <div className="torneo">
+      <div className="fase">{fase}</div>
+      <div className="duelo">
+        {[a, b].map(p => (
+          <button className="aspirante" key={p.id} onClick={() => elegir(p)}>
+            <img src={p.cartel} alt="" />
+            <span>{p.titulo}</span>
+          </button>
+        ))}
+      </div>
+      <div className="contador">Toca la que prefieras de las dos</div>
+    </div>
   )
 }
