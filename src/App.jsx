@@ -360,6 +360,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   const [ficha, setFicha] = useState(null)
   const [fiesta, setFiesta] = useState(null)
   const [verTodo, setVerTodo] = useState(false)
+  const [panel, setPanel] = useState(false)
 
   // catálogos de filtros: cambian según sean pelis o series
   useEffect(() => {
@@ -531,22 +532,13 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
           {!ocultarPlataformas && (
             <>
               <div className="barra-filtros">
-                <select value={genero} onChange={e => cambiarGenero(e.target.value)}
-                  aria-label="Filtrar por género">
-                  <option value="">Todos los géneros</option>
-                  {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-                </select>
-                <select value={anio} onChange={e => cambiarAnio(e.target.value)}
-                  aria-label="Filtrar por año">
-                  {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
-                </select>
-              </div>
-
-              <div className="barra-filtros">
-                <button className={`interruptor${calidad ? ' activo' : ''}`}
-                  onClick={alternarCalidad} aria-pressed={calidad}>
-                  <span className="bolita" />
-                  Quitar peor valoradas
+                <button className={`plegable${panel ? ' abierto' : ''}`}
+                  onClick={() => setPanel(v => !v)} aria-expanded={panel}>
+                  Más filtros
+                  {(genero || anio || calidad || verTodo) && (
+                    <em>{[genero, anio, calidad, verTodo].filter(Boolean).length}</em>
+                  )}
+                  <span className="flecha">{panel ? '▴' : '▾'}</span>
                 </button>
                 {hayFiltros && (
                   <button className="limpiar" onClick={() => {
@@ -556,23 +548,39 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
                 )}
               </div>
 
-              {calidad && (
-                <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
-                  Solo con nota igual o superior a 6 y al menos 250 votos.
-                </div>
-              )}
-
-              <div className="barra-filtros">
-                <button className={`interruptor${verTodo ? ' activo' : ''}`}
-                  onClick={() => setVerTodo(v => !v)} aria-pressed={verTodo}>
-                  <span className="bolita" />
-                  Ver las ya vistas por mí
-                </button>
-              </div>
-
-              {!verTodo && escondidas > 0 && (
-                <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
-                  {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya propuesta{escondidas === 1 ? '' : 's'} o descartada{escondidas === 1 ? '' : 's'}.
+              {panel && (
+                <div className="panel-filtros">
+                  <div className="barra-filtros">
+                    <select value={genero} onChange={e => cambiarGenero(e.target.value)}
+                      aria-label="Filtrar por género">
+                      <option value="">Todos los géneros</option>
+                      {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                    </select>
+                    <select value={anio} onChange={e => cambiarAnio(e.target.value)}
+                      aria-label="Filtrar por año">
+                      {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
+                    </select>
+                  </div>
+                  <button className={`interruptor${calidad ? ' activo' : ''}`}
+                    onClick={alternarCalidad} aria-pressed={calidad}>
+                    <span className="bolita" />
+                    Quitar peor valoradas
+                  </button>
+                  <button className={`interruptor${verTodo ? ' activo' : ''}`}
+                    onClick={() => setVerTodo(v => !v)} aria-pressed={verTodo}>
+                    <span className="bolita" />
+                    Ver las ya decididas
+                  </button>
+                  {calidad && (
+                    <div className="ayuda" style={{ margin: '10px 0 0' }}>
+                      Solo con nota igual o superior a 6 y al menos 250 votos.
+                    </div>
+                  )}
+                  {!verTodo && escondidas > 0 && (
+                    <div className="ayuda" style={{ margin: '6px 0 0' }}>
+                      {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya propuesta{escondidas === 1 ? '' : 's'} o descartada{escondidas === 1 ? '' : 's'}.
+                    </div>
+                  )}
                 </div>
               )}
             </>

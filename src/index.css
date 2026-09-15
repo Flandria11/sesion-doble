@@ -180,6 +180,29 @@ input::placeholder { color: #61539A; }
   border: 1px solid var(--borde); background: var(--sala);
   color: var(--papel); font-size: 13.5px; font-family: inherit;
 }
+/* los filtros secundarios se pliegan: si no, antes de las carátulas hay
+   media pantalla de controles */
+.plegable {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  padding: 11px 13px; border-radius: 10px;
+  border: 1px solid var(--borde); color: var(--apagado);
+  font-size: 13px; font-weight: 700;
+}
+.plegable.abierto { color: var(--papel); border-color: var(--ambar); }
+.plegable em {
+  font-style: normal; background: var(--ambar); color: var(--noche);
+  border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 800;
+}
+.plegable .flecha { margin-left: auto; font-size: 11px; }
+
+.panel-filtros {
+  margin-top: 8px; padding: 12px; border-radius: 12px;
+  background: var(--sala); border: 1px solid var(--borde);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.panel-filtros .barra-filtros { margin-top: 0; }
+.panel-filtros .interruptor { flex: none; }
+
 .limpiar {
   flex-shrink: 0; padding: 11px 13px; border-radius: 10px;
   border: 1px solid var(--borde); color: var(--ambar);
