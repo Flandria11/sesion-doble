@@ -901,29 +901,62 @@ function Matches({ lista, onRectificar }) {
   )
 }
 
+/* ---- selector común de los juegos ---- */
+function Filtro({ valor, onCambio, pelis, series }) {
+  const opciones = [
+    ['todas', 'Todas', pelis + series],
+    ['movie', 'Películas', pelis],
+    ['tv', 'Series', series]
+  ].filter(([, , n]) => n > 0)
+
+  if (opciones.length < 2) return null
+
+  return (
+    <div className="pestanas fina">
+      {opciones.map(([id, nombre, n]) => (
+        <button key={id} className={valor === id ? 'activo' : ''} onClick={() => onCambio(id)}>
+          {nombre} <em>{n}</em>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const filtrar = (lista, f) =>
+  f === 'movie' ? lista.filter(p => p.tipo !== 'tv')
+  : f === 'tv' ? lista.filter(p => p.tipo === 'tv')
+  : lista
+
 /* ---- ruleta: que decida el azar ---- */
 function Ruleta({ lista, onFicha }) {
+  const [filtro, setFiltro] = useState('todas')
   const [girando, setGirando] = useState(false)
   const [actual, setActual] = useState(null)
   const [elegida, setElegida] = useState(null)
 
+  const pelis = lista.filter(p => p.tipo !== 'tv').length
+  const series = lista.filter(p => p.tipo === 'tv').length
+  const grupo = filtrar(lista, filtro)
+
+  function cambiarFiltro(f) {
+    setFiltro(f); setElegida(null); setActual(null)
+  }
+
   function girar() {
-    if (girando) return
+    if (girando || !grupo.length) return
     setElegida(null)
     setGirando(true)
     let vueltas = 0
     const total = 18 + Math.floor(Math.random() * 8)
     const paso = () => {
-      setActual(lista[Math.floor(Math.random() * lista.length)])
+      setActual(grupo[Math.floor(Math.random() * grupo.length)])
       vueltas++
       if (vueltas < total) {
         // va frenando poco a poco, como una ruleta de verdad
         setTimeout(paso, 60 + Math.pow(vueltas / total, 3) * 340)
       } else {
-        const fin = lista[Math.floor(Math.random() * lista.length)]
-        setActual(fin)
-        setElegida(fin)
-        setGirando(false)
+        const fin = grupo[Math.floor(Math.random() * grupo.length)]
+        setActual(fin); setElegida(fin); setGirando(false)
       }
     }
     paso()
@@ -932,6 +965,7 @@ function Ruleta({ lista, onFicha }) {
   const p = actual
   return (
     <div className="ruleta">
+      <Filtro valor={filtro} onCambio={cambiarFiltro} pelis={pelis} series={series} />
       <div className={`tambor${girando ? ' girando' : ''}`}>
         {p
           ? <img src={p.cartel} alt="" />
@@ -943,36 +977,52 @@ function Ruleta({ lista, onFicha }) {
           <button onClick={() => onFicha(elegida)}>{elegida.titulo}</button>
         </div>
       )}
-      <button className="btn" onClick={girar} disabled={girando}>
+      <button className="btn" onClick={girar} disabled={girando || !grupo.length}>
         {girando ? 'Girando…' : elegida ? 'Otra vez' : 'Girar'}
       </button>
-      <div className="contador">{lista.length} en juego</div>
+      <div className="contador">{grupo.length} en juego</div>
     </div>
   )
 }
 
 /* ---- torneo: eliminatorias hasta que quede una ---- */
 function Torneo({ lista, onFicha }) {
+  const [filtro, setFiltro] = useState('todas')
   const [ronda, setRonda] = useState([])
   const [pasan, setPasan] = useState([])
   const [i, setI] = useState(0)
   const [campeona, setCampeona] = useState(null)
 
-  const arrancar = useCallback(() => {
-    // como mucho 8, para que no se haga eterno
-    const mezcla = [...lista].sort(() => Math.random() - 0.5).slice(0, 8)
-    setRonda(mezcla); setPasan([]); setI(0); setCampeona(null)
-  }, [lista])
+  const pelis = lista.filter(p => p.tipo !== 'tv').length
+  const series = lista.filter(p => p.tipo === 'tv').length
+  const grupo = filtrar(lista, filtro)
 
-  useEffect(() => { arrancar() }, [arrancar])
+  // El cuadro solo se rehace cuando cambian de verdad los títulos, no en
+  // cada refresco en tiempo real: si no, el torneo se reiniciaba solo.
+  const clave = grupo.map(p => p.id).sort().join(',')
+
+  useEffect(() => {
+    const mezcla = [...grupo].sort(() => Math.random() - 0.5)
+    setRonda(mezcla); setPasan([]); setI(0); setCampeona(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave])
+
+  function rejugar() {
+    const mezcla = [...grupo].sort(() => Math.random() - 0.5)
+    setRonda(mezcla); setPasan([]); setI(0); setCampeona(null)
+  }
+
+  function cerrarRonda(siguientes) {
+    if (siguientes.length === 1) { setCampeona(siguientes[0]); return }
+    setRonda(siguientes); setPasan([]); setI(0)
+  }
 
   function elegir(ganadora) {
     const siguientes = [...pasan, ganadora]
     const resto = i + 2
     if (resto < ronda.length) {
-      // si sobra una suelta, pasa directa
       if (resto === ronda.length - 1) {
-        setPasan([...siguientes, ronda[resto]])
+        // sobra una suelta: pasa directa a la siguiente ronda
         cerrarRonda([...siguientes, ronda[resto]])
       } else {
         setPasan(siguientes); setI(resto)
@@ -982,35 +1032,45 @@ function Torneo({ lista, onFicha }) {
     }
   }
 
-  function cerrarRonda(siguientes) {
-    if (siguientes.length === 1) { setCampeona(siguientes[0]); return }
-    setRonda(siguientes); setPasan([]); setI(0)
-  }
+  const cabecera = (
+    <Filtro valor={filtro} onCambio={f => setFiltro(f)} pelis={pelis} series={series} />
+  )
 
-  if (lista.length < 2) {
-    return <div className="vacio"><b>Hacen falta dos</b>Con una sola coincidencia no hay torneo.</div>
+  if (grupo.length < 2) {
+    return (
+      <>
+        {cabecera}
+        <div className="vacio"><b>Hacen falta dos</b>Con una sola no hay torneo.</div>
+      </>
+    )
   }
 
   if (campeona) {
     return (
       <div className="ruleta">
+        {cabecera}
         <div className="tambor"><img src={campeona.cartel} alt="" /></div>
         <div className="veredicto">
           <span>Ganadora del torneo</span>
           <button onClick={() => onFicha(campeona)}>{campeona.titulo}</button>
         </div>
-        <button className="btn" onClick={arrancar}>Jugar otra vez</button>
+        <button className="btn" onClick={rejugar}>Jugar otra vez</button>
       </div>
     )
   }
 
   const a = ronda[i], b = ronda[i + 1]
-  if (!a || !b) return <div className="cargando">Preparando el cuadro…</div>
+  if (!a || !b) return <>{cabecera}<div className="cargando">Preparando el cuadro…</div></>
 
-  const fase = ronda.length > 4 ? 'Cuartos' : ronda.length > 2 ? 'Semifinal' : 'Final'
+  const quedan = ronda.length
+  const fase = quedan === 2 ? 'Final'
+    : quedan <= 4 ? 'Semifinal'
+    : quedan <= 8 ? 'Cuartos'
+    : `Ronda de ${quedan}`
 
   return (
     <div className="torneo">
+      {cabecera}
       <div className="fase">{fase}</div>
       <div className="duelo">
         {[a, b].map(p => (
@@ -1020,7 +1080,9 @@ function Torneo({ lista, onFicha }) {
           </button>
         ))}
       </div>
-      <div className="contador">Toca la que prefieras de las dos</div>
+      <div className="contador">
+        Duelo {Math.floor(i / 2) + 1} de {Math.floor(quedan / 2)} · toca la que prefieras
+      </div>
     </div>
   )
 }

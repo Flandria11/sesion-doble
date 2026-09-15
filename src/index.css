@@ -116,6 +116,13 @@ input::placeholder { color: #61539A; }
 }
 .pestanas button.activo { background: var(--ambar); color: var(--noche); font-weight: 800; }
 
+/* variante compacta, para los juegos */
+.pestanas.fina { margin-bottom: 18px; }
+.pestanas.fina button { padding: 7px; font-size: 12.5px; }
+.pestanas.fina em {
+  font-style: normal; opacity: .6; font-size: 11px; margin-left: 2px;
+}
+
 .plataformas {
   display: flex; gap: 8px; margin: 10px -16px 0; padding: 2px 16px 4px;
   overflow-x: auto; scrollbar-width: none;
