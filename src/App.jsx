@@ -154,7 +154,19 @@ function Emparejar({ alUnir }) {
 /* ======================= app principal ======================= */
 function Principal({ sesion, pareja }) {
   const yo = sesion.user.id
-  const [vista, setVista] = useState('buscar')
+  // la pestaña se recuerda, para no volver siempre a Añadir al recargar
+  const [vista, setVista] = useState(() => {
+    try {
+      const v = localStorage.getItem('sd:vista')
+      return ['buscar', 'votar', 'mias', 'match'].includes(v) ? v : 'buscar'
+    } catch (e) {
+      return 'buscar'
+    }
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem('sd:vista', vista) } catch (e) { /* navegación privada */ }
+  }, [vista])
   const [titulos, setTitulos] = useState([])
   const [votos, setVotos] = useState([])
   const [nombres, setNombres] = useState({})
