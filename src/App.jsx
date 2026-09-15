@@ -600,6 +600,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               title={`Tráiler de ${p.titulo}`}
               allow="autoplay; encrypted-media" />
           )}
+          {trailer && <div className="capucha" />}
           {trailer && (
             <button className="altavoz" onClick={() => setSonido(x => !x)}
               aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
@@ -741,12 +742,12 @@ function Carta({ p, detras, nombres, onVotar, onFicha }) {
       <div className="velo" />
       <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
       {!detras && onFicha && (
-        <div className="chip der mandos-carta"
+        <button className="play"
           onPointerDown={e => e.stopPropagation()}
-          onPointerUp={e => e.stopPropagation()}>
-          <button onPointerUp={e => { e.stopPropagation(); onFicha() }}
-            aria-label={`Ver el tráiler de ${p.titulo}`}>▶</button>
-        </div>
+          onPointerUp={e => { e.stopPropagation(); onFicha() }}
+          aria-label={`Ver el tráiler de ${p.titulo}`}>
+          <span />
+        </button>
       )}
       <div ref={si} className="marca mSi">SÍ</div>
       <div ref={no} className="marca mNo">NO</div>
