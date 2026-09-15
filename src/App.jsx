@@ -479,7 +479,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
                 <button className={`interruptor${calidad ? ' activo' : ''}`}
                   onClick={alternarCalidad} aria-pressed={calidad}>
                   <span className="bolita" />
-                  Quitar las malas
+                  Quitar peor valoradas
                 </button>
                 {hayFiltros && (
                   <button className="limpiar" onClick={() => {
