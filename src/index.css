@@ -277,6 +277,8 @@ input::placeholder { color: #61539A; }
   box-shadow: 0 3px 10px rgba(0, 0, 0, .5);
 }
 .mas.ya { background: rgba(8, 4, 16, .8); color: var(--si); font-size: 15px; }
+/* descartada: el botón pasa a recuperarla */
+.mas.volver { background: rgba(8, 4, 16, .8); color: var(--apagado); border: 1px solid var(--borde); font-size: 15px; }
 
 .rotulo {
   margin-top: 7px; font-size: 12px; font-weight: 600; line-height: 1.3; color: var(--papel);
@@ -448,9 +450,23 @@ input::placeholder { color: #61539A; }
 }
 .diapo .sin {
   font-size: 13.5px; line-height: 1.5; color: #DDD4F0;
+  text-align: left; padding: 0; width: 100%;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-.diapo .btn { margin-top: 14px; }
+/* la sinopsis se despliega al tocarla y se pliega al volver a tocar */
+.diapo.abierta .sin {
+  display: block; -webkit-line-clamp: unset;
+  max-height: 42vh; overflow-y: auto;
+}
+.diapo.abierta .velo { background: rgba(8, 4, 16, .94); }
+
+.diapo .acciones { display: flex; gap: 9px; align-items: stretch; margin-top: 14px; }
+.diapo .acciones .btn { margin-top: 0; flex: 1; }
+.descartar {
+  flex-shrink: 0; padding: 15px 14px; border-radius: 10px;
+  border: 1px solid var(--borde); color: var(--apagado);
+  font-size: 12.5px; font-weight: 700; line-height: 1.2;
+}
 .diapo .altavoz { top: 14px; right: 14px; bottom: auto; }
 
 /* ---------- ficha emergente ---------- */

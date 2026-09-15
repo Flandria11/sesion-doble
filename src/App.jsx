@@ -170,17 +170,20 @@ function Principal({ sesion, pareja }) {
   const [titulos, setTitulos] = useState([])
   const [votos, setVotos] = useState([])
   const [nombres, setNombres] = useState({})
+  const [descartes, setDescartes] = useState([])
   const [cargando, setCargando] = useState(true)
 
   const recargar = useCallback(async () => {
-    const [t, v, p] = await Promise.all([
+    const [t, v, p, d] = await Promise.all([
       supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado'),
       supabase.from('votos').select('*'),
-      supabase.from('perfiles').select('id, nombre')
+      supabase.from('perfiles').select('id, nombre'),
+      supabase.from('descartes').select('tmdb_id, tipo')
     ])
     setTitulos(t.data || [])
     setVotos(v.data || [])
     setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Tu pareja'])))
+    setDescartes(d.data || [])
     setCargando(false)
   }, [pareja.id])
 
@@ -244,6 +247,40 @@ function Principal({ sesion, pareja }) {
     }
   }
 
+  // Los descartes son de cada uno: lo que tú no quieres ver le sigue
+  // apareciendo a la otra persona, que para eso tenéis gustos distintos.
+  async function descartar(p) {
+    setDescartes(d => [...d, { tmdb_id: p.tmdb_id, tipo: p.tipo }])
+    await supabase.from('descartes').insert({
+      usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo
+    })
+  }
+
+  async function recuperar(p) {
+    setDescartes(d => d.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
+    await supabase.from('descartes').delete()
+      .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
+  }
+
+  const descartada = p => descartes.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+
+  // Los descartes son personales: lo que tú apartas, ella lo sigue viendo.
+  const descartado = (tmdbId, tipo) =>
+    descartes.some(d => d.tmdb_id === tmdbId && d.tipo === tipo)
+
+  async function descartar(p) {
+    setDescartes(l => [...l, { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo }])
+    await supabase.from('descartes')
+      .upsert({ usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo },
+              { onConflict: 'usuario_id,tmdb_id,tipo' })
+  }
+
+  async function recuperar(p) {
+    setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
+    await supabase.from('descartes').delete()
+      .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
+  }
+
   async function quitar(id) {
     setTitulos(t => t.filter(x => x.id !== id))
     await supabase.from('titulos').delete().eq('id', id)
@@ -268,9 +305,11 @@ function Principal({ sesion, pareja }) {
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
-                miVoto={miVoto} onAdd={anadir} onVotar={votar} />}
+                miVoto={miVoto} onAdd={anadir} onVotar={votar}
+                descartada={descartada} onRecuperar={recuperar} />}
             {vista === 'reel' && <Reel titulos={titulos} yo={yo}
-                miVoto={miVoto} onAdd={anadir} onVotar={votar} />}
+                miVoto={miVoto} onAdd={anadir} onVotar={votar}
+                descartada={descartada} onDescartar={descartar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar} onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
@@ -290,7 +329,7 @@ function Principal({ sesion, pareja }) {
 }
 
 /* ======================= añadir ======================= */
-function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
+function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, onRecuperar }) {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('movie')
   const [modo, setModo] = useState('tendencias')
@@ -309,6 +348,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   const [anadiendo, setAnadiendo] = useState(null)
   const [ficha, setFicha] = useState(null)
   const [fiesta, setFiesta] = useState(null)
+  const [verTodo, setVerTodo] = useState(false)
 
   // catálogos de filtros: cambian según sean pelis o series
   useEffect(() => {
@@ -413,6 +453,19 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
 
   const explorando = q.trim().length < 2
   const hayFiltros = provs.length > 0 || genero || anio || calidad
+
+  /**
+   * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
+   * ya coincide y lo descartado. Lo que propuso ella sigue a la vista,
+   * camuflado, porque ahí aún te toca decidir.
+   */
+  const decidido = p => {
+    const e = estado(p)
+    if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return true
+    return descartado(p.tmdb_id, p.tipo)
+  }
+  const visibles = verTodo ? res : res.filter(p => !decidido(p))
+  const escondidas = res.length - visibles.length
   const modosVisibles = MODOS.filter(m =>
     (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
   )
@@ -497,6 +550,20 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
                   Solo con nota igual o superior a 6 y al menos 250 votos.
                 </div>
               )}
+
+              <div className="barra-filtros">
+                <button className={`interruptor${verTodo ? ' activo' : ''}`}
+                  onClick={() => setVerTodo(v => !v)} aria-pressed={verTodo}>
+                  <span className="bolita" />
+                  Ver las ya vistas por mí
+                </button>
+              </div>
+
+              {!verTodo && escondidas > 0 && (
+                <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
+                  {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya propuesta{escondidas === 1 ? '' : 's'} o descartada{escondidas === 1 ? '' : 's'}.
+                </div>
+              )}
             </>
           )}
 
@@ -514,12 +581,14 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
         {res.map(p => {
           const e = estado(p)
           const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
+          const fuera = !visible && descartada && descartada(p)
           const nota = visible === 'mio' ? 'La propusiste tú'
             : visible === 'coincide' ? '¡Coincidís!'
+            : fuera ? 'No te interesa'
             : [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
           return (
             <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
-              <button className={`lamina${visible ? ' puesta' : ''}`}
+              <button className={`lamina${visible || fuera ? ' puesta' : ''}`}
                 onClick={() => setFicha(p)}
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
@@ -527,13 +596,17 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
                 {p.voto && !visible && <span className="nota">★ {p.voto}</span>}
                 {visible && <span className="check">{visible === 'coincide' ? '★' : '✓'}</span>}
               </button>
-              <button className={`mas${visible ? ' ya' : ''}`}
-                onClick={() => actuar(p)}
+              <button className={`mas${visible ? ' ya' : ''}${fuera ? ' volver' : ''}`}
+                onClick={() => (fuera ? onRecuperar(p) : actuar(p))}
                 disabled={!!visible || anadiendo === p.tmdb_id}
-                aria-label={visible ? nota : `Proponer ${p.titulo}`}>
-                {anadiendo === p.tmdb_id ? '·' : visible === 'coincide' ? '★' : visible ? '✓' : '+'}
+                aria-label={fuera ? `Recuperar ${p.titulo}` : visible ? nota : `Proponer ${p.titulo}`}>
+                {anadiendo === p.tmdb_id ? '·'
+                  : visible === 'coincide' ? '★'
+                  : visible ? '✓'
+                  : fuera ? '↺'
+                  : '+'}
               </button>
-              <div className={`rotulo${visible ? ' marcado' : ''}`}>
+              <div className={`rotulo${visible || fuera ? ' marcado' : ''}`}>
                 {p.titulo}
                 <i>{nota}</i>
               </div>
@@ -548,10 +621,11 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
         <button className="btn suave" onClick={() => setPagina(n => n + 1)}>Ver más</button>
       )}
 
-      {!cargando && res.length === 0 && (
+      {!cargando && visibles.length === 0 && (
         <div className="vacio">
           <b>Sin resultados</b>
-          {explorando ? 'Prueba a quitar algún filtro.' : 'Prueba con otro título.'}
+          {res.length > 0 ? 'Ya has decidido sobre todas. Activa el interruptor para verlas.'
+            : explorando ? 'Prueba a quitar algún filtro.' : 'Prueba con otro título.'}
         </div>
       )}
 
@@ -572,7 +646,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
 }
 
 /* ======================= estrenos en vertical ======================= */
-function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
+function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) {
   const [lista, setLista] = useState([])
   const [pagina, setPagina] = useState(1)
   const [cargando, setCargando] = useState(true)
@@ -582,6 +656,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
   const [sonido, setSonido] = useState(false)
   const [anadiendo, setAnadiendo] = useState(null)
   const [fiesta, setFiesta] = useState(null)
+  const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
 
   useEffect(() => {
@@ -590,12 +665,14 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
     estrenos(pagina)
       .then(r => {
         if (!vivo) return
-        setLista(ant => (pagina === 1 ? r : [...ant, ...r]))
+        const limpia = r.filter(x => !descartada(x))
+        setLista(ant => (pagina === 1 ? limpia : [...ant, ...limpia]))
         setError('')
       })
       .catch(() => vivo && setError('No se han podido cargar los estrenos.'))
       .finally(() => vivo && setCargando(false))
     return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagina])
 
   // Solo sabemos cuál se está viendo mirando qué tarjeta ocupa la pantalla.
@@ -617,14 +694,14 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
 
   // el tráiler se pide solo cuando llegas a esa tarjeta
   useEffect(() => {
-    const p = lista[activo]
+    const p = lista.filter(x => !descartado(x.tmdb_id, x.tipo))[activo]
     if (!p || trailers[`${p.tipo}-${p.tmdb_id}`] !== undefined) return
     let vivo = true
     buscarTrailer(p.tmdb_id, p.tipo).then(t => {
       if (vivo) setTrailers(x => ({ ...x, [`${p.tipo}-${p.tmdb_id}`]: t || '' }))
     })
     return () => { vivo = false }
-  }, [activo, lista, trailers])
+  }, [activo, lista, trailers, descartado])
 
   // al acercarse al final, se pide la siguiente tanda
   useEffect(() => {
@@ -654,20 +731,35 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
     }
   }
 
-  if (cargando && !lista.length) return <div className="cargando">Buscando estrenos…</div>
+  function noInteresa(p) {
+    onDescartar(p)
+    setLista(l => l.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
+  }
+
+  // lo descartado no vuelve a aparecer
+  const visibles = lista.filter(p => !descartado(p.tmdb_id, p.tipo))
+
+  if (cargando && !visibles.length) return <div className="cargando">Buscando estrenos…</div>
   if (error) return <div className="error">{error}</div>
-  if (!lista.length) return <div className="vacio"><b>Nada por ahora</b>No hay estrenos que cumplan el filtro.</div>
+  if (!visibles.length) {
+    return (
+      <div className="vacio">
+        <b>No queda nada</b>
+        Has mirado todos los estrenos disponibles. Vuelve en unos días.
+      </div>
+    )
+  }
 
   return (
     <>
       <div className="pista" ref={pista}>
-        {lista.map((p, i) => {
+        {visibles.map((p, i) => {
           const clave = `${p.tipo}-${p.tmdb_id}`
           const tr = trailers[clave]
           const e = estado(p)
           const puesto = e && (e.tipo === 'mio' || e.tipo === 'coincide')
           return (
-            <section className="diapo" key={clave} data-i={i}>
+            <section className={`diapo${abierta === clave ? ' abierta' : ''}`} key={clave} data-i={i}>
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
                 {i === activo && tr && (
@@ -690,15 +782,26 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
                     .filter(Boolean).join(' · ')}
                 </div>
                 <div className="tit">{p.titulo}</div>
-                {p.sinopsis && <p className="sin">{p.sinopsis}</p>}
-                <button className={`btn${puesto ? ' suave' : ''}`}
-                  onClick={() => proponer(p)}
-                  disabled={!!puesto || anadiendo === p.tmdb_id}>
-                  {e && e.tipo === 'coincide' ? '¡Ya coincidís!'
-                    : e && e.tipo === 'mio' ? 'Ya la propusiste'
-                    : anadiendo === p.tmdb_id ? 'Un momento…'
-                    : 'Proponer'}
-                </button>
+                {p.sinopsis && (
+                  <button className="sin"
+                    onClick={() => setAbierta(a => (a === clave ? null : clave))}
+                    aria-expanded={abierta === clave}>
+                    {p.sinopsis}
+                  </button>
+                )}
+                <div className="acciones">
+                  <button className="descartar" onClick={() => noInteresa(p)}>
+                    No me interesa
+                  </button>
+                  <button className={`btn${puesto ? ' suave' : ''}`}
+                    onClick={() => proponer(p)}
+                    disabled={!!puesto || anadiendo === p.tmdb_id}>
+                    {e && e.tipo === 'coincide' ? '¡Ya coincidís!'
+                      : e && e.tipo === 'mio' ? 'Ya la propusiste'
+                      : anadiendo === p.tmdb_id ? 'Un momento…'
+                      : 'Proponer'}
+                  </button>
+                </div>
               </div>
             </section>
           )
