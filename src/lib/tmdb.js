@@ -205,6 +205,75 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
 }
 
 /**
+ * Novedades del último año que ya se pueden ver en alguna plataforma de
+ * España. Es lo que alimenta la bobina de tráilers.
+ */
+export async function recientes(pagina = 1, tipo = 'movie') {
+  const esPeli = tipo !== 'tv'
+  const campo = esPeli ? 'primary_release_date' : 'first_air_date'
+  const hace = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)
+  const hoy = new Date().toISOString().slice(0, 10)
+
+  const d = await pedir(`/discover/${esPeli ? 'movie' : 'tv'}`, {
+    page: String(pagina),
+    watch_region: REGION,
+    with_watch_monetization_types: 'flatrate',
+    include_adult: 'false',
+    sort_by: 'popularity.desc',
+    'vote_count.gte': '30',
+    [`${campo}.gte`]: hace,
+    [`${campo}.lte`]: hoy
+  })
+  return limpiar(d.results, esPeli ? 'movie' : 'tv').filter(x => x.fondo)
+}
+
+/**
+ * Estrenos recientes que ya se pueden ver en plataformas en España.
+ * Mezcla películas y series alternándolas.
+ *
+ * El listón de calidad es más bajo que en el resto de la app a propósito:
+ * un estreno de hace dos meses no ha tenido tiempo de acumular votos, y
+ * con el mínimo de 250 que usamos en Añadir esto saldría vacío.
+ */
+export async function estrenos(pagina = 1) {
+  const hoy = new Date()
+  const desde = new Date(hoy.getTime() - 400 * 864e5).toISOString().slice(0, 10)
+  const hasta = hoy.toISOString().slice(0, 10)
+
+  const comun = {
+    page: String(pagina),
+    watch_region: REGION,
+    with_watch_monetization_types: 'flatrate',
+    include_adult: 'false',
+    'vote_count.gte': '100',
+    'vote_average.gte': '6.2'
+  }
+
+  const [pelis, series] = await Promise.all([
+    pedir('/discover/movie', {
+      ...comun,
+      sort_by: 'primary_release_date.desc',
+      'primary_release_date.gte': desde,
+      'primary_release_date.lte': hasta
+    }).then(d => limpiar(d.results, 'movie')).catch(() => []),
+    pedir('/discover/tv', {
+      ...comun,
+      sort_by: 'first_air_date.desc',
+      'first_air_date.gte': desde,
+      'first_air_date.lte': hasta
+    }).then(d => limpiar(d.results, 'tv')).catch(() => [])
+  ])
+
+  // alternamos una y una para que no salgan todas las pelis seguidas
+  const mezcla = []
+  for (let i = 0; i < Math.max(pelis.length, series.length); i++) {
+    if (pelis[i]) mezcla.push(pelis[i])
+    if (series[i]) mezcla.push(series[i])
+  }
+  return mezcla
+}
+
+/**
  * Busca el tráiler en YouTube. Prioriza España; si no lo hay,
  * cae al original en vez de dejarlo vacío.
  */

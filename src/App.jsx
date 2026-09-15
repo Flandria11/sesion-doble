@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { buscar, explorar, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
+import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
 
 /* ======================= raíz ======================= */
 export default function App() {
@@ -158,7 +158,7 @@ function Principal({ sesion, pareja }) {
   const [vista, setVista] = useState(() => {
     try {
       const v = localStorage.getItem('sd:vista')
-      return ['buscar', 'votar', 'mias', 'match'].includes(v) ? v : 'buscar'
+      return ['buscar', 'reel', 'votar', 'mias', 'match'].includes(v) ? v : 'buscar'
     } catch (e) {
       return 'buscar'
     }
@@ -251,6 +251,7 @@ function Principal({ sesion, pareja }) {
 
   const pestanas = [
     ['buscar', 'Añadir', 0],
+    ['reel', 'Estrenos', 0],
     ['votar', 'Votar', cola.length],
     ['mias', 'Mis pelis', 0],
     ['match', 'Coinciden', matches.length]
@@ -267,6 +268,8 @@ function Principal({ sesion, pareja }) {
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
+                miVoto={miVoto} onAdd={anadir} onVotar={votar} />}
+            {vista === 'reel' && <Reel titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar} onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
@@ -563,6 +566,144 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
         )
       })()}
 
+      {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
+    </>
+  )
+}
+
+/* ======================= estrenos en vertical ======================= */
+function Reel({ titulos, yo, miVoto, onAdd, onVotar }) {
+  const [lista, setLista] = useState([])
+  const [pagina, setPagina] = useState(1)
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+  const [activo, setActivo] = useState(0)
+  const [trailers, setTrailers] = useState({})
+  const [sonido, setSonido] = useState(false)
+  const [anadiendo, setAnadiendo] = useState(null)
+  const [fiesta, setFiesta] = useState(null)
+  const pista = useRef(null)
+
+  useEffect(() => {
+    let vivo = true
+    setCargando(true)
+    estrenos(pagina)
+      .then(r => {
+        if (!vivo) return
+        setLista(ant => (pagina === 1 ? r : [...ant, ...r]))
+        setError('')
+      })
+      .catch(() => vivo && setError('No se han podido cargar los estrenos.'))
+      .finally(() => vivo && setCargando(false))
+    return () => { vivo = false }
+  }, [pagina])
+
+  // Solo sabemos cuál se está viendo mirando qué tarjeta ocupa la pantalla.
+  // Así cargamos el tráiler de esa y de ninguna más.
+  useEffect(() => {
+    const caja = pista.current
+    if (!caja) return
+    const ojo = new IntersectionObserver(
+      entradas => {
+        entradas.forEach(e => {
+          if (e.isIntersecting) setActivo(Number(e.target.dataset.i))
+        })
+      },
+      { root: caja, threshold: 0.6 }
+    )
+    caja.querySelectorAll('.diapo').forEach(d => ojo.observe(d))
+    return () => ojo.disconnect()
+  }, [lista])
+
+  // el tráiler se pide solo cuando llegas a esa tarjeta
+  useEffect(() => {
+    const p = lista[activo]
+    if (!p || trailers[`${p.tipo}-${p.tmdb_id}`] !== undefined) return
+    let vivo = true
+    buscarTrailer(p.tmdb_id, p.tipo).then(t => {
+      if (vivo) setTrailers(x => ({ ...x, [`${p.tipo}-${p.tmdb_id}`]: t || '' }))
+    })
+    return () => { vivo = false }
+  }, [activo, lista, trailers])
+
+  // al acercarse al final, se pide la siguiente tanda
+  useEffect(() => {
+    if (!cargando && lista.length && activo >= lista.length - 3) {
+      setPagina(n => (n < 5 ? n + 1 : n))
+    }
+  }, [activo, lista.length, cargando])
+
+  const estado = p => {
+    const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
+    if (!x) return null
+    if (x.propuesto_por === yo) return { tipo: 'mio', t: x }
+    return { tipo: miVoto(x.id) === 'si' ? 'coincide' : 'suyo', t: x }
+  }
+
+  async function proponer(p) {
+    const e = estado(p)
+    if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
+    setAnadiendo(p.tmdb_id)
+    if (e) {
+      await onVotar(e.t.id, 'si')
+      setAnadiendo(null)
+      setFiesta(p)
+    } else {
+      await onAdd(p)
+      setAnadiendo(null)
+    }
+  }
+
+  if (cargando && !lista.length) return <div className="cargando">Buscando estrenos…</div>
+  if (error) return <div className="error">{error}</div>
+  if (!lista.length) return <div className="vacio"><b>Nada por ahora</b>No hay estrenos que cumplan el filtro.</div>
+
+  return (
+    <>
+      <div className="pista" ref={pista}>
+        {lista.map((p, i) => {
+          const clave = `${p.tipo}-${p.tmdb_id}`
+          const tr = trailers[clave]
+          const e = estado(p)
+          const puesto = e && (e.tipo === 'mio' || e.tipo === 'coincide')
+          return (
+            <section className="diapo" key={clave} data-i={i}>
+              <div className="lienzo">
+                {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
+                {i === activo && tr && (
+                  <iframe key={sonido ? 'con' : 'sin'}
+                    src={`https://www.youtube-nocookie.com/embed/${tr}?autoplay=1&mute=${sonido ? 0 : 1}` +
+                         `&controls=0&loop=1&playlist=${tr}&playsinline=1&rel=0&modestbranding=1`}
+                    title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+                )}
+              </div>
+              <div className="velo" />
+
+              <button className="altavoz" onClick={() => setSonido(x => !x)}
+                aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
+                {sonido ? '🔊' : '🔇'}
+              </button>
+
+              <div className="cuerpo">
+                <div className="meta">
+                  {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.voto && `★ ${p.voto}`]
+                    .filter(Boolean).join(' · ')}
+                </div>
+                <div className="tit">{p.titulo}</div>
+                {p.sinopsis && <p className="sin">{p.sinopsis}</p>}
+                <button className={`btn${puesto ? ' suave' : ''}`}
+                  onClick={() => proponer(p)}
+                  disabled={!!puesto || anadiendo === p.tmdb_id}>
+                  {e && e.tipo === 'coincide' ? '¡Ya coincidís!'
+                    : e && e.tipo === 'mio' ? 'Ya la propusiste'
+                    : anadiendo === p.tmdb_id ? 'Un momento…'
+                    : 'Proponer'}
+                </button>
+              </div>
+            </section>
+          )
+        })}
+      </div>
       {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
     </>
   )

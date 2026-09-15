@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Anton&family=Karla:wght@400;500;600;800&display=swap');
 
 /* ==========================================================================
-   Sesión Doble — hoja de estilos
+   Dos Butacas — hoja de estilos
    base · estructura · formularios · acceso · añadir · votar · ficha
    · reproductor · celebración · navegación · avisos
    ========================================================================== */
@@ -399,6 +399,59 @@ input::placeholder { color: #61539A; }
 .vNo { border-color: rgba(240, 96, 126, .45); color: var(--no); }
 .vVista { border-color: var(--borde); color: var(--apagado); }
 .contador { text-align: center; font-size: 11.5px; color: var(--paso); margin-top: 13px; }
+
+/* ---------- estrenos en vertical ---------- */
+/* Una tarjeta por pantalla, con anclaje al desplazar: el dedo suelta y
+   la siguiente se coloca sola, como en las apps de vídeo. */
+.pista {
+  height: calc(100dvh - 190px);
+  min-height: 420px;
+  margin: 4px -16px 0;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-radius: 0;
+}
+.pista::-webkit-scrollbar { display: none; }
+
+.diapo {
+  position: relative;
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow: hidden;
+  background: var(--sala);
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.diapo + .diapo { border-top: 1px solid rgba(8, 4, 16, .6); }
+
+.diapo .lienzo { position: absolute; inset: 0; }
+.diapo .lienzo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.diapo iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; pointer-events: none;
+}
+.diapo .velo {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top,
+    rgba(8, 4, 16, .96) 14%, rgba(8, 4, 16, .55) 42%, rgba(8, 4, 16, .06) 72%);
+}
+.diapo .cuerpo { position: relative; padding: 20px 18px 24px; }
+.diapo .meta {
+  font-size: 11.5px; color: var(--ambar); font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; margin-bottom: 7px;
+}
+.diapo .tit {
+  font-family: 'Anton', sans-serif; font-size: 30px; line-height: 1.05;
+  text-transform: uppercase; margin-bottom: 9px;
+}
+.diapo .sin {
+  font-size: 13.5px; line-height: 1.5; color: #DDD4F0;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.diapo .btn { margin-top: 14px; }
+.diapo .altavoz { top: 14px; right: 14px; bottom: auto; }
 
 /* ---------- ficha emergente ---------- */
 /* El fondo no se desplaza: quien se desplaza es el texto de dentro. Si el
