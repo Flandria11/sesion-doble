@@ -101,10 +101,38 @@ export async function generosLista(tipo = 'movie') {
  * seleccionados usamos /discover, que es el que admite filtros; si no,
  * las listas rápidas de TMDB, que traen mejores resultados.
  */
-export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', pagina = 1 } = {}) {
+/**
+ * Opciones del filtro de año. Los últimos sueltos, y hacia atrás por
+ * décadas: nadie quiere buscar "1997" exacto.
+ */
+export const ANOS = [
+  { id: '', nombre: 'Cualquier año' },
+  { id: '2026', nombre: '2026' },
+  { id: '2025', nombre: '2025' },
+  { id: '2024', nombre: '2024' },
+  { id: '2023', nombre: '2023' },
+  { id: '2022', nombre: '2022' },
+  { id: 'd2020', nombre: 'Años 2020', desde: '2020-01-01', hasta: '2029-12-31' },
+  { id: 'd2010', nombre: 'Años 2010', desde: '2010-01-01', hasta: '2019-12-31' },
+  { id: 'd2000', nombre: 'Años 2000', desde: '2000-01-01', hasta: '2009-12-31' },
+  { id: 'd1990', nombre: 'Años 90', desde: '1990-01-01', hasta: '1999-12-31' },
+  { id: 'd1980', nombre: 'Años 80', desde: '1980-01-01', hasta: '1989-12-31' },
+  { id: 'ant', nombre: 'Antes de 1980', hasta: '1979-12-31' }
+]
+
+/**
+ * Mínimos de votos. Un 9 con cuatro votos no significa nada, así que
+ * cualquier filtro por nota necesita también un mínimo de participación.
+ * No lo subo más porque el cine español recibe muchos menos votos que el
+ * americano, y un listón alto se lo lleva por delante.
+ */
+const VOTOS = { valoradas: 1000, calidad: 250, normal: 40 }
+const NOTA_MINIMA = 6
+
+export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
   const base = { page: String(pagina) }
-  const filtrando = proveedores.length > 0 || genero
+  const filtrando = proveedores.length > 0 || genero || anio || calidad
 
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
@@ -130,7 +158,24 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     ...base,
     watch_region: REGION,
     include_adult: 'false',
-    'vote_count.gte': modo === 'valoradas' ? '300' : '40'
+    'vote_count.gte': String(
+      modo === 'valoradas' ? VOTOS.valoradas : calidad ? VOTOS.calidad : VOTOS.normal
+    )
+  }
+  if (calidad) p['vote_average.gte'] = String(NOTA_MINIMA)
+
+  // filtro de año: los sueltos por año exacto, las décadas por rango
+  if (anio) {
+    const campo = esPeli ? 'primary_release_date' : 'first_air_date'
+    const op = ANOS.find(a => a.id === anio)
+    if (op && (op.desde || op.hasta)) {
+      if (op.desde) p[`${campo}.gte`] = op.desde
+      if (op.hasta) p[`${campo}.lte`] = op.hasta
+    } else if (esPeli) {
+      p.primary_release_year = anio
+    } else {
+      p.first_air_date_year = anio
+    }
   }
   if (proveedores.length) {
     p.with_watch_providers = proveedores.join('|')

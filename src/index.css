@@ -153,6 +153,31 @@ input::placeholder { color: #61539A; }
   font-size: 12.5px; font-weight: 700; white-space: nowrap;
 }
 
+/* interruptor de calidad */
+.interruptor {
+  flex: 1; display: flex; align-items: center; gap: 9px;
+  padding: 10px 13px; border-radius: 10px;
+  border: 1px solid var(--borde); color: var(--apagado);
+  font-size: 13px; font-weight: 700;
+}
+.interruptor .bolita {
+  width: 34px; height: 19px; border-radius: 12px; flex-shrink: 0;
+  background: var(--terciopelo); position: relative;
+  transition: background .18s ease;
+}
+.interruptor .bolita::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--apagado); transition: transform .18s ease, background .18s ease;
+}
+.interruptor.activo { color: var(--papel); border-color: var(--ambar); }
+.interruptor.activo .bolita { background: rgba(245, 196, 81, .35); }
+.interruptor.activo .bolita::after { transform: translateX(15px); background: var(--ambar); }
+
+@media (prefers-reduced-motion: reduce) {
+  .interruptor .bolita, .interruptor .bolita::after { transition: none; }
+}
+
 .donde {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 14px;
 }

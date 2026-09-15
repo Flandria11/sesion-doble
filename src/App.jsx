@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { buscar, explorar, MODOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
+import { buscar, explorar, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
 
 /* ======================= raíz ======================= */
 export default function App() {
@@ -293,6 +293,8 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   const [modo, setModo] = useState('tendencias')
   const [provs, setProvs] = useState([])
   const [genero, setGenero] = useState('')
+  const [anio, setAnio] = useState('')
+  const [calidad, setCalidad] = useState(false)
   const [pagina, setPagina] = useState(1)
 
   const [plats, setPlats] = useState([])
@@ -336,7 +338,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
     if (q.trim().length >= 2) return
     let vivo = true
     setCargando(true)
-    explorar({ tipo, modo, proveedores: provs, genero, pagina })
+    explorar({ tipo, modo, proveedores: provs, genero, anio, calidad, pagina })
       .then(r => {
         if (!vivo) return
         setRes(ant => (pagina === 1 ? r : [...ant, ...r]))
@@ -345,7 +347,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
       .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
       .finally(() => vivo && setCargando(false))
     return () => { vivo = false }
-  }, [tipo, modo, provs, genero, pagina, q])
+  }, [tipo, modo, provs, genero, anio, calidad, pagina, q])
 
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
@@ -377,7 +379,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   // cualquier cambio de filtro devuelve a la primera página
   const cambiar = fn => (...a) => { fn(...a); setPagina(1); setRes([]) }
   const cambiarTipo = cambiar(t => {
-    setTipo(t); setProvs([]); setGenero('')
+    setTipo(t); setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
     if (t === 'tv' && modo === 'cines') setModo('tendencias')
   })
 
@@ -385,7 +387,9 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   // una es la sala y la otra el streaming.
   const cambiarModo = cambiar(m => {
     setModo(m)
-    if (m === 'cines') { setProvs([]); setGenero('') }
+    // en cartelera no aplicamos nada de esto: un estreno de esta semana
+    // todavía no tiene votos y el filtro de calidad lo dejaría vacío
+    if (m === 'cines') { setProvs([]); setGenero(''); setAnio(''); setCalidad(false) }
   })
 
   // Y al revés: si marcas una plataforma estando en un modo que no admite
@@ -395,13 +399,17 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
     if (m && !m.filtrable) setModo('populares')
   }
   const cambiarGenero = cambiar(g => { setGenero(g); if (g) saltarSiHaceFalta() })
+  const cambiarAnio = cambiar(a => { setAnio(a); if (a) saltarSiHaceFalta() })
+  const alternarCalidad = cambiar(() => {
+    setCalidad(v => { if (!v) saltarSiHaceFalta(); return !v })
+  })
   const alternarPlat = cambiar(id => {
     setProvs(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]))
     saltarSiHaceFalta()
   })
 
   const explorando = q.trim().length < 2
-  const hayFiltros = provs.length > 0 || genero
+  const hayFiltros = provs.length > 0 || genero || anio || calidad
   const modosVisibles = MODOS.filter(m =>
     (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
   )
@@ -454,18 +462,39 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
           )}
 
           {!ocultarPlataformas && (
-          <div className="barra-filtros">
-            <select value={genero} onChange={e => cambiarGenero(e.target.value)}
-              aria-label="Filtrar por género">
-              <option value="">Todos los géneros</option>
-              {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-            </select>
-            {hayFiltros && (
-              <button className="limpiar" onClick={() => {
-                setProvs([]); setGenero(''); setPagina(1); setRes([])
-              }}>Quitar filtros</button>
-            )}
-          </div>
+            <>
+              <div className="barra-filtros">
+                <select value={genero} onChange={e => cambiarGenero(e.target.value)}
+                  aria-label="Filtrar por género">
+                  <option value="">Todos los géneros</option>
+                  {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                </select>
+                <select value={anio} onChange={e => cambiarAnio(e.target.value)}
+                  aria-label="Filtrar por año">
+                  {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
+                </select>
+              </div>
+
+              <div className="barra-filtros">
+                <button className={`interruptor${calidad ? ' activo' : ''}`}
+                  onClick={alternarCalidad} aria-pressed={calidad}>
+                  <span className="bolita" />
+                  Quitar las malas
+                </button>
+                {hayFiltros && (
+                  <button className="limpiar" onClick={() => {
+                    setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
+                    setPagina(1); setRes([])
+                  }}>Limpiar</button>
+                )}
+              </div>
+
+              {calidad && (
+                <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
+                  Solo con nota igual o superior a 6 y al menos 250 votos.
+                </div>
+              )}
+            </>
           )}
 
           {provs.length > 0 && (
