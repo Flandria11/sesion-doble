@@ -41,7 +41,7 @@ function Marco({ children, sub }) {
     <div className="app">
       <header>
         <div className="bombillas"><i /><i /><i /><i /><i /><i /><i /></div>
-        <h1>SESIÓN DOBLE</h1>
+        <h1>DOS BUTACAS</h1>
         {sub && <div className="sub">{sub}</div>}
       </header>
       <main>{children}</main>
@@ -260,7 +260,7 @@ function Principal({ sesion, pareja }) {
     <div className="app">
       <header>
         <div className="bombillas"><i /><i /><i /><i /><i /><i /><i /></div>
-        <h1>SESIÓN DOBLE</h1>
+        <h1>DOS BUTACAS</h1>
         <div className="sub">Código {pareja.codigo}</div>
       </header>
       <main key={vista} className="entra">

@@ -1,6 +1,6 @@
 {
-  "name": "Sesión Doble",
-  "short_name": "Sesión Doble",
+  "name": "Dos Butacas",
+  "short_name": "Dos Butacas",
   "description": "Dos listas, un plan. Elegid juntos qué ver esta noche.",
   "start_url": "/",
   "scope": "/",
