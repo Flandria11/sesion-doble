@@ -589,7 +589,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
       {error && <div className="error">{error}</div>}
 
       <div className="catalogo">
-        {res.map(p => {
+        {visibles.map(p => {
           const e = estado(p)
           const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
           const fuera = !visible && descartada && descartada(p)
@@ -686,63 +686,74 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
   const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
 
-  useEffect(() => {
-    let vivo = true
-    setCargando(true)
-    estrenos(pagina)
-      .then(r => {
-        if (!vivo) return
-        const limpia = r.filter(x => !descartada(x))
-        setLista(ant => (pagina === 1 ? limpia : [...ant, ...limpia]))
-        setError('')
-      })
-      .catch(() => vivo && setError('No se han podido cargar los estrenos.'))
-      .finally(() => vivo && setCargando(false))
-    return () => { vivo = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagina])
-
-  // Solo sabemos cuál se está viendo mirando qué tarjeta ocupa la pantalla.
-  // Así cargamos el tráiler de esa y de ninguna más.
-  useEffect(() => {
-    const caja = pista.current
-    if (!caja) return
-    const ojo = new IntersectionObserver(
-      entradas => {
-        entradas.forEach(e => {
-          if (e.isIntersecting) setActivo(Number(e.target.dataset.i))
-        })
-      },
-      { root: caja, threshold: 0.6 }
-    )
-    caja.querySelectorAll('.diapo').forEach(d => ojo.observe(d))
-    return () => ojo.disconnect()
-  }, [lista])
-
-  // el tráiler se pide solo cuando llegas a esa tarjeta
-  useEffect(() => {
-    const p = lista.filter(x => !descartada(x))[activo]
-    if (!p || trailers[`${p.tipo}-${p.tmdb_id}`] !== undefined) return
-    let vivo = true
-    buscarTrailer(p.tmdb_id, p.tipo).then(t => {
-      if (vivo) setTrailers(x => ({ ...x, [`${p.tipo}-${p.tmdb_id}`]: t || '' }))
-    })
-    return () => { vivo = false }
-  }, [activo, lista, trailers, descartada])
-
-  // al acercarse al final, se pide la siguiente tanda
-  useEffect(() => {
-    if (!cargando && lista.length && activo >= lista.length - 3) {
-      setPagina(n => (n < 5 ? n + 1 : n))
-    }
-  }, [activo, lista.length, cargando])
-
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
     if (!x) return null
     if (x.propuesto_por === yo) return { tipo: 'mio', t: x }
     return { tipo: miVoto(x.id) === 'si' ? 'coincide' : 'suyo', t: x }
   }
+
+  /**
+   * Se calcula una sola vez y se usa en todas partes: en la rejilla, en el
+   * detector de cuál estás viendo y al pedir el tráiler. Si cada sitio
+   * filtrara a su manera, el índice de la tarjeta visible no coincidiría
+   * con el de la lista y el tráiler saldría de otra película, o de ninguna.
+   */
+  const visibles = lista.filter(p => {
+    if (descartada(p)) return false
+    const e = estado(p)
+    return !(e && (e.tipo === 'mio' || e.tipo === 'coincide'))
+  })
+
+  useEffect(() => {
+    let vivo = true
+    setCargando(true)
+    estrenos(pagina)
+      .then(r => {
+        if (!vivo) return
+        setLista(ant => (pagina === 1 ? r : [...ant, ...r]))
+        setError('')
+      })
+      .catch(() => vivo && setError('No se han podido cargar los estrenos.'))
+      .finally(() => vivo && setCargando(false))
+    return () => { vivo = false }
+  }, [pagina])
+
+  // cuál se está viendo: la que ocupa la pantalla
+  useEffect(() => {
+    const caja = pista.current
+    if (!caja) return
+    const ojo = new IntersectionObserver(
+      entradas => entradas.forEach(e => {
+        if (e.isIntersecting) setActivo(Number(e.target.dataset.i))
+      }),
+      { root: caja, threshold: 0.6 }
+    )
+    caja.querySelectorAll('.diapo').forEach(d => ojo.observe(d))
+    return () => ojo.disconnect()
+  }, [visibles.length])
+
+  // el tráiler se pide solo al llegar a esa tarjeta
+  useEffect(() => {
+    const p = visibles[activo]
+    if (!p) return
+    const clave = `${p.tipo}-${p.tmdb_id}`
+    if (trailers[clave] !== undefined) return
+    let vivo = true
+    buscarTrailer(p.tmdb_id, p.tipo).then(t => {
+      if (vivo) setTrailers(x => ({ ...x, [clave]: t || '' }))
+    })
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo, visibles.length, trailers])
+
+  // al acercarse al final se pide la siguiente tanda
+  useEffect(() => {
+    if (!cargando && visibles.length && activo >= visibles.length - 3) {
+      setPagina(n => (n < 5 ? n + 1 : n))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo, visibles.length, cargando])
 
   async function proponer(p) {
     const e = estado(p)
@@ -758,30 +769,14 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
     }
   }
 
-  function noInteresa(p) {
-    onDescartar(p)
-    setLista(l => l.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
-  }
-
-  // lo descartado no vuelve a aparecer
-  /**
-   * Fuera lo descartado, lo que propusiste tú y lo que ya coincide.
-   * Lo que propuso ella sí sigue apareciendo, camuflado: si le das a
-   * proponer, salta la coincidencia.
-   */
-  const visibles = lista.filter(p => {
-    if (descartada(p)) return false
-    const e = estado(p)
-    return !(e && (e.tipo === 'mio' || e.tipo === 'coincide'))
-  })
-
   if (cargando && !visibles.length) return <div className="cargando">Buscando estrenos…</div>
   if (error) return <div className="error">{error}</div>
   if (!visibles.length) {
     return (
       <div className="vacio">
         <b>No queda nada</b>
-        Has mirado todos los estrenos disponibles. Vuelve en unos días.
+        Has mirado todos los estrenos que cumplen el filtro de calidad.
+        Vuelve en unos días.
       </div>
     )
   }
@@ -795,7 +790,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
           const e = estado(p)
           const puesto = e && (e.tipo === 'mio' || e.tipo === 'coincide')
           return (
-            <section className={`diapo${abierta === clave ? ' abierta' : ''}`} key={clave} data-i={i}>
+            <section className={`diapo${abierta === clave ? ' abierta' : ''}`}
+              key={clave} data-i={i}>
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
                 {i === activo && tr && (
@@ -820,8 +816,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
                 <div className="tit">{p.titulo}</div>
                 {p.sinopsis && (
                   <button className="sin"
-                    onClick={() => setAbierta(a => (a === clave ? null : clave))}
-                    aria-expanded={abierta === clave}>
+                    onClick={() => setAbierta(a => (a === clave ? null : clave))}>
                     {p.sinopsis}
                   </button>
                 )}
@@ -836,10 +831,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
                 <button className={`btn${puesto ? ' suave' : ''}`}
                   onClick={() => proponer(p)}
                   disabled={!!puesto || anadiendo === p.tmdb_id}>
-                  {e && e.tipo === 'coincide' ? '¡Ya coincidís!'
-                    : e && e.tipo === 'mio' ? 'Ya la propusiste'
-                    : anadiendo === p.tmdb_id ? 'Un momento…'
-                    : 'Proponer'}
+                  {anadiendo === p.tmdb_id ? 'Un momento…' : 'Proponer'}
                 </button>
               </div>
             </section>
