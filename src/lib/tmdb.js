@@ -237,40 +237,62 @@ export async function recientes(pagina = 1, tipo = 'movie') {
  */
 export async function estrenos(pagina = 1) {
   const hoy = new Date()
-  const desde = new Date(hoy.getTime() - 400 * 864e5).toISOString().slice(0, 10)
-  const hasta = hoy.toISOString().slice(0, 10)
+  const dia = t => new Date(hoy.getTime() - t * 864e5).toISOString().slice(0, 10)
+
+  /**
+   * El listón sube con la antigüedad. Una película de hace dos semanas no
+   * ha tenido tiempo de acumular votos; una de hace un año sí, así que si
+   * apenas tiene, por algo será.
+   */
+  const ventanas = [
+    { desde: dia(92),  hasta: dia(0),   votos: '100' },
+    { desde: dia(184), hasta: dia(93),  votos: '200' },
+    { desde: dia(400), hasta: dia(185), votos: '400' }
+  ]
 
   const comun = {
     page: String(pagina),
     watch_region: REGION,
     with_watch_monetization_types: 'flatrate',
     include_adult: 'false',
-    'vote_count.gte': '100',
     'vote_average.gte': '6.2'
   }
 
-  const [pelis, series] = await Promise.all([
-    pedir('/discover/movie', {
-      ...comun,
-      sort_by: 'primary_release_date.desc',
-      'primary_release_date.gte': desde,
-      'primary_release_date.lte': hasta
-    }).then(d => limpiar(d.results, 'movie')).catch(() => []),
-    pedir('/discover/tv', {
-      ...comun,
-      sort_by: 'first_air_date.desc',
-      'first_air_date.gte': desde,
-      'first_air_date.lte': hasta
-    }).then(d => limpiar(d.results, 'tv')).catch(() => [])
-  ])
+  const tandas = await Promise.all(
+    ventanas.flatMap(v => [
+      pedir('/discover/movie', {
+        ...comun,
+        'vote_count.gte': v.votos,
+        sort_by: 'primary_release_date.desc',
+        'primary_release_date.gte': v.desde,
+        'primary_release_date.lte': v.hasta
+      }).then(d => limpiar(d.results, 'movie')).catch(() => []),
+      pedir('/discover/tv', {
+        ...comun,
+        'vote_count.gte': v.votos,
+        sort_by: 'first_air_date.desc',
+        'first_air_date.gte': v.desde,
+        'first_air_date.lte': v.hasta
+      }).then(d => limpiar(d.results, 'tv')).catch(() => [])
+    ])
+  )
 
-  // alternamos una y una para que no salgan todas las pelis seguidas
-  const mezcla = []
-  for (let i = 0; i < Math.max(pelis.length, series.length); i++) {
-    if (pelis[i]) mezcla.push(pelis[i])
-    if (series[i]) mezcla.push(series[i])
+  // de lo más reciente a lo menos, alternando película y serie
+  const salida = []
+  const vistos = new Set()
+  for (let v = 0; v < ventanas.length; v++) {
+    const pelis = tandas[v * 2], series = tandas[v * 2 + 1]
+    for (let i = 0; i < Math.max(pelis.length, series.length); i++) {
+      for (const x of [pelis[i], series[i]]) {
+        if (!x) continue
+        const clave = `${x.tipo}-${x.tmdb_id}`
+        if (vistos.has(clave)) continue
+        vistos.add(clave)
+        salida.push(x)
+      }
+    }
   }
-  return mezcla
+  return salida
 }
 
 /**

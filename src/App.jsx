@@ -889,6 +889,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   const [gen, setGen] = useState('')
   const [donde, setDonde] = useState([])
   const [sonido, setSonido] = useState(false)
+  const [abierta, setAbierta] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -935,7 +936,10 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
             {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, gen, p.voto && `★ ${p.voto} en TMDB`]
               .filter(Boolean).join(' · ')}
           </div>
-          <p>{p.sinopsis || 'Sin sinopsis disponible en español.'}</p>
+          <button className={`resumen${abierta ? ' abierta' : ''}`}
+            onClick={() => setAbierta(a => !a)}>
+            {p.sinopsis || 'Sin sinopsis disponible en español.'}
+          </button>
           {donde.length > 0 && (
             <div className="donde">
               <span>Incluida en</span>
@@ -958,8 +962,27 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
 
 /* ---- reproductor con barra propia ---- */
 /* ======================= votar ======================= */
+/* Mismo formato que Estrenos: una tarjeta por pantalla, el tráiler sonando
+   y las tres opciones abajo. El tráiler ya viene guardado con el título,
+   así que aquí no hay que pedirle nada a TMDB. */
 function Votar({ cola, nombres, onVotar }) {
-  const [ficha, setFicha] = useState(null)
+  const [activo, setActivo] = useState(0)
+  const [sonido, setSonido] = useState(false)
+  const [abierta, setAbierta] = useState(null)
+  const pista = useRef(null)
+
+  useEffect(() => {
+    const caja = pista.current
+    if (!caja) return
+    const ojo = new IntersectionObserver(
+      entradas => entradas.forEach(e => {
+        if (e.isIntersecting) setActivo(Number(e.target.dataset.i))
+      }),
+      { root: caja, threshold: 0.6 }
+    )
+    caja.querySelectorAll('.diapo').forEach(d => ojo.observe(d))
+    return () => ojo.disconnect()
+  }, [cola.length])
 
   if (!cola.length) {
     return (
@@ -969,123 +992,62 @@ function Votar({ cola, nombres, onVotar }) {
       </div>
     )
   }
-  const p = cola[0]
-  return (
-    <>
-      <div className="baraja">
-        {cola[1] && <Carta key={cola[1].id} p={cola[1]} detras nombres={nombres} />}
-        <Carta key={p.id} p={p} nombres={nombres} onVotar={onVotar}
-          onFicha={() => setFicha(p)} />
-      </div>
-      <div className="votos">
-        <button className="vNo" onClick={() => onVotar(p.id, 'no')}>No me llama</button>
-        <button className="vVista" onClick={() => onVotar(p.id, 'vista')}>Ya vista</button>
-        <button className="vSi" onClick={() => onVotar(p.id, 'si')}>Me apetece</button>
-      </div>
-      <div className="contador">Quedan {cola.length} · desliza la tarjeta o usa los botones</div>
-      {ficha && (
-        <Ficha p={ficha} puesta ocultarBoton
-          onCerrar={() => setFicha(null)}
-          onProponer={() => setFicha(null)} />
-      )}
-    </>
-  )
-}
-
-function Carta({ p, detras, nombres, onVotar, onFicha }) {
-  const el = useRef(null)
-  const si = useRef(null)
-  const no = useRef(null)
-  const [abierto, setAbierto] = useState(false)
-
-  useEffect(() => {
-    const c = el.current
-    if (!c || detras || !onVotar) return
-    let x0 = null, y0 = 0, dx = 0, activo = false
-
-    const abajo = e => {
-      if (e.target.closest('button')) return
-      x0 = e.clientX; y0 = e.clientY; activo = false
-      c.classList.remove('suave')
-    }
-    const mover = e => {
-      if (x0 === null) return
-      const ax = e.clientX - x0, ay = e.clientY - y0
-      if (!activo) {
-        if (Math.abs(ax) < 8 && Math.abs(ay) < 8) return
-        if (Math.abs(ay) > Math.abs(ax)) { x0 = null; return }
-        activo = true
-        try { c.setPointerCapture(e.pointerId) } catch { /* da igual */ }
-      }
-      dx = ax
-      c.style.transform = `translateX(${dx}px) rotate(${dx / 24}deg)`
-      if (si.current) si.current.style.opacity = dx > 0 ? Math.min(dx / 90, 1) : 0
-      if (no.current) no.current.style.opacity = dx < 0 ? Math.min(-dx / 90, 1) : 0
-    }
-    const soltar = () => {
-      if (x0 === null) return
-      const d = dx, hubo = activo
-      x0 = null; dx = 0
-      c.classList.add('suave')
-      if (hubo && Math.abs(d) > 95) {
-        c.style.transform = `translateX(${d > 0 ? 700 : -700}px) rotate(${d / 11}deg)`
-        c.style.opacity = '0'
-        setTimeout(() => onVotar(p.id, d > 0 ? 'si' : 'no'), 190)
-      } else {
-        c.style.transform = ''
-        if (si.current) si.current.style.opacity = 0
-        if (no.current) no.current.style.opacity = 0
-        // fue un toque, no un arrastre: abrimos la ficha con el tráiler
-        if (!hubo && onFicha) onFicha()
-      }
-      activo = false
-    }
-
-    c.addEventListener('pointerdown', abajo)
-    c.addEventListener('pointermove', mover)
-    c.addEventListener('pointerup', soltar)
-    c.addEventListener('pointercancel', soltar)
-    return () => {
-      c.removeEventListener('pointerdown', abajo)
-      c.removeEventListener('pointermove', mover)
-      c.removeEventListener('pointerup', soltar)
-      c.removeEventListener('pointercancel', soltar)
-    }
-  }, [p.id, detras, onVotar, onFicha])
-
-  const largo = (p.sinopsis || '').length > 150
 
   return (
-    <article ref={el} className={`carta${detras ? ' detras' : ''}${abierto ? ' leyendo' : ''}`}>
-      <div className="lienzo">
-        {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-      </div>
-      <div className="velo" />
-      <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-      {!detras && onFicha && (
-        <button className="play"
-          onPointerDown={e => e.stopPropagation()}
-          onPointerUp={e => { e.stopPropagation(); onFicha() }}
-          aria-label={`Ver el tráiler de ${p.titulo}`}>
-          <span />
-        </button>
-      )}
-      <div ref={si} className="marca mSi">SÍ</div>
-      <div ref={no} className="marca mNo">NO</div>
-      <div className="cuerpo">
-        <div className="tit">{p.titulo}</div>
-        <div className="meta">
-          {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero].filter(Boolean).join(' · ')}
-        </div>
-        {p.sinopsis && <div className="sin">{p.sinopsis}</div>}
-        {largo && (
-          <button className="leer"
-            onPointerUp={e => { e.stopPropagation(); setAbierto(a => !a) }}>
-            {abierto ? 'Leer menos' : 'Leer más'}
-          </button>
-        )}
-      </div>
-    </article>
+    <div className="pista" ref={pista}>
+      {cola.map((p, i) => {
+        const clave = p.id
+        return (
+          <section className={`diapo${abierta === clave ? ' abierta' : ''}`}
+            key={clave} data-i={i}>
+            <div className="lienzo">
+              {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
+              {i === activo && p.trailer && (
+                <iframe key={sonido ? 'con' : 'sin'}
+                  src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
+                       `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
+                  title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+              )}
+            </div>
+            <div className="velo" />
+
+            <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
+            {p.trailer && (
+              <button className="altavoz" onClick={() => setSonido(x => !x)}
+                aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
+                {sonido ? '🔊' : '🔇'}
+              </button>
+            )}
+
+            <div className="cuerpo">
+              <div className="meta">
+                {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero]
+                  .filter(Boolean).join(' · ')}
+              </div>
+              <div className="tit">{p.titulo}</div>
+              {p.sinopsis && (
+                <button className="sin"
+                  onClick={() => setAbierta(a => (a === clave ? null : clave))}>
+                  {p.sinopsis}
+                </button>
+              )}
+              <div className="acciones">
+                <button className="descartar" onClick={() => onVotar(p.id, 'no')}>
+                  No me llama
+                </button>
+                <button className="descartar vista" onClick={() => onVotar(p.id, 'vista')}>
+                  Ya vista
+                </button>
+              </div>
+              <button className="btn" onClick={() => onVotar(p.id, 'si')}>
+                Me apetece
+              </button>
+              <div className="contador">Quedan {cola.length} por votar</div>
+            </div>
+          </section>
+        )
+      })}
+    </div>
   )
 }
 
