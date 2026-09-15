@@ -821,18 +821,19 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
                 {i === activo && tr && !parado && (
-                  <iframe key={sonido ? 'con' : 'sin'}
-                    src={`https://www.youtube-nocookie.com/embed/${tr}?autoplay=1&mute=${sonido ? 0 : 1}` +
-                         `&controls=0&loop=1&playlist=${tr}&playsinline=1&rel=0&modestbranding=1`}
-                    title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+                  <>
+                    <iframe key={sonido ? 'con' : 'sin'}
+                      src={`https://www.youtube-nocookie.com/embed/${tr}?autoplay=1&mute=${sonido ? 0 : 1}` +
+                           `&controls=0&loop=1&playlist=${tr}&playsinline=1&rel=0&modestbranding=1`}
+                      title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+                    {/* YouTube enseña sus iconos el primer instante y no hay
+                        forma de desactivarlos: los tapamos con la carátula */}
+                    <div className="cortina" key={`c-${sonido ? 'con' : 'sin'}`}
+                      style={{ backgroundImage: `url(${p.fondo || p.cartel})` }} />
+                  </>
                 )}
               </div>
               <div className="velo" />
-
-              {tr && (
-                <button className="toque" onClick={() => setParado(v => !v)}
-                  aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'} />
-              )}
 
               <div className="mandos-video">
                 {tr && (
@@ -1043,20 +1044,19 @@ function Votar({ cola, nombres, onVotar }) {
             <div className="lienzo">
               {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
               {i === activo && p.trailer && !parado && (
-                <iframe key={sonido ? 'con' : 'sin'}
-                  src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
-                       `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
-                  title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+                <>
+                  <iframe key={sonido ? 'con' : 'sin'}
+                    src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
+                         `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
+                    title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+                  <div className="cortina" key={`c-${sonido ? 'con' : 'sin'}`}
+                    style={{ backgroundImage: `url(${p.fondo || p.cartel})` }} />
+                </>
               )}
             </div>
             <div className="velo" />
 
             <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-            {p.trailer && (
-              <button className="toque" onClick={() => setParado(v => !v)}
-                aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'} />
-            )}
-
             <div className="mandos-video">
               {p.trailer && (
                 <button onClick={() => setParado(v => !v)}
