@@ -63,7 +63,9 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 
 /* Anton no tiene minúsculas reales: forzamos mayúsculas para que los
    acentos y la ñ no queden desalineados. */
-h1, h2, .detalle h3, .vacio b, /* ---------- estructura ---------- */
+h1, h2, .detalle h3, .vacio b, .tit, .confeti h2 { text-transform: uppercase; }
+
+/* ---------- estructura ---------- */
 .app { padding-bottom: 108px; }
 
 header {
@@ -347,10 +349,14 @@ input::placeholder { color: #61539A; }
    Una tarjeta por pantalla con anclaje al desplazar: sueltas el dedo y la
    siguiente se coloca sola. El tráiler solo se monta en la que estás
    viendo, para no cargar veinte vídeos a la vez. */
+/* La altura se calcula con las medidas reales: cabecera (unos 86px),
+   barra inferior (unos 62px) y el aire de main. Así la tarjeta entra
+   entera y no queda media cortada bajo la navegación. */
 .pista {
-  height: calc(100dvh - 190px);
-  min-height: 420px;
-  margin: 4px -16px 0;
+  height: calc(100vh - 196px);
+  height: calc(100dvh - 196px);
+  min-height: 380px;
+  margin: 0 -16px;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
