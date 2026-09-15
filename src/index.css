@@ -542,10 +542,14 @@ input::placeholder { color: #61539A; }
 }
 
 /* ---------- transición al cambiar de pestaña ---------- */
-.entra { animation: entrar .26s ease-out both; }
+/* Solo opacidad, nunca transform. Un transform en <main>, aunque sea
+   translateY(0), convierte a main en el marco de referencia de todo lo
+   que lleve position:fixed dentro, y las fichas se abrían descuadradas.
+   La opacidad no tiene ese efecto. */
+.entra { animation: entrar .28s ease-out both; }
 @keyframes entrar {
-  from { opacity: 0; transform: translateY(9px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ---------- navegación inferior ---------- */
