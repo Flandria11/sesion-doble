@@ -265,9 +265,6 @@ function Principal({ sesion, pareja }) {
   const descartada = p => descartes.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
 
   // Los descartes son personales: lo que tú apartas, ella lo sigue viendo.
-  const descartado = (tmdbId, tipo) =>
-    descartes.some(d => d.tmdb_id === tmdbId && d.tipo === tipo)
-
   async function descartar(p) {
     setDescartes(l => [...l, { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo }])
     await supabase.from('descartes')
@@ -306,7 +303,7 @@ function Principal({ sesion, pareja }) {
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
-                descartada={descartada} onRecuperar={recuperar} />}
+                descartada={descartada} onDescartar={descartar} onRecuperar={recuperar} />}
             {vista === 'reel' && <Reel titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
                 descartada={descartada} onDescartar={descartar} />}
@@ -329,7 +326,7 @@ function Principal({ sesion, pareja }) {
 }
 
 /* ======================= añadir ======================= */
-function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, onRecuperar }) {
+function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, onDescartar, onRecuperar }) {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('movie')
   const [modo, setModo] = useState('tendencias')
@@ -462,7 +459,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, onRe
   const decidido = p => {
     const e = estado(p)
     if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return true
-    return descartado(p.tmdb_id, p.tipo)
+    return descartada(p)
   }
   const visibles = verTodo ? res : res.filter(p => !decidido(p))
   const escondidas = res.length - visibles.length
@@ -694,14 +691,14 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
 
   // el tráiler se pide solo cuando llegas a esa tarjeta
   useEffect(() => {
-    const p = lista.filter(x => !descartado(x.tmdb_id, x.tipo))[activo]
+    const p = lista.filter(x => !descartada(x))[activo]
     if (!p || trailers[`${p.tipo}-${p.tmdb_id}`] !== undefined) return
     let vivo = true
     buscarTrailer(p.tmdb_id, p.tipo).then(t => {
       if (vivo) setTrailers(x => ({ ...x, [`${p.tipo}-${p.tmdb_id}`]: t || '' }))
     })
     return () => { vivo = false }
-  }, [activo, lista, trailers, descartado])
+  }, [activo, lista, trailers, descartada])
 
   // al acercarse al final, se pide la siguiente tanda
   useEffect(() => {
@@ -737,7 +734,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
   }
 
   // lo descartado no vuelve a aparecer
-  const visibles = lista.filter(p => !descartado(p.tmdb_id, p.tipo))
+  const visibles = lista.filter(p => !descartada(p))
 
   if (cargando && !visibles.length) return <div className="cargando">Buscando estrenos…</div>
   if (error) return <div className="error">{error}</div>
