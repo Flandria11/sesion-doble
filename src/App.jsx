@@ -829,6 +829,11 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
               </div>
               <div className="velo" />
 
+              {tr && (
+                <button className="toque" onClick={() => setParado(v => !v)}
+                  aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'} />
+              )}
+
               <div className="mandos-video">
                 {tr && (
                   <button onClick={() => setParado(v => !v)}
@@ -1047,6 +1052,11 @@ function Votar({ cola, nombres, onVotar }) {
             <div className="velo" />
 
             <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
+            {p.trailer && (
+              <button className="toque" onClick={() => setParado(v => !v)}
+                aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'} />
+            )}
+
             <div className="mandos-video">
               {p.trailer && (
                 <button onClick={() => setParado(v => !v)}
