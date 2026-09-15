@@ -129,6 +129,10 @@ input::placeholder { color: #61539A; }
 .plataformas button img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .plataformas button:hover { opacity: .7; }
 .plataformas button.activo { opacity: 1; border-color: var(--ambar); }
+/* pista de que la fila continúa hacia la derecha */
+.plataformas::after {
+  content: ''; flex-shrink: 0; width: 1px;
+}
 
 .barra-filtros { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .barra-filtros select {

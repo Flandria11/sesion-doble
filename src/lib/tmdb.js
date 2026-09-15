@@ -56,11 +56,31 @@ export const MODOS = [
  * Plataformas disponibles en España, pedidas a TMDB para que la lista
  * no se quede desfasada cuando alguna cambie de nombre o desaparezca.
  */
+// Las que más se usan en España van primero; el resto detrás, por la
+// prioridad que les da TMDB. No hardcodeamos identificadores, solo el
+// orden: si alguna cambia de nombre o desaparece, la lista sigue siendo
+// la que TMDB dice que opera en España.
+const PREFERIDAS = [
+  'netflix', 'amazon prime video', 'prime video', 'disney plus', 'disney+',
+  'max', 'hbo max', 'movistar plus', 'filmin', 'apple tv', 'skyshowtime',
+  'rakuten tv', 'atresplayer', 'crunchyroll', 'flixolé', 'mubi'
+]
+
+const rango = nombre => {
+  const n = nombre.toLowerCase()
+  const i = PREFERIDAS.findIndex(p => n.includes(p))
+  return i === -1 ? 999 : i
+}
+
 export async function plataformas(tipo = 'movie') {
   const d = await pedir(`/watch/providers/${tipo === 'tv' ? 'tv' : 'movie'}`, { watch_region: REGION })
   return (d.results || [])
-    .sort((a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99))
-    .slice(0, 12)
+    .sort((a, b) => {
+      const ra = rango(a.provider_name), rb = rango(b.provider_name)
+      if (ra !== rb) return ra - rb
+      return (a.display_priority ?? 99) - (b.display_priority ?? 99)
+    })
+    .slice(0, 20)
     .map(x => ({ id: x.provider_id, nombre: x.provider_name, logo: logo(x.logo_path) }))
 }
 
