@@ -378,24 +378,8 @@ input::placeholder { color: #61539A; }
   position: absolute; inset: 0; width: 100%; height: 100%;
   border: 0; pointer-events: none;
 }
-
-/* cortina de arranque: la carátula tapa el vídeo los dos primeros
-   segundos, que es cuando YouTube enseña sus propios iconos */
-.cortina {
-  position: absolute; inset: 0; z-index: 1;
-  background-size: cover; background-position: center;
-  animation: descubrir .5s ease-out 1.7s both;
-}
-@keyframes descubrir {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cortina { animation: none; opacity: 0; }
-}
-
 .velo {
-  position: absolute; inset: 0; z-index: 2;
+  position: absolute; inset: 0;
   background: linear-gradient(to top,
     rgba(8, 4, 16, .96) 14%, rgba(8, 4, 16, .55) 42%, rgba(8, 4, 16, .06) 72%);
 }
