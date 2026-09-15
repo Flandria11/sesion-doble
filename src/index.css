@@ -374,11 +374,8 @@ input::placeholder { color: #61539A; }
 
 .lienzo { position: absolute; inset: 0; }
 .lienzo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* Mismo encaje que antes (el vídeo dentro de un marco a pantalla
-   completa), solo que subido para que no quede tanto negro arriba. */
 .diapo iframe {
-  position: absolute; left: 0; top: -8%;
-  width: 100%; height: 100%;
+  position: absolute; inset: 0; width: 100%; height: 100%;
   border: 0; pointer-events: none;
 }
 
