@@ -257,13 +257,13 @@ input::placeholder { color: #61539A; }
 /* Franja que disimula el título y el logo de YouTube. Opaca arriba, donde
    los dibuja, y se desvanece antes de comerse la imagen. */
 .capucha {
-  position: absolute; top: 0; left: 0; right: 0; height: 40%;
+  position: absolute; top: 0; left: 0; right: 0; height: 30%;
   background: linear-gradient(to bottom,
     #0B0517 0%,
-    #0B0517 30%,
-    rgba(11, 5, 23, .92) 46%,
-    rgba(11, 5, 23, .55) 66%,
-    rgba(11, 5, 23, .18) 84%,
+    #0B0517 26%,
+    rgba(11, 5, 23, .9) 44%,
+    rgba(11, 5, 23, .5) 66%,
+    rgba(11, 5, 23, .16) 85%,
     transparent 100%);
   pointer-events: none; z-index: 3;
 }
