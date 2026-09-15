@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { buscar, catalogo, CATALOGOS, buscarTrailer, generos } from './lib/tmdb'
+import { buscar, explorar, MODOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
 
 /* ======================= raíz ======================= */
 export default function App() {
@@ -277,8 +277,14 @@ function Principal({ sesion, pareja }) {
 /* ======================= añadir ======================= */
 function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   const [q, setQ] = useState('')
-  const [filtro, setFiltro] = useState('tendencias')
+  const [tipo, setTipo] = useState('movie')
+  const [modo, setModo] = useState('tendencias')
+  const [provs, setProvs] = useState([])
+  const [genero, setGenero] = useState('')
   const [pagina, setPagina] = useState(1)
+
+  const [plats, setPlats] = useState([])
+  const [gens, setGens] = useState([])
   const [res, setRes] = useState([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
@@ -287,6 +293,15 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
   const [ficha, setFicha] = useState(null)
   const [fiesta, setFiesta] = useState(null)
 
+  // catálogos de filtros: cambian según sean pelis o series
+  useEffect(() => {
+    let vivo = true
+    plataformas(tipo).then(p => vivo && setPlats(p)).catch(() => {})
+    generosLista(tipo).then(g => vivo && setGens(g)).catch(() => {})
+    return () => { vivo = false }
+  }, [tipo])
+
+  // búsqueda por texto
   useEffect(() => {
     if (q.trim().length < 2) return
     let vivo = true
@@ -304,11 +319,12 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
     return () => { vivo = false; clearTimeout(t) }
   }, [q])
 
+  // exploración con filtros
   useEffect(() => {
     if (q.trim().length >= 2) return
     let vivo = true
     setCargando(true)
-    catalogo(filtro, pagina)
+    explorar({ tipo, modo, proveedores: provs, genero, pagina })
       .then(r => {
         if (!vivo) return
         setRes(ant => (pagina === 1 ? r : [...ant, ...r]))
@@ -317,32 +333,17 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
       .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
       .finally(() => vivo && setCargando(false))
     return () => { vivo = false }
-  }, [filtro, pagina, q])
+  }, [tipo, modo, provs, genero, pagina, q])
 
-  /**
-   * Estados posibles de un título:
-   *   null      -> nadie lo ha propuesto, se puede proponer
-   *   mio       -> lo propusiste tú, esperando su voto
-   *   suyo      -> lo propuso la otra persona y aún no has votado
-   *   coincide  -> lo propuso ella y ya dijiste que sí
-   *   descartado-> lo propuso ella y dijiste que no
-   */
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
     if (!x) return null
     if (x.propuesto_por === yo) return { tipo: 'mio', t: x }
     const v = miVoto(x.id)
-    if (v === 'si') return { tipo: 'coincide', t: x, de: nombres[x.propuesto_por] || 'tu pareja' }
-    if (v) return { tipo: 'descartado', t: x, de: nombres[x.propuesto_por] || 'tu pareja' }
-    return { tipo: 'suyo', t: x, de: nombres[x.propuesto_por] || 'tu pareja' }
+    if (v === 'si') return { tipo: 'coincide', t: x }
+    return { tipo: 'suyo', t: x }
   }
-  const puesto = p => estado(p) !== null
 
-  /**
-   * Para el usuario solo existe un gesto: proponer.
-   * Por dentro, si la otra persona ya la había propuesto, lo que hacemos es
-   * votar que sí. Eso genera la coincidencia, y ahí es cuando se revela.
-   */
   async function actuar(p) {
     const e = estado(p)
     if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
@@ -361,28 +362,80 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
     }
   }
 
-  function cambiarFiltro(id) {
-    setFiltro(id); setPagina(1); setRes([])
-  }
+  // cualquier cambio de filtro devuelve a la primera página
+  const cambiar = fn => (...a) => { fn(...a); setPagina(1); setRes([]) }
+  const cambiarTipo = cambiar(t => {
+    setTipo(t); setProvs([]); setGenero('')
+    if (t === 'tv' && modo === 'cines') setModo('tendencias')
+  })
+  const cambiarModo = cambiar(setModo)
+  const cambiarGenero = cambiar(setGenero)
+  const alternarPlat = cambiar(id =>
+    setProvs(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]))
+  )
 
   const explorando = q.trim().length < 2
+  const modosVisibles = MODOS.filter(m => tipo === 'movie' || !m.soloPelis)
+  const hayFiltros = provs.length > 0 || genero
 
   return (
     <>
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
-      <div className="ayuda">Toca una carátula para ver el tráiler, o el + para proponerla directamente.</div>
+      <div className="ayuda">Toca una carátula para ver el tráiler, o el + para proponerla.</div>
 
       <input type="text" placeholder="Buscar una peli o serie…"
         value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
 
       {explorando && (
-        <div className="filtros">
-          {CATALOGOS.map(c => (
-            <button key={c.id} className={filtro === c.id ? 'activo' : ''}
-              onClick={() => cambiarFiltro(c.id)}>{c.nombre}</button>
-          ))}
-        </div>
+        <>
+          <div className="pestanas">
+            <button className={tipo === 'movie' ? 'activo' : ''}
+              onClick={() => cambiarTipo('movie')}>Películas</button>
+            <button className={tipo === 'tv' ? 'activo' : ''}
+              onClick={() => cambiarTipo('tv')}>Series</button>
+          </div>
+
+          <div className="filtros">
+            {modosVisibles.map(m => (
+              <button key={m.id} className={modo === m.id ? 'activo' : ''}
+                onClick={() => cambiarModo(m.id)}>{m.nombre}</button>
+            ))}
+          </div>
+
+          {plats.length > 0 && (
+            <div className="plataformas">
+              {plats.map(pl => (
+                <button key={pl.id}
+                  className={provs.includes(pl.id) ? 'activo' : ''}
+                  onClick={() => alternarPlat(pl.id)}
+                  title={pl.nombre} aria-label={pl.nombre}
+                  aria-pressed={provs.includes(pl.id)}>
+                  <img src={pl.logo} alt="" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="barra-filtros">
+            <select value={genero} onChange={e => cambiarGenero(e.target.value)}
+              aria-label="Filtrar por género">
+              <option value="">Todos los géneros</option>
+              {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+            </select>
+            {hayFiltros && (
+              <button className="limpiar" onClick={() => {
+                setProvs([]); setGenero(''); setPagina(1); setRes([])
+              }}>Quitar filtros</button>
+            )}
+          </div>
+
+          {provs.length > 0 && (
+            <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
+              Solo lo incluido en la suscripción de {provs.length === 1 ? 'esa plataforma' : 'esas plataformas'} en España.
+            </div>
+          )}
+        </>
       )}
 
       {error && <div className="error">{error}</div>}
@@ -390,7 +443,6 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
       <div className="catalogo">
         {res.map(p => {
           const e = estado(p)
-          // solo se revela lo tuyo y lo ya coincidido; lo suyo va camuflado
           const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
           const nota = visible === 'mio' ? 'La propusiste tú'
             : visible === 'coincide' ? '¡Coincidís!'
@@ -426,8 +478,11 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
         <button className="btn suave" onClick={() => setPagina(n => n + 1)}>Ver más</button>
       )}
 
-      {!cargando && !explorando && res.length === 0 && (
-        <div className="vacio"><b>Sin resultados</b>Prueba con otro título.</div>
+      {!cargando && res.length === 0 && (
+        <div className="vacio">
+          <b>Sin resultados</b>
+          {explorando ? 'Prueba a quitar algún filtro.' : 'Prueba con otro título.'}
+        </div>
       )}
 
       {ficha && (() => {
@@ -472,12 +527,14 @@ function Fiesta({ p, onCerrar }) {
 function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
+  const [donde, setDonde] = useState([])
   const [sonido, setSonido] = useState(false)
 
   useEffect(() => {
     let vivo = true
     buscarTrailer(p.tmdb_id, p.tipo).then(t => vivo && setTrailer(t || ''))
     generos(p.tmdb_id, p.tipo).then(g => vivo && setGen(g))
+    dondeVerla(p.tmdb_id, p.tipo).then(d => vivo && setDonde(d))
     return () => { vivo = false }
   }, [p.tmdb_id, p.tipo])
 
@@ -519,6 +576,12 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               .filter(Boolean).join(' · ')}
           </div>
           <p>{p.sinopsis || 'Sin sinopsis disponible en español.'}</p>
+          {donde.length > 0 && (
+            <div className="donde">
+              <span>Incluida en</span>
+              {donde.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
+            </div>
+          )}
           {trailer === '' && <div className="aviso">No hay tráiler disponible para este título.</div>}
           {!ocultarBoton && (
             <button className={`btn${puesta ? ' suave' : ''}`}
