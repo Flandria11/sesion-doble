@@ -171,6 +171,7 @@ function Principal({ sesion, pareja }) {
   const [votos, setVotos] = useState([])
   const [nombres, setNombres] = useState({})
   const [descartes, setDescartes] = useState([])
+  const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
 
   const recargar = useCallback(async () => {
@@ -249,34 +250,43 @@ function Principal({ sesion, pareja }) {
 
   // Los descartes son de cada uno: lo que tú no quieres ver le sigue
   // apareciendo a la otra persona, que para eso tenéis gustos distintos.
-  async function descartar(p) {
-    setDescartes(d => [...d, { tmdb_id: p.tmdb_id, tipo: p.tipo }])
-    await supabase.from('descartes').insert({
-      usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo
-    })
-  }
+  async function descartar(p, motivo = 'no_interesa') {
+    const fila = { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo, motivo }
+    setDescartes(l => [
+      ...l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)),
+      fila
+    ])
 
-  async function recuperar(p) {
-    setDescartes(d => d.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
-    await supabase.from('descartes').delete()
-      .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
-  }
+    const { error } = await supabase.from('descartes')
+      .upsert(fila, { onConflict: 'usuario_id,tmdb_id,tipo' })
 
-  const descartada = p => descartes.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+    if (error) {
+      // sin esto el fallo se perdía en silencio y los descartes volvían
+      console.error('descartes:', error)
+      setAviso(`No se ha podido guardar el descarte: ${error.message}`)
+      setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
+      return
+    }
+    setAviso('')
 
-  // Los descartes son personales: lo que tú apartas, ella lo sigue viendo.
-  async function descartar(p) {
-    setDescartes(l => [...l, { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo }])
-    await supabase.from('descartes')
-      .upsert({ usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo },
-              { onConflict: 'usuario_id,tmdb_id,tipo' })
+    // si la habías propuesto tú, se retira
+    const mia = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo && t.propuesto_por === yo)
+    if (mia) await quitar(mia.id)
   }
 
   async function recuperar(p) {
     setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
-    await supabase.from('descartes').delete()
+    const { error } = await supabase.from('descartes').delete()
       .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
+    if (error) {
+      console.error('descartes:', error)
+      setAviso(`No se ha podido deshacer: ${error.message}`)
+    }
   }
+
+  const descartada = p => descartes.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+  const motivoDescarte = p =>
+    (descartes.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo) || {}).motivo
 
   async function quitar(id) {
     setTitulos(t => t.filter(x => x.id !== id))
@@ -299,11 +309,15 @@ function Principal({ sesion, pareja }) {
         <div className="sub">Código {pareja.codigo}</div>
       </header>
       <main key={vista} className="entra">
+        {aviso && (
+          <div className="error" onClick={() => setAviso('')} role="alert">{aviso}</div>
+        )}
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
-                descartada={descartada} onDescartar={descartar} onRecuperar={recuperar} />}
+                descartada={descartada} motivoDescarte={motivoDescarte}
+                onDescartar={descartar} onRecuperar={recuperar} />}
             {vista === 'reel' && <Reel titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
                 descartada={descartada} onDescartar={descartar} />}
@@ -326,7 +340,7 @@ function Principal({ sesion, pareja }) {
 }
 
 /* ======================= añadir ======================= */
-function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, onDescartar, onRecuperar }) {
+function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar }) {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('movie')
   const [modo, setModo] = useState('tendencias')
@@ -633,7 +647,23 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, onDe
           <Ficha p={ficha} puesta={!!visible}
             etiquetaPuesta={visible === 'coincide' ? '¡Ya coincidís en esta!' : 'Ya la propusiste tú'}
             onCerrar={() => setFicha(null)}
-            onProponer={async () => { setFicha(null); await actuar(ficha) }} />
+            onProponer={async () => { setFicha(null); await actuar(ficha) }}
+            acciones={
+              <div className="rectificar">
+                {descartada(ficha)
+                  ? <button onClick={() => { onRecuperar(ficha); setFicha(null) }}>
+                      {motivoDescarte(ficha) === 'vista' ? 'Marcada como vista' : 'Descartada'} · deshacer
+                    </button>
+                  : <>
+                      <button onClick={() => { onDescartar(ficha, 'no_interesa'); setFicha(null) }}>
+                        No me interesa
+                      </button>
+                      <button onClick={() => { onDescartar(ficha, 'vista'); setFicha(null) }}>
+                        Ya vista
+                      </button>
+                    </>}
+              </div>
+            } />
         )
       })()}
 
@@ -734,7 +764,16 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
   }
 
   // lo descartado no vuelve a aparecer
-  const visibles = lista.filter(p => !descartada(p))
+  /**
+   * Fuera lo descartado, lo que propusiste tú y lo que ya coincide.
+   * Lo que propuso ella sí sigue apareciendo, camuflado: si le das a
+   * proponer, salta la coincidencia.
+   */
+  const visibles = lista.filter(p => {
+    if (descartada(p)) return false
+    const e = estado(p)
+    return !(e && (e.tipo === 'mio' || e.tipo === 'coincide'))
+  })
 
   if (cargando && !visibles.length) return <div className="cargando">Buscando estrenos…</div>
   if (error) return <div className="error">{error}</div>
@@ -787,18 +826,21 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
                   </button>
                 )}
                 <div className="acciones">
-                  <button className="descartar" onClick={() => noInteresa(p)}>
+                  <button className="descartar" onClick={() => onDescartar(p, 'no_interesa')}>
                     No me interesa
                   </button>
-                  <button className={`btn${puesto ? ' suave' : ''}`}
-                    onClick={() => proponer(p)}
-                    disabled={!!puesto || anadiendo === p.tmdb_id}>
-                    {e && e.tipo === 'coincide' ? '¡Ya coincidís!'
-                      : e && e.tipo === 'mio' ? 'Ya la propusiste'
-                      : anadiendo === p.tmdb_id ? 'Un momento…'
-                      : 'Proponer'}
+                  <button className="descartar vista" onClick={() => onDescartar(p, 'vista')}>
+                    Ya vista
                   </button>
                 </div>
+                <button className={`btn${puesto ? ' suave' : ''}`}
+                  onClick={() => proponer(p)}
+                  disabled={!!puesto || anadiendo === p.tmdb_id}>
+                  {e && e.tipo === 'coincide' ? '¡Ya coincidís!'
+                    : e && e.tipo === 'mio' ? 'Ya la propusiste'
+                    : anadiendo === p.tmdb_id ? 'Un momento…'
+                    : 'Proponer'}
+                </button>
               </div>
             </section>
           )
