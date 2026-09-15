@@ -263,7 +263,7 @@ function Principal({ sesion, pareja }) {
         <h1>SESIÓN DOBLE</h1>
         <div className="sub">Código {pareja.codigo}</div>
       </header>
-      <main>
+      <main key={vista} className="entra">
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
@@ -570,19 +570,37 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar }) {
 
 /* ---- celebración de coincidencia ---- */
 function Fiesta({ p, onCerrar }) {
+  const [fase, setFase] = useState('entrando')
+
   useEffect(() => {
     const esc = e => e.key === 'Escape' && onCerrar()
     document.addEventListener('keydown', esc)
-    return () => document.removeEventListener('keydown', esc)
+    // las dos carátulas se juntan y al chocar se revela el título
+    const a = setTimeout(() => setFase('chocando'), 620)
+    const b = setTimeout(() => setFase('hecho'), 1000)
+    return () => {
+      document.removeEventListener('keydown', esc)
+      clearTimeout(a); clearTimeout(b)
+    }
   }, [onCerrar])
 
   return (
     <div className="telon fiesta" onClick={onCerrar}>
-      <div className="confeti" onClick={e => e.stopPropagation()}>
-        <div className="chispa">★</div>
+      <div className={`confeti ${fase}`} onClick={e => e.stopPropagation()}>
+        <div className="destellos" aria-hidden="true">
+          {Array.from({ length: 14 }).map((_, i) => (
+            <i key={i} style={{ '--n': i }} />
+          ))}
+        </div>
+
+        <div className="choque">
+          <div className="mitad izquierda"><img src={p.cartel} alt="" /></div>
+          <div className="mitad derecha"><img src={p.cartel} alt="" /></div>
+          <div className="fogonazo" aria-hidden="true" />
+        </div>
+
         <h2>¡Habéis coincidido!</h2>
         <div className="lead">A los dos os apetece</div>
-        <img src={p.cartel} alt="" />
         <div className="titulo-fiesta">{p.titulo}</div>
         <button className="btn" onClick={onCerrar}>Seguir mirando</button>
       </div>
