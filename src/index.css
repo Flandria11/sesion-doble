@@ -254,10 +254,24 @@ input::placeholder { color: #61539A; }
   position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none;
 }
 /* franja superior que disimula el título y el logo de YouTube */
+/* Franja que disimula el título y el logo de YouTube. Opaca arriba, donde
+   los dibuja, y se desvanece antes de comerse la imagen. */
 .capucha {
-  position: absolute; top: 0; left: 0; right: 0; height: 26%;
-  background: linear-gradient(to bottom, rgba(8, 4, 16, .95), rgba(8, 4, 16, .5) 60%, transparent);
+  position: absolute; top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(to bottom,
+    #0B0517 0%,
+    #0B0517 30%,
+    rgba(11, 5, 23, .92) 46%,
+    rgba(11, 5, 23, .55) 66%,
+    rgba(11, 5, 23, .18) 84%,
+    transparent 100%);
   pointer-events: none; z-index: 3;
+}
+/* la esquina inferior derecha, donde asoma el enlace de "Ver en YouTube" */
+.pantallita .capucha::after {
+  content: ''; position: absolute; left: 0; right: 0;
+  top: 100%; height: 130%;
+  background: linear-gradient(to bottom, transparent 55%, rgba(11, 5, 23, .5) 100%);
 }
 .carta .velo {
   position: absolute; inset: 0;
