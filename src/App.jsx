@@ -759,16 +759,19 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
     return () => ojo.disconnect()
   }, [visibles.length])
 
-  // el tráiler se pide solo al llegar a esa tarjeta
+  // Se piden el tráiler de la tarjeta actual y el de la siguiente, para
+  // que al bajar arranque sin esperas. Solo la clave del vídeo: el
+  // reproductor se monta únicamente en la que estás viendo.
   useEffect(() => {
-    const p = visibles[activo]
-    if (!p) return
-    const clave = `${p.tipo}-${p.tmdb_id}`
-    if (trailers[clave] !== undefined) return
     let vivo = true
-    buscarTrailer(p.tmdb_id, p.tipo).then(t => {
-      if (vivo) setTrailers(x => ({ ...x, [clave]: t || '' }))
-    })
+    for (const p of [visibles[activo], visibles[activo + 1]]) {
+      if (!p) continue
+      const clave = `${p.tipo}-${p.tmdb_id}`
+      if (trailers[clave] !== undefined) continue
+      buscarTrailer(p.tmdb_id, p.tipo).then(t => {
+        if (vivo) setTrailers(x => ({ ...x, [clave]: t || '' }))
+      })
+    }
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, visibles.length, trailers])
@@ -848,6 +851,21 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
                 </button>
               </div>
 
+              <div className="torre">
+                <button className={`redondo principal${puesto ? ' hecho' : ''}`}
+                  onClick={() => proponer(p)}
+                  disabled={!!puesto || anadiendo === p.tmdb_id}>
+                  <span>{puesto ? '✓' : '+'}</span>
+                  <i>{puesto ? 'Puesta' : 'Proponer'}</i>
+                </button>
+                <button className="redondo" onClick={() => onDescartar(p, 'no_interesa')}>
+                  <span>✕</span><i>Paso</i>
+                </button>
+                <button className="redondo" onClick={() => onDescartar(p, 'vista')}>
+                  <span>👁</span><i>Vista</i>
+                </button>
+              </div>
+
               <div className="cuerpo">
                 <div className="meta">
                   {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.voto && `★ ${p.voto}`]
@@ -860,19 +878,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
                     {p.sinopsis}
                   </button>
                 )}
-                <div className="acciones">
-                  <button className="descartar" onClick={() => onDescartar(p, 'no_interesa')}>
-                    No me interesa
-                  </button>
-                  <button className="descartar vista" onClick={() => onDescartar(p, 'vista')}>
-                    Ya vista
-                  </button>
-                </div>
-                <button className={`btn${puesto ? ' suave' : ''}`}
-                  onClick={() => proponer(p)}
-                  disabled={!!puesto || anadiendo === p.tmdb_id}>
-                  {anadiendo === p.tmdb_id ? 'Un momento…' : 'Proponer'}
-                </button>
+
               </div>
             </section>
           )
@@ -1070,6 +1076,18 @@ function Votar({ cola, nombres, onVotar }) {
               </button>
             </div>
 
+            <div className="torre">
+              <button className="redondo principal" onClick={() => onVotar(p.id, 'si')}>
+                <span>♥</span><i>Me apetece</i>
+              </button>
+              <button className="redondo" onClick={() => onVotar(p.id, 'no')}>
+                <span>✕</span><i>Paso</i>
+              </button>
+              <button className="redondo" onClick={() => onVotar(p.id, 'vista')}>
+                <span>👁</span><i>Vista</i>
+              </button>
+            </div>
+
             <div className="cuerpo">
               <div className="meta">
                 {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero]
@@ -1082,18 +1100,7 @@ function Votar({ cola, nombres, onVotar }) {
                   {p.sinopsis}
                 </button>
               )}
-              <div className="acciones">
-                <button className="descartar" onClick={() => onVotar(p.id, 'no')}>
-                  No me llama
-                </button>
-                <button className="descartar vista" onClick={() => onVotar(p.id, 'vista')}>
-                  Ya vista
-                </button>
-              </div>
-              <button className="btn" onClick={() => onVotar(p.id, 'si')}>
-                Me apetece
-              </button>
-              <div className="contador">Quedan {cola.length} por votar</div>
+
             </div>
           </section>
         )
