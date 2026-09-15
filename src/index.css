@@ -212,6 +212,22 @@ input::placeholder { color: #61539A; }
 .rotulo i { display: block; font-style: normal; font-size: 10.5px; color: var(--apagado); margin-top: 3px; }
 .rotulo.marcado i { color: var(--ambar); font-weight: 700; }
 
+/* ---------- grupos de películas y series ---------- */
+.grupo { margin-top: 22px; }
+.grupo:first-of-type { margin-top: 6px; }
+.grupo h3 {
+  font-family: 'Anton', sans-serif; font-size: 15px; letter-spacing: .05em;
+  color: var(--apagado); text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--terciopelo);
+}
+.grupo h3 span {
+  background: var(--terciopelo); color: var(--ambar);
+  font-family: 'Karla', sans-serif; font-size: 11px; font-weight: 800;
+  border-radius: 20px; padding: 2px 8px; letter-spacing: 0;
+}
+.grupo .catalogo { margin-top: 12px; }
+
 /* ---------- votar: baraja de cartas ---------- */
 .baraja { position: relative; height: min(66vh, 490px); }
 

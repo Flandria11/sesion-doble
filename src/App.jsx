@@ -756,31 +756,38 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
     setFicha(null)
   }
 
+  const pelis = lista.filter(p => p.tipo !== 'tv')
+  const series = lista.filter(p => p.tipo === 'tv')
+
+  const bloque = (titulo, grupo) => grupo.length > 0 && (
+    <section className="grupo">
+      <h3>{titulo} <span>{grupo.length}</span></h3>
+      <div className="catalogo">
+        {grupo.map(p => {
+          const v = suVoto(p.id)
+          return (
+            <div className="tarjeta" key={p.id}>
+              <button className={`lamina${v === 'no' ? ' puesta' : ''}`}
+                onClick={() => setFicha(p)}
+                aria-label={`Ver información de ${p.titulo}`}>
+                <img src={p.cartel} alt="" loading="lazy" />
+                {v === 'si' && <span className="nota">Le gusta</span>}
+              </button>
+              <div className="rotulo">{p.titulo}<i>{texto(v)}</i></div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+
   return (
     <>
       <h2>Mis propuestas</h2>
       <div className="ayuda">Lo que has propuesto y qué ha dicho la otra persona.</div>
       {lista.length === 0
         ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
-        : (
-          <div className="catalogo">
-            {lista.map(p => {
-              const v = suVoto(p.id)
-              return (
-                <div className="tarjeta" key={p.id}>
-                  <button className={`lamina${v === 'no' ? ' puesta' : ''}`}
-                    onClick={() => setFicha(p)}
-                    aria-label={`Ver información de ${p.titulo}`}>
-                    <img src={p.cartel} alt="" loading="lazy" />
-                    <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
-                    {v === 'si' && <span className="nota">Le gusta</span>}
-                  </button>
-                  <div className="rotulo">{p.titulo}<i>{texto(v)}</i></div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+        : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
       <div className="pie">
         Código de pareja: <b>{codigo}</b><br />
         <button onClick={onSalir}>Cerrar sesión</button>
@@ -803,6 +810,11 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
 function Matches({ lista, onRectificar }) {
   const [ficha, setFicha] = useState(null)
 
+  async function marcar(voto) {
+    await onRectificar(ficha, voto)
+    setFicha(null)
+  }
+
   if (!lista.length) {
     return (
       <div className="vacio">
@@ -812,27 +824,32 @@ function Matches({ lista, onRectificar }) {
     )
   }
 
-  async function marcar(voto) {
-    await onRectificar(ficha, voto)
-    setFicha(null)
-  }
+  const pelis = lista.filter(p => p.tipo !== 'tv')
+  const series = lista.filter(p => p.tipo === 'tv')
 
-  return (
-    <>
-      <h2>Coincidencias</h2>
-      <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
+  const bloque = (titulo, grupo) => grupo.length > 0 && (
+    <section className="grupo">
+      <h3>{titulo} <span>{grupo.length}</span></h3>
       <div className="catalogo">
-        {lista.map(p => (
+        {grupo.map(p => (
           <div className="tarjeta" key={p.id}>
             <button className="lamina" onClick={() => setFicha(p)}
               aria-label={`Ver información de ${p.titulo}`}>
               <img src={p.cartel} alt="" loading="lazy" />
-              <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
             </button>
             <div className="rotulo">{p.titulo}<i>{p.quien}</i></div>
           </div>
         ))}
       </div>
+    </section>
+  )
+
+  return (
+    <>
+      <h2>Coincidencias</h2>
+      <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
+      {bloque('Películas', pelis)}
+      {bloque('Series', series)}
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
           onCerrar={() => setFicha(null)}
