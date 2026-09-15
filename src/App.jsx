@@ -2,6 +2,23 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
 import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
 
+/**
+ * El sonido se recuerda entre pantallas y entre sesiones. La primera vez
+ * hace falta un toque: los navegadores no dejan arrancar un vídeo con
+ * audio si el usuario no ha interactuado antes con la página.
+ */
+function useSonido() {
+  const [sonido, setSonido] = useState(() => {
+    try { return localStorage.getItem('sd:sonido') === '1' } catch (e) { return false }
+  })
+  const alternar = () => setSonido(v => {
+    const n = !v
+    try { localStorage.setItem('sd:sonido', n ? '1' : '0') } catch (e) { /* privada */ }
+    return n
+  })
+  return [sonido, alternar]
+}
+
 /* ======================= raíz ======================= */
 export default function App() {
   const [sesion, setSesion] = useState(undefined)
@@ -688,7 +705,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
   const [error, setError] = useState('')
   const [activo, setActivo] = useState(0)
   const [trailers, setTrailers] = useState({})
-  const [sonido, setSonido] = useState(false)
+  const [sonido, alternarSonido] = useSonido()
   const [anadiendo, setAnadiendo] = useState(null)
   const [fiesta, setFiesta] = useState(null)
   const [abierta, setAbierta] = useState(null)
@@ -811,7 +828,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
               </div>
               <div className="velo" />
 
-              <button className="altavoz" onClick={() => setSonido(x => !x)}
+              <button className="altavoz" onClick={alternarSonido}
                 aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
                 {sonido ? '🔊' : '🔇'}
               </button>
@@ -896,7 +913,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [donde, setDonde] = useState([])
-  const [sonido, setSonido] = useState(false)
+  const [sonido, alternarSonido] = useSonido()
   const [abierta, setAbierta] = useState(false)
 
   useEffect(() => {
@@ -932,7 +949,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               allow="autoplay; encrypted-media" />
           )}
           {trailer && (
-            <button className="altavoz" onClick={() => setSonido(x => !x)}
+            <button className="altavoz" onClick={alternarSonido}
               aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
               {sonido ? '🔊' : '🔇'}
             </button>
@@ -975,7 +992,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
    así que aquí no hay que pedirle nada a TMDB. */
 function Votar({ cola, nombres, onVotar }) {
   const [activo, setActivo] = useState(0)
-  const [sonido, setSonido] = useState(false)
+  const [sonido, alternarSonido] = useSonido()
   const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
 
@@ -1021,7 +1038,7 @@ function Votar({ cola, nombres, onVotar }) {
 
             <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
             {p.trailer && (
-              <button className="altavoz" onClick={() => setSonido(x => !x)}
+              <button className="altavoz" onClick={alternarSonido}
                 aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
                 {sonido ? '🔊' : '🔇'}
               </button>
