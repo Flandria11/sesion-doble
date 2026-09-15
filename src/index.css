@@ -378,6 +378,7 @@ input::placeholder { color: #61539A; }
   position: absolute; inset: 0; width: 100%; height: 100%;
   border: 0; pointer-events: none;
 }
+
 .velo {
   position: absolute; inset: 0;
   background: linear-gradient(to top,
