@@ -815,14 +815,19 @@ function Trailer({ clave, titulo, cartel }) {
       )}
       <div className="cortina" style={{ backgroundImage: `url(${cartel})` }} />
       {api === true && (
-        <div className="mandos-video">
-          <button onClick={play} aria-label={parado ? 'Reproducir' : 'Pausar'}>
+        <>
+          {/* en el centro, justo encima del botón de YouTube, que no
+              responde porque el vídeo no recibe el toque */}
+          <button className={`centro${parado ? ' visible' : ''}`}
+            onClick={play} aria-label={parado ? 'Reproducir' : 'Pausar'}>
             {parado ? '▶' : '❚❚'}
           </button>
-          <button onClick={volumen} aria-label={mudo ? 'Activar el sonido' : 'Silenciar'}>
-            {mudo ? '🔇' : '🔊'}
-          </button>
-        </div>
+          <div className="mandos-video">
+            <button onClick={volumen} aria-label={mudo ? 'Activar el sonido' : 'Silenciar'}>
+              {mudo ? '🔇' : '🔊'}
+            </button>
+          </div>
+        </>
       )}
     </>
   )
