@@ -881,11 +881,16 @@ function Trailer({ clave, titulo, cartel }) {
   )
 }
 
+/* Lo que se estaba viendo en Estrenos. Vive fuera del componente para que
+ * al cambiar de pestaña y volver no se pierda: si no, se recargaba todo y
+ * volvías a la primera tarjeta. */
+const memoriaReel = { lista: [], pagina: 1, scroll: 0 }
+
 /* ======================= estrenos en vertical ======================= */
 function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar, onComentar }) {
-  const [lista, setLista] = useState([])
-  const [pagina, setPagina] = useState(1)
-  const [cargando, setCargando] = useState(true)
+  const [lista, setLista] = useState(memoriaReel.lista)
+  const [pagina, setPagina] = useState(memoriaReel.pagina)
+  const [cargando, setCargando] = useState(memoriaReel.lista.length === 0)
   const [error, setError] = useState('')
   const [activo, setActivo] = useState(0)
   const [trailers, setTrailers] = useState({})
@@ -916,6 +921,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
   })
 
   useEffect(() => {
+    // si volvemos con la lista ya cargada, no se vuelve a pedir
+    if (pagina === memoriaReel.pagina && memoriaReel.lista.length) return
     let vivo = true
     setCargando(true)
     estrenos(pagina)
@@ -934,6 +941,21 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
       .finally(() => vivo && setCargando(false))
     return () => { vivo = false }
   }, [pagina])
+
+  // se guarda lo cargado y dónde estabas, para el regreso
+  useEffect(() => {
+    memoriaReel.lista = lista
+    memoriaReel.pagina = pagina
+  }, [lista, pagina])
+
+  useEffect(() => {
+    const caja = pista.current
+    if (!caja) return
+    if (memoriaReel.scroll) caja.scrollTop = memoriaReel.scroll
+    const alDesplazar = () => { memoriaReel.scroll = caja.scrollTop }
+    caja.addEventListener('scroll', alDesplazar, { passive: true })
+    return () => caja.removeEventListener('scroll', alDesplazar)
+  }, [lista.length])
 
   // cuál se está viendo: la que ocupa la pantalla
   useEffect(() => {

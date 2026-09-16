@@ -235,9 +235,19 @@ export async function recientes(pagina = 1, tipo = 'movie') {
  * un estreno de hace dos meses no ha tenido tiempo de acumular votos, y
  * con el mínimo de 250 que usamos en Añadir esto saldría vacío.
  */
+const barajar = l => {
+  const a = [...l]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 export async function estrenos(pagina = 1) {
   const hoy = new Date()
   const dia = t => new Date(hoy.getTime() - t * 864e5).toISOString().slice(0, 10)
+
 
   /**
    * El listón sube con la antigüedad. Una película de hace dos semanas no
@@ -250,8 +260,12 @@ export async function estrenos(pagina = 1) {
     { desde: dia(400), hasta: dia(185), votos: '400' }
   ]
 
+  // Se pide una página al azar dentro de las primeras y luego se baraja:
+  // así no salen siempre los mismos títulos ni en el mismo orden.
+  const pagBase = pagina === 1 ? 1 + Math.floor(Math.random() * 3) : pagina + 2
+
   const comun = {
-    page: String(pagina),
+    page: String(pagBase),
     watch_region: REGION,
     with_watch_monetization_types: 'flatrate',
     include_adult: 'false',
@@ -277,19 +291,17 @@ export async function estrenos(pagina = 1) {
     ])
   )
 
-  // de lo más reciente a lo menos, alternando película y serie
+  // Cada ventana se baraja por dentro, pero las más recientes siguen
+  // saliendo antes: así hay variedad sin perder el sentido de "estrenos".
   const salida = []
   const vistos = new Set()
   for (let v = 0; v < ventanas.length; v++) {
-    const pelis = tandas[v * 2], series = tandas[v * 2 + 1]
-    for (let i = 0; i < Math.max(pelis.length, series.length); i++) {
-      for (const x of [pelis[i], series[i]]) {
-        if (!x) continue
-        const clave = `${x.tipo}-${x.tmdb_id}`
-        if (vistos.has(clave)) continue
-        vistos.add(clave)
-        salida.push(x)
-      }
+    const mezcla = barajar([...tandas[v * 2], ...tandas[v * 2 + 1]])
+    for (const x of mezcla) {
+      const clave = `${x.tipo}-${x.tmdb_id}`
+      if (vistos.has(clave)) continue
+      vistos.add(clave)
+      salida.push(x)
     }
   }
   return salida
