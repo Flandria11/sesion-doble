@@ -257,11 +257,19 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   }
 
   async function anadir(p, nota = '') {
+    // La búsqueda de TMDB no trae ni el tráiler ni los géneros: hay que
+    // pedirlos aparte. Sin esto, las propuestas se guardaban sin vídeo y
+    // en Votar solo se veía la carátula.
+    const [trailer, genero] = await Promise.all([
+      p.trailer ? Promise.resolve(p.trailer) : buscarTrailer(p.tmdb_id, p.tipo),
+      p.genero ? Promise.resolve(p.genero) : generos(p.tmdb_id, p.tipo)
+    ])
+
     const { data, error } = await supabase.from('titulos').insert({
       pareja_id: pareja.id, propuesto_por: yo,
       tmdb_id: p.tmdb_id, tipo: p.tipo, titulo: p.titulo,
       anio: p.anio, cartel: p.cartel, fondo: p.fondo,
-      sinopsis: p.sinopsis, trailer: p.trailer, genero: p.genero,
+      sinopsis: p.sinopsis, trailer: trailer || null, genero: genero || null,
       nota: nota || null
     }).select().single()
     if (error) { console.error('titulos:', error); setAviso('No se ha podido proponer: ' + detalle(error)); return null }
@@ -823,7 +831,9 @@ function Trailer({ clave, titulo, cartel }) {
             autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1,
             playsinline: 1, disablekb: 1, iv_load_policy: 3,
             loop: 1, playlist: clave,
-            enablejsapi: 1, origin: window.location.origin
+            // sin 'origin': la API de YouTube avisa de un desajuste de
+            // origen y no aporta nada aquí
+            enablejsapi: 1
           },
           events: {
             onReady: e => {
@@ -1092,10 +1102,11 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
                 </div>
                 <div className="tit">{p.titulo}</div>
                 {p.sinopsis && (
-                  <button className="sin"
-                    onClick={() => setAbierta(a => (a === clave ? null : clave))}>
+                  <div className="sin" role="button" tabIndex={0}
+                    onClick={() => setAbierta(a => (a === clave ? null : clave))}
+                    onKeyDown={e => e.key === 'Enter' && setAbierta(a => (a === clave ? null : clave))}>
                     {p.sinopsis}
-                  </button>
+                  </div>
                 )}
 
               </div>
@@ -1215,9 +1226,11 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           </div>
           <div className="tit">{p.titulo}</div>
 
-          <button className="sin" onClick={() => setAbierta(a => !a)}>
+          <div className="sin" role="button" tabIndex={0}
+            onClick={() => setAbierta(a => !a)}
+            onKeyDown={e => e.key === 'Enter' && setAbierta(a => !a)}>
             {p.sinopsis || 'Sin sinopsis disponible en español.'}
-          </button>
+          </div>
 
           {donde.length > 0 && (
             <div className="donde">
@@ -1244,6 +1257,22 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
     ,
     document.body
   )
+}
+
+/* Las propuestas guardadas antes del arreglo no tienen la clave del
+ * tráiler. En vez de dejarlas sin vídeo, se busca en el momento. */
+function TrailerDeTitulo({ p }) {
+  const [clave, setClave] = useState(p.trailer || null)
+
+  useEffect(() => {
+    if (p.trailer) { setClave(p.trailer); return }
+    let vivo = true
+    buscarTrailer(p.tmdb_id, p.tipo).then(t => vivo && setClave(t || ''))
+    return () => { vivo = false }
+  }, [p.id, p.trailer, p.tmdb_id, p.tipo])
+
+  if (!clave) return null
+  return <Trailer clave={clave} titulo={p.titulo} cartel={p.fondo || p.cartel} />
 }
 
 /* ======================= votar ======================= */
@@ -1286,8 +1315,8 @@ function Votar({ cola, nombres, onVotar }) {
             key={clave} data-i={i}>
             <div className="lienzo">
               {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-              {i === activo && p.trailer && (
-                <Trailer clave={p.trailer} titulo={p.titulo} cartel={p.fondo || p.cartel} />
+              {i === activo && (
+                <TrailerDeTitulo p={p} />
               )}
             </div>
             <div className="velo" />
@@ -1317,10 +1346,11 @@ function Votar({ cola, nombres, onVotar }) {
                 </div>
               )}
               {p.sinopsis && (
-                <button className="sin"
-                  onClick={() => setAbierta(a => (a === clave ? null : clave))}>
+                <div className="sin" role="button" tabIndex={0}
+                  onClick={() => setAbierta(a => (a === clave ? null : clave))}
+                  onKeyDown={e => e.key === 'Enter' && setAbierta(a => (a === clave ? null : clave))}>
                   {p.sinopsis}
-                </button>
+                </div>
               )}
 
             </div>
