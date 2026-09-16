@@ -775,7 +775,15 @@ function Trailer({ clave, titulo, cartel }) {
             loop: 1, playlist: clave,
             enablejsapi: 1, origin: window.location.origin
           },
-          events: { onReady: () => vivo && setApi(true) }
+          events: {
+            onReady: () => vivo && setApi(true),
+            // Al terminar, YouTube enseña su pantalla final con vídeos
+            // sugeridos y su logo. Rebobinamos antes de que aparezca.
+            onStateChange: e => {
+              if (!vivo) return
+              if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
+            }
+          }
         })
       })
       .catch(() => vivo && setApi(false))

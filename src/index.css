@@ -433,16 +433,21 @@ input::placeholder { color: #61539A; }
   .cortina { animation: none; opacity: 0; }
 }
 
+/* El degradado sube bastante por abajo: ahí es donde YouTube dibuja su
+   pantalla final ("ver más vídeos" y su logo) cuando el tráiler termina,
+   y no hay parámetro para quitarla. */
 .velo {
   position: absolute; inset: 0; z-index: 2;
   background: linear-gradient(to top,
-    rgba(8, 4, 16, .96) 14%, rgba(8, 4, 16, .55) 42%, rgba(8, 4, 16, .06) 72%);
+    rgba(8, 4, 16, .98) 26%, rgba(8, 4, 16, .72) 44%, rgba(8, 4, 16, .2) 62%, transparent 80%);
 }
 /* El texto deja hueco a la derecha para la columna de botones, y sube
    por abajo porque ahí es donde YouTube dibuja los subtítulos. */
 /* El texto sube: además de dejar ver más tráiler, tapa los subtítulos que
    YouTube dibuja en la parte baja del vídeo. */
-.cuerpo { position: relative; z-index: 3; padding: 14px 84px 56px 16px; }
+/* deja sitio a la columna de botones de la derecha y sube el texto para
+   tapar la parte baja del reproductor */
+.cuerpo { position: relative; z-index: 3; padding: 14px 98px 94px 16px; }
 .meta {
   font-size: 10.5px; color: var(--ambar); font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; margin-bottom: 5px;
@@ -741,7 +746,7 @@ nav .num {
 
 /* ---------- columna de acciones, estilo vídeo vertical ---------- */
 .torre {
-  position: absolute; right: 10px; bottom: 134px; z-index: 5;
+  position: absolute; right: 10px; bottom: 152px; z-index: 5;
   display: flex; flex-direction: column; gap: 16px; align-items: center;
 }
 .redondo {
