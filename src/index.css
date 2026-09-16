@@ -289,6 +289,21 @@ input::placeholder { color: #61539A; }
   font-size: 8.5px; font-weight: 800; letter-spacing: .02em;
   padding: 3px 5px; border-radius: 5px;
 }
+/* etiqueta de estado sobre la carátula: al lado del título se perdía
+   cuando el nombre era largo */
+.sello-foto {
+  position: absolute; left: 6px; bottom: 6px; z-index: 2;
+  max-width: calc(100% - 12px);
+  background: rgba(8, 4, 16, .82); backdrop-filter: blur(4px);
+  color: var(--papel); border-radius: 6px;
+  padding: 3px 7px; font-size: 9px; font-weight: 800;
+  letter-spacing: .02em; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.sello-foto.si { color: var(--si); }
+.sello-foto.no { color: var(--no); }
+.sello-foto.vista { color: var(--apagado); }
+
 .lamina .check {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -299,11 +314,15 @@ input::placeholder { color: #61539A; }
   position: absolute; right: 6px; bottom: 6px; z-index: 2;
   width: 30px; height: 30px; border-radius: 50%;
   background: var(--ambar); color: var(--noche);
-  font-size: 19px; font-weight: 800; line-height: 1;
+  font-size: 19px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 3px 10px rgba(0, 0, 0, .5);
+  /* el signo es texto y la tipografía deja hueco bajo el trazo: con
+     line-height 0 el glifo se centra por su caja real, no por la línea */
+  line-height: 0;
+  padding-bottom: 1px;
 }
-.mas.ya { background: rgba(8, 4, 16, .8); color: var(--si); font-size: 15px; }
+.mas.ya { background: rgba(8, 4, 16, .8); color: var(--si); font-size: 15px; padding-bottom: 0; }
 /* descartada: el botón pasa a recuperarla */
 .mas.volver { background: rgba(8, 4, 16, .8); color: var(--apagado); border: 1px solid var(--borde); font-size: 15px; }
 

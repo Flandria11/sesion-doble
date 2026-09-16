@@ -359,7 +359,7 @@ function Principal({ sesion, pareja }) {
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
                 onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
-            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
+            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} yo={yo} />}
           </>
         )}
       </main>
@@ -1265,10 +1265,10 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
                 onClick={() => setFicha(p)}
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
-                {v === 'si' && <span className="nota">Le gusta</span>}
                 {p.nota && <span className="tag">💬</span>}
+                <span className={`sello-foto ${v || ''}`}>{texto_voto(v)}</span>
               </button>
-              <div className="rotulo">{p.titulo}<i>{texto_voto(v)}</i></div>
+              <div className="rotulo">{p.titulo}</div>
               <button className="comentar" onClick={() => abrirComentario(p)}>
                 {p.nota ? 'Editar comentario' : 'Comentar'}
               </button>
@@ -1359,9 +1359,10 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar }) {
+function Matches({ lista, onRectificar, yo }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
+  const [dequien, setDequien] = useState('todas')
 
   async function marcar(voto) {
     await onRectificar(ficha, voto)
@@ -1377,8 +1378,13 @@ function Matches({ lista, onRectificar }) {
     )
   }
 
-  const pelis = lista.filter(p => p.tipo !== 'tv')
-  const series = lista.filter(p => p.tipo === 'tv')
+  // filtro por autor: con muchas coincidencias ayuda a acotar
+  const visible = dequien === 'todas' ? lista
+    : dequien === 'mias' ? lista.filter(p => p.propuesto_por === yo)
+    : lista.filter(p => p.propuesto_por !== yo)
+
+  const pelis = visible.filter(p => p.tipo !== 'tv')
+  const series = visible.filter(p => p.tipo === 'tv')
 
   const bloque = (titulo, grupo) => grupo.length > 0 && (
     <section className="grupo">
@@ -1389,8 +1395,9 @@ function Matches({ lista, onRectificar }) {
             <button className="lamina" onClick={() => setFicha(p)}
               aria-label={`Ver información de ${p.titulo}`}>
               <img src={p.cartel} alt="" loading="lazy" />
+              <span className="sello-foto si">{p.quien}</span>
             </button>
-            <div className="rotulo">{p.titulo}<i>{p.quien}</i></div>
+            <div className="rotulo">{p.titulo}</div>
           </div>
         ))}
       </div>
@@ -1408,7 +1415,22 @@ function Matches({ lista, onRectificar }) {
         <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
       </div>
 
-      {juego === 'lista' && <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+      {juego === 'lista' && (
+        <>
+          <div className="filtros">
+            {[['todas', 'Todas', lista.length],
+              ['mias', 'Tuyas', lista.filter(p => p.propuesto_por === yo).length],
+              ['suyas', 'Suyas', lista.filter(p => p.propuesto_por !== yo).length]]
+              .map(([id, nombre, n]) => (
+                <button key={id} className={dequien === id ? 'activo' : ''}
+                  onClick={() => setDequien(id)}>{nombre} · {n}</button>
+              ))}
+          </div>
+          {visible.length === 0
+            ? <div className="vacio"><b>Nada aquí</b>Prueba con otro filtro.</div>
+            : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+        </>
+      )}
       {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
       {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
 
@@ -1514,6 +1536,7 @@ function Ruleta({ lista, onFicha }) {
 /* ---- torneo: eliminatorias hasta que quede una ---- */
 function Torneo({ lista, onFicha }) {
   const [filtro, setFiltro] = useState('todas')
+  const [tope, setTope] = useState(8)   // cuántas entran al cuadro
   const [ronda, setRonda] = useState([])
   const [pasan, setPasan] = useState([])
   const [i, setI] = useState(0)
@@ -1525,17 +1548,22 @@ function Torneo({ lista, onFicha }) {
 
   // El cuadro solo se rehace cuando cambian de verdad los títulos, no en
   // cada refresco en tiempo real: si no, el torneo se reiniciaba solo.
-  const clave = grupo.map(p => p.id).sort().join(',')
+  const clave = grupo.map(p => p.id).sort().join(',') + '|' + tope
+
+  // Con muchas coincidencias, un cuadro completo son decenas de duelos.
+  // Se coge una muestra al azar del tamaño elegido.
+  const preparar = () => {
+    const mezcla = [...grupo].sort(() => Math.random() - 0.5)
+    return tope === 0 ? mezcla : mezcla.slice(0, tope)
+  }
 
   useEffect(() => {
-    const mezcla = [...grupo].sort(() => Math.random() - 0.5)
-    setRonda(mezcla); setPasan([]); setI(0); setCampeona(null)
+    setRonda(preparar()); setPasan([]); setI(0); setCampeona(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave])
 
   function rejugar() {
-    const mezcla = [...grupo].sort(() => Math.random() - 0.5)
-    setRonda(mezcla); setPasan([]); setI(0); setCampeona(null)
+    setRonda(preparar()); setPasan([]); setI(0); setCampeona(null)
   }
 
   function cerrarRonda(siguientes) {
@@ -1558,8 +1586,24 @@ function Torneo({ lista, onFicha }) {
     }
   }
 
+  const duelos = Math.max(0, (tope === 0 ? grupo.length : Math.min(tope, grupo.length)) - 1)
+
   const cabecera = (
-    <Filtro valor={filtro} onCambio={f => setFiltro(f)} pelis={pelis} series={series} />
+    <>
+      <Filtro valor={filtro} onCambio={f => setFiltro(f)} pelis={pelis} series={series} />
+      <div className="filtros">
+        {[[4, '4'], [8, '8'], [16, '16'], [0, 'Todas']].map(([n, nombre]) => (
+          <button key={n} className={tope === n ? 'activo' : ''}
+            onClick={() => setTope(n)}
+            disabled={n !== 0 && n > grupo.length}>
+            {nombre}
+          </button>
+        ))}
+      </div>
+      <div className="ayuda" style={{ margin: '8px 0 0' }}>
+        {duelos} duelo{duelos === 1 ? '' : 's'} hasta la ganadora.
+      </div>
+    </>
   )
 
   if (grupo.length < 2) {
