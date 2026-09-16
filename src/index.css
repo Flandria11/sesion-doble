@@ -778,3 +778,32 @@ nav .num {
   font-style: normal; font-size: 12px; font-weight: 700;
   color: rgba(247, 242, 233, .85); letter-spacing: .02em;
 }
+
+/* ---------- lista personal y comentarios ---------- */
+.redondo.marcado span { background: rgba(79, 209, 153, .85); color: var(--noche); border-color: transparent; }
+
+.comentar {
+  width: 100%; margin-top: 6px; padding: 6px 4px; border-radius: 7px;
+  border: 1px solid var(--borde); color: var(--apagado);
+  font-size: 10.5px; font-weight: 700;
+}
+.comentar:hover, .comentar:focus-visible { color: var(--ambar); border-color: var(--ambar); }
+
+/* el comentario de quien la propuso, al votar */
+.comentario {
+  background: rgba(245, 196, 81, .12); border-left: 3px solid var(--ambar);
+  border-radius: 0 8px 8px 0; padding: 8px 11px; margin-bottom: 9px;
+  font-size: 12.5px; line-height: 1.45; color: var(--papel);
+}
+.comentario b { color: var(--ambar); font-weight: 800; }
+
+.panel.chico { max-width: 380px; }
+.panel.chico .detalle { padding: 20px; }
+textarea {
+  width: 100%; min-height: 96px; resize: vertical;
+  padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--borde); background: var(--noche);
+  color: var(--papel); font-family: inherit; font-size: 14.5px; line-height: 1.5;
+}
+textarea:focus { border-color: var(--ambar); outline: none; }
+textarea::placeholder { color: #61539A; }

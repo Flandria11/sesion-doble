@@ -172,11 +172,12 @@ function Principal({ sesion, pareja }) {
   const [votos, setVotos] = useState([])
   const [nombres, setNombres] = useState({})
   const [descartes, setDescartes] = useState([])
+  const [guardados, setGuardados] = useState([])
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
 
   const recargar = useCallback(async () => {
-    const [t, v, p, d] = await Promise.all([
+    const [t, v, p, d, g] = await Promise.all([
       supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado'),
       supabase.from('votos').select('*'),
       supabase.from('perfiles').select('id, nombre'),
@@ -186,6 +187,7 @@ function Principal({ sesion, pareja }) {
     setVotos(v.data || [])
     setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Tu pareja'])))
     setDescartes(d.data || [])
+    setGuardados(g.data || [])
     setCargando(false)
   }, [pareja.id])
 
@@ -289,6 +291,36 @@ function Principal({ sesion, pareja }) {
   const motivoDescarte = p =>
     (descartes.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo) || {}).motivo
 
+  // Lista personal: lo que te apetece a ti y no quieres proponer todavía.
+  const guardada = p => guardados.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+
+  async function guardar(p) {
+    const fila = {
+      usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo, titulo: p.titulo,
+      anio: p.anio || '', cartel: p.cartel || '', fondo: p.fondo || '',
+      sinopsis: p.sinopsis || '', trailer: p.trailer || '', genero: p.genero || ''
+    }
+    setGuardados(l => [fila, ...l])
+    const { error } = await supabase.from('guardados').upsert(fila, { onConflict: 'usuario_id,tmdb_id,tipo' })
+    if (error) {
+      setAviso(`No se ha podido guardar: ${error.message}`)
+      setGuardados(l => l.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
+    }
+  }
+
+  async function olvidar(p) {
+    setGuardados(l => l.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
+    await supabase.from('guardados').delete()
+      .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
+  }
+
+  // comentario que acompaña a una propuesta
+  async function comentar(id, nota) {
+    setTitulos(l => l.map(t => (t.id === id ? { ...t, nota } : t)))
+    const { error } = await supabase.from('titulos').update({ nota }).eq('id', id)
+    if (error) setAviso(`No se ha podido guardar el comentario: ${error.message}`)
+  }
+
   async function quitar(id) {
     setTitulos(t => t.filter(x => x.id !== id))
     await supabase.from('titulos').delete().eq('id', id)
@@ -318,12 +350,16 @@ function Principal({ sesion, pareja }) {
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
                 descartada={descartada} motivoDescarte={motivoDescarte}
-                onDescartar={descartar} onRecuperar={recuperar} />}
+                onDescartar={descartar} onRecuperar={recuperar}
+                guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
             {vista === 'reel' && <Reel titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
-                descartada={descartada} onDescartar={descartar} />}
+                descartada={descartada} onDescartar={descartar}
+                guardada={guardada} onGuardar={guardar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
-            {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar} onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
+            {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
+                guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
+                onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
           </>
         )}
@@ -341,7 +377,7 @@ function Principal({ sesion, pareja }) {
 }
 
 /* ======================= añadir ======================= */
-function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar }) {
+function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('movie')
   const [modo, setModo] = useState('tendencias')
@@ -659,6 +695,13 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
             onProponer={async () => { setFicha(null); await actuar(ficha) }}
             acciones={
               <div className="rectificar">
+                {guardada(ficha)
+                  ? <button onClick={() => { onOlvidar(ficha); setFicha(null) }}>
+                      Quitar de mi lista
+                    </button>
+                  : <button onClick={() => { onGuardar(ficha); setFicha(null) }}>
+                      Guardar para mí
+                    </button>}
                 {descartada(ficha)
                   ? <button onClick={() => { onRecuperar(ficha); setFicha(null) }}>
                       {motivoDescarte(ficha) === 'vista' ? 'Marcada como vista' : 'Descartada'} · deshacer
@@ -768,7 +811,7 @@ function Trailer({ clave, titulo, cartel }) {
 }
 
 /* ======================= estrenos en vertical ======================= */
-function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) {
+function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar }) {
   const [lista, setLista] = useState([])
   const [pagina, setPagina] = useState(1)
   const [cargando, setCargando] = useState(true)
@@ -909,6 +952,10 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
                 </button>
                 <button className="redondo" onClick={() => onDescartar(p, 'vista')}>
                   <span>👁</span><i>Vista</i>
+                </button>
+                <button className={`redondo${guardada(p) ? ' marcado' : ''}`}
+                  onClick={() => onGuardar(p)} disabled={guardada(p)}>
+                  <span>🔖</span><i>{guardada(p) ? 'Guardada' : 'Para mí'}</i>
                 </button>
               </div>
 
@@ -1107,6 +1154,11 @@ function Votar({ cola, nombres, onVotar }) {
                   .filter(Boolean).join(' · ')}
               </div>
               <div className="tit">{p.titulo}</div>
+              {p.nota && (
+                <div className="comentario">
+                  <b>{nombres[p.propuesto_por] || 'Tu pareja'}:</b> {p.nota}
+                </div>
+              )}
               {p.sinopsis && (
                 <button className="sin"
                   onClick={() => setAbierta(a => (a === clave ? null : clave))}>
@@ -1123,25 +1175,32 @@ function Votar({ cola, nombres, onVotar }) {
 }
 
 /* ======================= mis pelis ======================= */
-function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
+function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSalir, codigo }) {
   const [ficha, setFicha] = useState(null)
+  const [pestana, setPestana] = useState('propuestas')
+  const [editando, setEditando] = useState(null)
+  const [texto, setTexto] = useState('')
 
-  const texto = v =>
+  const texto_voto = v =>
     v === 'si' ? 'Le gusta'
     : v === 'vista' ? 'Ya la ha visto'
     : v === 'no' ? 'Descartada'
     : 'Sin votar'
 
-  async function retirar() {
-    await onQuitar(ficha.id)
-    setFicha(null)
+  function abrirComentario(p) {
+    setEditando(p.id)
+    setTexto(p.nota || '')
+  }
+  async function guardarComentario() {
+    await onComentar(editando, texto.trim())
+    setEditando(null)
   }
 
   const pelis = lista.filter(p => p.tipo !== 'tv')
   const series = lista.filter(p => p.tipo === 'tv')
 
   const bloque = (titulo, grupo) => grupo.length > 0 && (
-    <section className="grupo">
+    <section className="grupo" key={titulo}>
       <h3>{titulo} <span>{grupo.length}</span></h3>
       <div className="catalogo">
         {grupo.map(p => {
@@ -1153,8 +1212,12 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
                 {v === 'si' && <span className="nota">Le gusta</span>}
+                {p.nota && <span className="tag">💬</span>}
               </button>
-              <div className="rotulo">{p.titulo}<i>{texto(v)}</i></div>
+              <div className="rotulo">{p.titulo}<i>{texto_voto(v)}</i></div>
+              <button className="comentar" onClick={() => abrirComentario(p)}>
+                {p.nota ? 'Editar comentario' : 'Comentar'}
+              </button>
             </div>
           )
         })}
@@ -1164,22 +1227,86 @@ function Mias({ lista, suVoto, onQuitar, onSalir, codigo }) {
 
   return (
     <>
-      <h2>Mis propuestas</h2>
-      <div className="ayuda">Lo que has propuesto y qué ha dicho la otra persona.</div>
-      {lista.length === 0
-        ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
-        : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+      <h2>Mis pelis</h2>
+
+      <div className="pestanas fina">
+        <button className={pestana === 'propuestas' ? 'activo' : ''}
+          onClick={() => setPestana('propuestas')}>
+          Propuestas <em>{lista.length}</em>
+        </button>
+        <button className={pestana === 'mias' ? 'activo' : ''}
+          onClick={() => setPestana('mias')}>
+          Para mí <em>{guardados.length}</em>
+        </button>
+      </div>
+
+      {pestana === 'propuestas' && (
+        <>
+          <div className="ayuda">Lo que has propuesto y qué ha dicho la otra persona.</div>
+          {lista.length === 0
+            ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
+            : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+        </>
+      )}
+
+      {pestana === 'mias' && (
+        <>
+          <div className="ayuda">Solo para ti. La otra persona no ve esta lista.</div>
+          {guardados.length === 0
+            ? <div className="vacio"><b>Nada guardado</b>Usa «Para mí» en Estrenos o en la ficha de cualquier título.</div>
+            : (
+              <div className="catalogo">
+                {guardados.map(p => (
+                  <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
+                    <button className="lamina" onClick={() => setFicha(p)}
+                      aria-label={`Ver información de ${p.titulo}`}>
+                      <img src={p.cartel} alt="" loading="lazy" />
+                      <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+                    </button>
+                    <div className="rotulo">{p.titulo}<i>{p.anio}</i></div>
+                    <button className="comentar" onClick={() => onOlvidar(p)}>Quitar</button>
+                  </div>
+                ))}
+              </div>
+            )}
+        </>
+      )}
+
       <div className="pie">
         Código de pareja: <b>{codigo}</b><br />
         <button onClick={onSalir}>Cerrar sesión</button>
       </div>
+
+      {editando && (
+        <div className="telon" onClick={() => setEditando(null)}>
+          <div className="panel chico" onClick={e => e.stopPropagation()}>
+            <div className="detalle">
+              <h3>Tu comentario</h3>
+              <div className="ayuda" style={{ marginBottom: 12 }}>
+                Lo verá la otra persona al votar esta propuesta.
+              </div>
+              <textarea value={texto} onChange={e => setTexto(e.target.value)}
+                placeholder="Esta es de mis favoritas…" maxLength={200} autoFocus />
+              <button className="btn" onClick={guardarComentario}>Guardar</button>
+              <button className="btn suave" onClick={() => setEditando(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
           onCerrar={() => setFicha(null)}
           onProponer={() => setFicha(null)}
           acciones={
             <div className="rectificar">
-              <button onClick={retirar}>Retirar mi propuesta</button>
+              {ficha.id
+                ? <button onClick={async () => { await onQuitar(ficha.id); setFicha(null) }}>
+                    Retirar mi propuesta
+                  </button>
+                : <button onClick={() => { onOlvidar(ficha); setFicha(null) }}>
+                    Quitar de mi lista
+                  </button>}
             </div>
           } />
       )}
