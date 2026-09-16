@@ -921,7 +921,13 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     estrenos(pagina)
       .then(r => {
         if (!vivo) return
-        setLista(ant => (pagina === 1 ? r : [...ant, ...r]))
+        // al pedir más, se descartan las que ya estaban: con el orden
+        // barajado podrían repetirse entre tandas
+        setLista(ant => {
+          if (pagina === 1) return r
+          const claves = new Set(ant.map(x => `${x.tipo}-${x.tmdb_id}`))
+          return [...ant, ...r.filter(x => !claves.has(`${x.tipo}-${x.tmdb_id}`))]
+        })
         setError('')
       })
       .catch(() => vivo && setError('No se han podido cargar los estrenos.'))
