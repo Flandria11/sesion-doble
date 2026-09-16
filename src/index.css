@@ -391,11 +391,11 @@ input::placeholder { color: #61539A; }
 .centro {
   position: absolute; top: 42%; left: 50%; z-index: 6;
   transform: translate(-50%, -50%) scale(.8);
-  width: 60px; height: 60px; border-radius: 50%;
+  width: 74px; height: 74px; border-radius: 50%;
   background: rgba(8, 4, 16, .45); backdrop-filter: blur(6px);
   border: 1.5px solid rgba(247, 242, 233, .3);
   display: flex; align-items: center; justify-content: center;
-  color: var(--papel); font-size: 18px; line-height: 1;
+  color: var(--papel); font-size: 23px; line-height: 1;
   /* mientras se reproduce no se ve, pero sigue recibiendo el toque:
      así el gesto natural de tocar el centro funciona igual */
   opacity: 0; transition: opacity .22s ease, transform .22s ease;
