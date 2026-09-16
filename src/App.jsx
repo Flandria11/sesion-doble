@@ -181,7 +181,8 @@ function Principal({ sesion, pareja }) {
       supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado'),
       supabase.from('votos').select('*'),
       supabase.from('perfiles').select('id, nombre'),
-      supabase.from('descartes').select('tmdb_id, tipo')
+      supabase.from('descartes').select('tmdb_id, tipo, motivo'),
+      supabase.from('guardados').select('*').order('creado', { ascending: false })
     ])
     setTitulos(t.data || [])
     setVotos(v.data || [])
@@ -189,6 +190,9 @@ function Principal({ sesion, pareja }) {
     setDescartes(d.data || [])
     setGuardados(g.data || [])
     setCargando(false)
+    // si alguna consulta falla, se avisa en vez de dejar la pantalla a medias
+    const fallo = [t, v, p, d, g].find(r => r && r.error)
+    if (fallo) setAviso(`Error al cargar: ${fallo.error.message}`)
   }, [pareja.id])
 
   useEffect(() => { recargar() }, [recargar])
