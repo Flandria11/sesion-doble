@@ -123,8 +123,10 @@ input:focus { border-color: var(--ambar); outline: none; }
    hace zoom al tocar el campo. Lo que sí se puede encoger es la altura y
    el tamaño del texto de ejemplo, que es lo que se ve casi siempre. */
 .busca {
-  padding: 3px 10px; font-size: 16px; line-height: 1.5;
-  border-radius: 7px; border-color: var(--terciopelo);
+  width: auto; max-width: 240px;
+  padding: 4px 11px; font-size: 16px; line-height: 1.45;
+  border-radius: 16px; border-color: var(--terciopelo);
+  background: var(--sala);
 }
 .busca::placeholder { font-size: 12px; }
 input::placeholder { color: #61539A; }
