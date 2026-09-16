@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
+import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -209,11 +209,13 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       supabase.from('descartes').select('*'),
       supabase.from('guardados').select('*').order('creado', { ascending: false })
     ])
-    setTitulos(t.data || [])
-    setVotos(v.data || [])
-    setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Alguien'])))
-    setDescartes(d.data || [])
-    setGuardados(g.data || [])
+    // si una consulta falla, se deja lo que ya había en vez de vaciarlo:
+    // mejor una lista algo vieja que una lista vacía que no es verdad
+    if (!t.error) setTitulos(t.data || [])
+    if (!v.error) setVotos(v.data || [])
+    if (!p.error) setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Alguien'])))
+    if (!d.error) setDescartes(d.data || [])
+    if (!g.error) setGuardados(g.data || [])
     setCargando(false)
     // si alguna consulta falla, se avisa en vez de dejar la pantalla a medias
     const fallo = [t, v, p, d, g].find(r => r && r.error)
@@ -248,12 +250,23 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   ]
 
   async function votar(tituloId, voto) {
+    const anterior = votos.find(v => v.titulo_id === tituloId && v.usuario_id === yo)
     setVotos(v => [...v.filter(x => !(x.titulo_id === tituloId && x.usuario_id === yo)),
       { titulo_id: tituloId, usuario_id: yo, voto }])
-    await supabase.from('votos').upsert(
+    const { error } = await supabase.from('votos').upsert(
       { titulo_id: tituloId, usuario_id: yo, voto },
       { onConflict: 'titulo_id,usuario_id' }
     )
+    if (error) {
+      console.error('votos:', error)
+      setAviso('No se ha podido guardar el voto: ' + detalle(error))
+      // se deshace: sin esto, el voto se veía puesto aunque no se hubiera
+      // guardado, y desaparecía solo en el siguiente refresco
+      setVotos(v => {
+        const sinEste = v.filter(x => !(x.titulo_id === tituloId && x.usuario_id === yo))
+        return anterior ? [...sinEste, anterior] : sinEste
+      })
+    }
   }
 
   async function anadir(p, nota = '') {
@@ -341,9 +354,15 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 
   // comentario que acompaña a una propuesta
   async function comentar(id, nota) {
+    const anterior = (titulos.find(t => t.id === id) || {}).nota
     setTitulos(l => l.map(t => (t.id === id ? { ...t, nota } : t)))
     const { error } = await supabase.from('titulos').update({ nota }).eq('id', id)
-    if (error) setAviso('No se ha podido guardar el comentario: ' + detalle(error))
+    if (error) {
+      setAviso('No se ha podido guardar el comentario: ' + detalle(error))
+      // se deshace: si no, se veía el comentario nuevo como guardado
+      // aunque el servidor lo hubiera rechazado
+      setTitulos(l => l.map(t => (t.id === id ? { ...t, nota: anterior } : t)))
+    }
   }
 
   /**
@@ -357,8 +376,16 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   }
 
   async function quitar(id) {
+    const anterior = titulos.find(x => x.id === id)
     setTitulos(t => t.filter(x => x.id !== id))
-    await supabase.from('titulos').delete().eq('id', id)
+    const { error } = await supabase.from('titulos').delete().eq('id', id)
+    if (error) {
+      console.error('titulos:', error)
+      setAviso('No se ha podido retirar la propuesta: ' + detalle(error))
+      // se recupera: si no, se veía retirada aunque el borrado hubiera
+      // fallado, y reaparecía sola de la nada en el siguiente refresco
+      if (anterior) setTitulos(t => [...t, anterior])
+    }
   }
 
   const pestanas = [
@@ -1898,7 +1925,7 @@ function Torneo({ lista, onFicha }) {
   // Con muchas coincidencias, un cuadro completo son decenas de duelos.
   // Se coge una muestra al azar del tamaño elegido.
   const preparar = () => {
-    const mezcla = [...grupo].sort(() => Math.random() - 0.5)
+    const mezcla = barajar(grupo)
     return tope === 0 ? mezcla : mezcla.slice(0, tope)
   }
 

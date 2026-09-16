@@ -235,7 +235,7 @@ export async function recientes(pagina = 1, tipo = 'movie') {
  * un estreno de hace dos meses no ha tenido tiempo de acumular votos, y
  * con el mínimo de 250 que usamos en Añadir esto saldría vacío.
  */
-const barajar = l => {
+export const barajar = l => {
   const a = [...l]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))

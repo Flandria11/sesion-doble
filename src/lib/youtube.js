@@ -20,8 +20,11 @@ export function cargarYT() {
     s.async = true
     s.onerror = () => { promesa = null; mal(new Error('no se pudo cargar YouTube')) }
     document.head.appendChild(s)
-    // si tarda demasiado, que el reproductor pueda seguir sin la API
-    setTimeout(() => mal(new Error('tiempo agotado')), 8000)
+    // si tarda demasiado, que el reproductor pueda seguir sin la API.
+    // Se olvida también el intento, igual que en el error de arriba: si no,
+    // la próxima tarjeta se quedaría con el reproductor simple para
+    // siempre, aunque la API acabase cargando poco después.
+    setTimeout(() => { promesa = null; mal(new Error('tiempo agotado')) }, 8000)
   })
 
   return promesa
