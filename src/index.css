@@ -380,7 +380,7 @@ input::placeholder { color: #61539A; }
 /* el vídeo va desplazado hacia arriba para que el título y el logo que
    YouTube dibuja en su borde superior queden fuera de la vista */
 .diapo iframe, .diapo .marco {
-  position: absolute; left: 0; top: -6%;
+  position: absolute; left: 0; top: -5%;
   width: 100%; height: 100%;
   border: 0; pointer-events: none;
 }
