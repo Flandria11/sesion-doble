@@ -231,69 +231,18 @@ function Principal({ sesion, pareja }) {
     )
   }
 
-  async function anadir(p) {
-    const trailer = await buscarTrailer(p.tmdb_id, p.tipo)
-    const genero = await generos(p.tmdb_id, p.tipo)
-    const { error } = await supabase.from('titulos').insert({
+  async function anadir(p, nota = '') {
+    const { data, error } = await supabase.from('titulos').insert({
       pareja_id: pareja.id, propuesto_por: yo,
       tmdb_id: p.tmdb_id, tipo: p.tipo, titulo: p.titulo,
       anio: p.anio, cartel: p.cartel, fondo: p.fondo,
-      sinopsis: p.sinopsis, trailer, genero
-    })
-    if (!error) recargar()
-    return !error
+      sinopsis: p.sinopsis, trailer: p.trailer, genero: p.genero,
+      nota: nota || null
+    }).select().single()
+    if (error) { setAviso(`No se ha podido proponer: ${error.message}`); return null }
+    recargar()
+    return data
   }
-
-  // Rectificar desde coincidencias: si la propuse yo, cambio el voto de la
-  // otra persona no puedo, asi que retiro mi propuesta; si la propuso ella,
-  // cambio mi voto.
-  async function rectificar(p, voto) {
-    if (p.propuesto_por === yo) {
-      await quitar(p.id)
-    } else {
-      await votar(p.id, voto)
-    }
-  }
-
-  // Los descartes son de cada uno: lo que tú no quieres ver le sigue
-  // apareciendo a la otra persona, que para eso tenéis gustos distintos.
-  async function descartar(p, motivo = 'no_interesa') {
-    const fila = { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo, motivo }
-    setDescartes(l => [
-      ...l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)),
-      fila
-    ])
-
-    const { error } = await supabase.from('descartes')
-      .upsert(fila, { onConflict: 'usuario_id,tmdb_id,tipo' })
-
-    if (error) {
-      // sin esto el fallo se perdía en silencio y los descartes volvían
-      console.error('descartes:', error)
-      setAviso(`No se ha podido guardar el descarte: ${error.message}`)
-      setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
-      return
-    }
-    setAviso('')
-
-    // si la habías propuesto tú, se retira
-    const mia = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo && t.propuesto_por === yo)
-    if (mia) await quitar(mia.id)
-  }
-
-  async function recuperar(p) {
-    setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
-    const { error } = await supabase.from('descartes').delete()
-      .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
-    if (error) {
-      console.error('descartes:', error)
-      setAviso(`No se ha podido deshacer: ${error.message}`)
-    }
-  }
-
-  const descartada = p => descartes.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
-  const motivoDescarte = p =>
-    (descartes.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo) || {}).motivo
 
   // Lista personal: lo que te apetece a ti y no quieres proponer todavía.
   const guardada = p => guardados.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
@@ -359,7 +308,7 @@ function Principal({ sesion, pareja }) {
             {vista === 'reel' && <Reel titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
                 descartada={descartada} onDescartar={descartar}
-                guardada={guardada} onGuardar={guardar} />}
+                guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
@@ -454,7 +403,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     return { tipo: 'suyo', t: x }
   }
 
-  async function actuar(p) {
+  async function actuar(p, nota = '') {
     const e = estado(p)
     if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
     setAnadiendo(p.tmdb_id)
@@ -463,7 +412,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
       setAnadiendo(null)
       setFiesta(p)
     } else {
-      const ok = await onAdd(p)
+      const ok = await onAdd(p, nota)
       setAnadiendo(null)
       if (ok) {
         setFlash(`${p.titulo} está en tu lista`)
@@ -693,10 +642,10 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
         const e = estado(ficha)
         const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
         return (
-          <Ficha p={ficha} puesta={!!visible}
+          <Ficha p={ficha} puesta={!!visible} conNota
             etiquetaPuesta={visible === 'coincide' ? '¡Ya coincidís en esta!' : 'Ya la propusiste tú'}
             onCerrar={() => setFicha(null)}
-            onProponer={async () => { setFicha(null); await actuar(ficha) }}
+            onProponer={async nota => { setFicha(null); await actuar(ficha, nota) }}
             acciones={
               <div className="rectificar">
                 {guardada(ficha)
@@ -725,6 +674,27 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
       {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
     </>
+  )
+}
+
+/* ---- ventana de comentario, usada al proponer y al editar ---- */
+function Comentario({ inicial = '', titulo, onGuardar, onCerrar }) {
+  const [texto, setTexto] = useState(inicial)
+  return (
+    <div className="telon" onClick={onCerrar}>
+      <div className="panel chico" onClick={e => e.stopPropagation()}>
+        <div className="detalle">
+          <h3>Tu comentario</h3>
+          <div className="ayuda" style={{ marginBottom: 12 }}>
+            {titulo ? `Sobre ${titulo}. ` : ''}Lo verá la otra persona al votarla.
+          </div>
+          <textarea value={texto} onChange={e => setTexto(e.target.value)}
+            placeholder="Esta es de mis favoritas…" maxLength={200} autoFocus />
+          <button className="btn" onClick={() => onGuardar(texto.trim())}>Guardar</button>
+          <button className="btn suave" onClick={onCerrar}>Cancelar</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -815,7 +785,7 @@ function Trailer({ clave, titulo, cartel }) {
 }
 
 /* ======================= estrenos en vertical ======================= */
-function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar }) {
+function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar, onComentar }) {
   const [lista, setLista] = useState([])
   const [pagina, setPagina] = useState(1)
   const [cargando, setCargando] = useState(true)
@@ -825,6 +795,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
   const [anadiendo, setAnadiendo] = useState(null)
   const [fiesta, setFiesta] = useState(null)
   const [abierta, setAbierta] = useState(null)
+  const [recien, setRecien] = useState(null)   // recién propuesta, por si quieres comentarla
+  const [comentando, setComentando] = useState(null)
   const pista = useRef(null)
 
   const estado = p => {
@@ -908,8 +880,12 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
       setAnadiendo(null)
       setFiesta(p)
     } else {
-      await onAdd(p)
+      const fila = await onAdd(p)
       setAnadiendo(null)
+      if (fila) {
+        setRecien({ ...fila, titulo: p.titulo })
+        setTimeout(() => setRecien(r => (r && r.id === fila.id ? null : r)), 6000)
+      }
     }
   }
 
@@ -981,6 +957,22 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
           )
         })}
       </div>
+      {recien && !comentando && (
+        <div className="propuesta-hecha">
+          <span>{recien.titulo} está en tu lista</span>
+          <button onClick={() => setComentando(recien)}>Comentar</button>
+        </div>
+      )}
+
+      {comentando && (
+        <Comentario titulo={comentando.titulo} inicial={comentando.nota || ''}
+          onCerrar={() => setComentando(null)}
+          onGuardar={async nota => {
+            await onComentar(comentando.id, nota)
+            setComentando(null); setRecien(null)
+          }} />
+      )}
+
       {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
     </>
   )
@@ -1027,11 +1019,12 @@ function Fiesta({ p, onCerrar }) {
 }
 
 /* ---- ficha con tráiler ---- */
-function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, onCerrar, onProponer }) {
+function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [donde, setDonde] = useState([])
   const [abierta, setAbierta] = useState(false)
+  const [nota, setNota] = useState('')
 
   useEffect(() => {
     let vivo = true
@@ -1079,9 +1072,14 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
             </div>
           )}
           {trailer === '' && <div className="aviso">No hay tráiler disponible para este título.</div>}
+          {!ocultarBoton && conNota && !puesta && (
+            <textarea className="nota-corta" value={nota}
+              onChange={e => setNota(e.target.value)} maxLength={200}
+              placeholder="Comentario para tu pareja (opcional)" />
+          )}
           {!ocultarBoton && (
             <button className={`btn${puesta ? ' suave' : ''}`}
-              onClick={onProponer} disabled={puesta}>
+              onClick={() => onProponer(nota.trim())} disabled={puesta}>
               {puesta ? (etiquetaPuesta || 'Ya está en tu lista') : (etiquetaBoton || 'Proponer')}
             </button>
           )}
@@ -1195,11 +1193,6 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
     setEditando(p.id)
     setTexto(p.nota || '')
   }
-  async function guardarComentario() {
-    await onComentar(editando, texto.trim())
-    setEditando(null)
-  }
-
   const pelis = lista.filter(p => p.tipo !== 'tv')
   const series = lista.filter(p => p.tipo === 'tv')
 
@@ -1282,20 +1275,10 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
       </div>
 
       {editando && (
-        <div className="telon" onClick={() => setEditando(null)}>
-          <div className="panel chico" onClick={e => e.stopPropagation()}>
-            <div className="detalle">
-              <h3>Tu comentario</h3>
-              <div className="ayuda" style={{ marginBottom: 12 }}>
-                Lo verá la otra persona al votar esta propuesta.
-              </div>
-              <textarea value={texto} onChange={e => setTexto(e.target.value)}
-                placeholder="Esta es de mis favoritas…" maxLength={200} autoFocus />
-              <button className="btn" onClick={guardarComentario}>Guardar</button>
-              <button className="btn suave" onClick={() => setEditando(null)}>Cancelar</button>
-            </div>
-          </div>
-        </div>
+        <Comentario titulo={(lista.find(x => x.id === editando) || {}).titulo}
+          inicial={texto}
+          onCerrar={() => setEditando(null)}
+          onGuardar={async nota => { await onComentar(editando, nota); setEditando(null) }} />
       )}
 
       {ficha && (
