@@ -289,6 +289,21 @@ input::placeholder { color: #61539A; }
   font-size: 8.5px; font-weight: 800; letter-spacing: .02em;
   padding: 3px 5px; border-radius: 5px;
 }
+/* quién ha dicho qué, sobre la carátula, en el historial */
+.marcas {
+  position: absolute; left: 5px; right: 5px; bottom: 5px; z-index: 2;
+  display: flex; flex-wrap: wrap; gap: 3px;
+}
+.marcas i {
+  font-style: normal; font-size: 8.5px; font-weight: 800;
+  padding: 2px 5px; border-radius: 4px;
+  background: rgba(8, 4, 16, .85); backdrop-filter: blur(3px);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.marcas i.si { color: var(--si); }
+.marcas i.no { color: var(--no); }
+.marcas i.vista { color: var(--apagado); }
+
 /* etiqueta de estado sobre la carátula: al lado del título se perdía
    cuando el nombre era largo */
 .sello-foto {

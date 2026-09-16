@@ -359,7 +359,8 @@ function Principal({ sesion, pareja }) {
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
                 onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
-            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
+            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
+                todos={titulos} votos={votos} nombres={nombres} yo={yo} />}
           </>
         )}
       </main>
@@ -1359,7 +1360,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar }) {
+function Matches({ lista, onRectificar, todos, votos, nombres, yo }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
 
@@ -1407,6 +1408,7 @@ function Matches({ lista, onRectificar }) {
         <button className={juego === 'lista' ? 'activo' : ''} onClick={() => setJuego('lista')}>Lista</button>
         <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
         <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
+        <button className={juego === 'historial' ? 'activo' : ''} onClick={() => setJuego('historial')}>Historial</button>
       </div>
 
       {juego === 'lista' && (
@@ -1417,6 +1419,9 @@ function Matches({ lista, onRectificar }) {
       )}
       {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
       {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
+      {juego === 'historial' && (
+        <Historial todos={todos} votos={votos} nombres={nombres} yo={yo} onFicha={setFicha} />
+      )}
 
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
@@ -1429,6 +1434,73 @@ function Matches({ lista, onRectificar }) {
             </div>
           } />
       )}
+    </>
+  )
+}
+
+/* ---- historial: qué ha dicho cada uno de cada título ----
+ * Coincidencias solo guarda lo que os gusta a los dos. Aquí se ve todo
+ * lo demás: lo descartado y lo ya visto, y de quién es cada voto.
+ */
+function Historial({ todos, votos, nombres, yo, onFicha }) {
+  const [estado, setEstado] = useState('si')
+
+  const voto = (tituloId, usuario) => {
+    const v = votos.find(x => x.titulo_id === tituloId && x.usuario_id === usuario)
+    return v ? v.voto : null
+  }
+  const nombre = u => (u === yo ? 'Tú' : (nombres[u] || 'Tu pareja'))
+
+  // por cada título, quién ha dicho qué (quien propone dice que sí)
+  const fichas = todos.map(t => {
+    const gente = [...new Set([t.propuesto_por, ...votos.filter(v => v.titulo_id === t.id).map(v => v.usuario_id)])]
+    const marcas = gente.map(u => ({
+      usuario: u,
+      voto: u === t.propuesto_por ? (voto(t.id, u) || 'si') : voto(t.id, u)
+    })).filter(m => m.voto)
+    return { ...t, marcas }
+  })
+
+  const ESTADOS = [
+    ['si', 'Les gustan'],
+    ['vista', 'Ya vistas'],
+    ['no', 'Descartadas']
+  ]
+  const visibles = fichas.filter(f => f.marcas.some(m => m.voto === estado))
+
+  return (
+    <>
+      <div className="filtros">
+        {ESTADOS.map(([id, nombreEstado]) => (
+          <button key={id} className={estado === id ? 'activo' : ''}
+            onClick={() => setEstado(id)}>
+            {nombreEstado} · {fichas.filter(f => f.marcas.some(m => m.voto === id)).length}
+          </button>
+        ))}
+      </div>
+
+      {visibles.length === 0
+        ? <div className="vacio"><b>Nada aquí</b>Todavía no hay títulos en este estado.</div>
+        : (
+          <div className="catalogo">
+            {visibles.map(p => (
+              <div className="tarjeta" key={p.id}>
+                <button className="lamina" onClick={() => onFicha(p)}
+                  aria-label={`Ver información de ${p.titulo}`}>
+                  <img src={p.cartel} alt="" loading="lazy" />
+                  <span className="marcas">
+                    {p.marcas.map(m => (
+                      <i key={m.usuario} className={m.voto}>
+                        {nombre(m.usuario)}
+                      </i>
+                    ))}
+                  </span>
+                </button>
+                <div className="rotulo">{p.titulo}</div>
+              </div>
+            ))}
+          </div>
+        )}
     </>
   )
 }
@@ -1576,7 +1648,7 @@ function Torneo({ lista, onFicha }) {
     <>
       <Filtro valor={filtro} onCambio={f => setFiltro(f)} pelis={pelis} series={series} />
       <div className="filtros">
-        {[[4, '4'], [8, '8'], [16, '16'], [0, 'Todas']].map(([n, nombre]) => (
+        {[[8, '8'], [16, '16'], [32, '32'], [0, 'Todas']].map(([n, nombre]) => (
           <button key={n} className={tope === n ? 'activo' : ''}
             onClick={() => setTope(n)}
             disabled={n !== 0 && n > grupo.length}>
