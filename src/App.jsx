@@ -7,6 +7,7 @@ import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, bus
 export default function App() {
   const [sesion, setSesion] = useState(undefined)
   const [pareja, setPareja] = useState(undefined)
+  const [parejas, setParejas] = useState([])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSesion(data.session))
@@ -17,24 +18,41 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  // Se puede pertenecer a varios grupos: con la novia, con amigos… El
+  // elegido se recuerda en este dispositivo.
   const cargarPareja = useCallback(async () => {
     if (!sesion) return
     const { data } = await supabase
       .from('miembros')
       .select('pareja_id, parejas(codigo)')
       .eq('usuario_id', sesion.user.id)
-      .maybeSingle()
-    setPareja(data ? { id: data.pareja_id, codigo: data.parejas?.codigo } : null)
+    const lista = (data || []).map(x => ({ id: x.pareja_id, codigo: x.parejas?.codigo }))
+    setParejas(lista)
+
+    let elegida = null
+    try {
+      const guardada = localStorage.getItem('sd:pareja')
+      elegida = lista.find(x => x.id === guardada) || null
+    } catch (e) { /* navegación privada */ }
+    setPareja(elegida || lista[0] || null)
   }, [sesion])
 
   useEffect(() => { if (sesion) cargarPareja() }, [sesion, cargarPareja])
+
+  function cambiarPareja(p) {
+    try { localStorage.setItem('sd:pareja', p.id) } catch (e) { /* privada */ }
+    setPareja(p)
+  }
 
   if (sesion === undefined) return <Marco><div className="cargando">Abriendo la taquilla…</div></Marco>
   if (!sesion) return <Marco sub="Dos listas, un plan"><Acceso /></Marco>
   if (pareja === undefined) return <Marco><div className="cargando">Cargando…</div></Marco>
   if (!pareja) return <Marco sub="Falta emparejar"><Emparejar alUnir={cargarPareja} /></Marco>
 
-  return <Principal sesion={sesion} pareja={pareja} />
+  return (
+    <Principal key={pareja.id} sesion={sesion} pareja={pareja}
+      parejas={parejas} onCambiarPareja={cambiarPareja} onRecargarParejas={cargarPareja} />
+  )
 }
 
 function Marco({ children, sub }) {
@@ -153,7 +171,7 @@ function Emparejar({ alUnir }) {
 }
 
 /* ======================= app principal ======================= */
-function Principal({ sesion, pareja }) {
+function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas }) {
   const yo = sesion.user.id
   // la pestaña se recuerda, para no volver siempre a Añadir al recargar
   const [vista, setVista] = useState(() => {
@@ -174,6 +192,7 @@ function Principal({ sesion, pareja }) {
   const [descartes, setDescartes] = useState([])
   const [guardados, setGuardados] = useState([])
   const [aviso, setAviso] = useState('')
+  const [ajustes, setAjustes] = useState(false)
   const [cargando, setCargando] = useState(true)
 
   const recargar = useCallback(async () => {
@@ -358,12 +377,19 @@ function Principal({ sesion, pareja }) {
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
+                onAjustes={() => setAjustes(true)}
                 onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
                 todos={titulos} votos={votos} nombres={nombres} yo={yo} />}
           </>
         )}
       </main>
+      {ajustes && (
+        <Ajustes yo={yo} nombres={nombres} parejas={parejas} pareja={pareja}
+          onCambiarPareja={onCambiarPareja} onRecargarParejas={onRecargarParejas}
+          onCerrar={() => setAjustes(false)} />
+      )}
+
       <nav>
         {pestanas.map(([id, texto, num]) => (
           <button key={id} className={vista === id ? 'activo' : ''} onClick={() => setVista(id)}>
@@ -1234,8 +1260,106 @@ function Votar({ cola, nombres, onVotar }) {
   )
 }
 
+/* ======================= ajustes ======================= */
+function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarParejas, onCerrar }) {
+  const [nombre, setNombre] = useState(nombres[yo] === 'Tu pareja' ? '' : (nombres[yo] || ''))
+  const [pass, setPass] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [ok, setOk] = useState('')
+  const [error, setError] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+
+  async function guardarNombre() {
+    setOcupado(true); setError(''); setOk('')
+    const { error } = await supabase.from('perfiles').update({ nombre: nombre.trim() }).eq('id', yo)
+    setOcupado(false)
+    if (error) setError(error.message)
+    else { setOk('Nombre guardado'); onRecargarParejas() }
+  }
+
+  async function cambiarPass() {
+    if (pass.length < 8) return setError('La contraseña necesita 8 caracteres como mínimo.')
+    setOcupado(true); setError(''); setOk('')
+    const { error } = await supabase.auth.updateUser({ password: pass })
+    setOcupado(false)
+    if (error) setError(error.message)
+    else { setOk('Contraseña cambiada'); setPass('') }
+  }
+
+  async function crearGrupo() {
+    setOcupado(true); setError(''); setOk('')
+    const { data, error } = await supabase.rpc('crear_pareja')
+    setOcupado(false)
+    if (error) return setError(error.message)
+    setOk(`Grupo creado. Código: ${data}`)
+    await onRecargarParejas()
+  }
+
+  async function unirseGrupo() {
+    setOcupado(true); setError(''); setOk('')
+    const { error } = await supabase.rpc('unirse_pareja', { cod: codigo })
+    setOcupado(false)
+    if (error) return setError('No existe ningún grupo con ese código.')
+    setCodigo(''); setOk('Te has unido al grupo')
+    await onRecargarParejas()
+  }
+
+  return (
+    <div className="telon" onClick={onCerrar}>
+      <div className="panel chico" onClick={e => e.stopPropagation()}>
+        <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
+        <div className="detalle">
+          <h3>Ajustes</h3>
+          {ok && <div className="ok" style={{ marginTop: 12 }}>{ok}</div>}
+          {error && <div className="error">{error}</div>}
+
+          <div className="bloque-ajuste">
+            <label>Tu nombre</label>
+            <div className="ayuda">Es el que ve la otra persona en sus propuestas.</div>
+            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+              placeholder="Tu nombre" />
+            <button className="btn suave" onClick={guardarNombre}
+              disabled={ocupado || !nombre.trim()}>Guardar nombre</button>
+          </div>
+
+          <div className="bloque-ajuste">
+            <label>Contraseña</label>
+            <input type="password" value={pass} onChange={e => setPass(e.target.value)}
+              placeholder="Nueva contraseña" autoComplete="new-password" />
+            <button className="btn suave" onClick={cambiarPass}
+              disabled={ocupado || !pass}>Cambiar contraseña</button>
+          </div>
+
+          <div className="bloque-ajuste">
+            <label>Tus grupos</label>
+            <div className="ayuda">Cada grupo tiene sus propias listas y coincidencias.</div>
+            <div className="grupos">
+              {parejas.map(p => (
+                <button key={p.id}
+                  className={`grupo-fila${p.id === pareja.id ? ' activo' : ''}`}
+                  onClick={() => { onCambiarPareja(p); onCerrar() }}>
+                  <span>Código {p.codigo}</span>
+                  {p.id === pareja.id && <i>En uso</i>}
+                </button>
+              ))}
+            </div>
+            <button className="btn suave" onClick={crearGrupo} disabled={ocupado}>
+              Crear un grupo nuevo
+            </button>
+            <div className="anadir" style={{ marginTop: 10 }}>
+              <input type="text" value={codigo} placeholder="Código de otro grupo"
+                onChange={e => setCodigo(e.target.value.toUpperCase())} />
+              <button onClick={unirseGrupo} disabled={ocupado || codigo.length < 4}>+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ======================= mis pelis ======================= */
-function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSalir, codigo }) {
+function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSalir, codigo, onAjustes }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
   const [editando, setEditando] = useState(null)
@@ -1328,8 +1452,8 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
       )}
 
       <div className="pie">
-        Código de pareja: <b>{codigo}</b><br />
-        <button onClick={onSalir}>Cerrar sesión</button>
+        Código del grupo: <b>{codigo}</b><br />
+        <button onClick={onAjustes}>Ajustes</button> · <button onClick={onSalir}>Cerrar sesión</button>
       </div>
 
       {editando && (

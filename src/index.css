@@ -869,3 +869,40 @@ textarea::placeholder { color: #61539A; }
 
 /* campo de comentario dentro de la ficha */
 .nota-corta { min-height: 62px; margin-top: 14px; font-size: 13.5px; }
+
+/* fila de campo + botón (unirse a un grupo) */
+.anadir { display: flex; gap: 8px; }
+.anadir input { flex: 1; margin-bottom: 0; }
+.anadir button {
+  flex-shrink: 0; background: var(--ambar); color: var(--noche);
+  border-radius: 10px; padding: 0 18px; font-size: 20px; font-weight: 800;
+  line-height: 0;
+}
+.anadir button:disabled { opacity: .45; }
+
+/* ---------- ajustes ---------- */
+.bloque-ajuste {
+  margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--terciopelo);
+}
+.bloque-ajuste:first-of-type { border-top: 0; padding-top: 0; }
+.bloque-ajuste label {
+  display: block; font-family: 'Anton', sans-serif; font-size: 13px;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ambar);
+  margin-bottom: 6px;
+}
+.bloque-ajuste .ayuda { margin-bottom: 8px; }
+.bloque-ajuste input { margin-bottom: 4px; }
+
+.grupos { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
+.grupo-fila {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 13px; border-radius: 10px;
+  border: 1px solid var(--borde); background: var(--noche);
+  font-size: 13.5px; font-weight: 600; color: var(--papel);
+}
+.grupo-fila.activo { border-color: var(--ambar); }
+.grupo-fila i {
+  font-style: normal; font-size: 10.5px; font-weight: 800;
+  color: var(--noche); background: var(--ambar);
+  border-radius: 10px; padding: 2px 8px;
+}
