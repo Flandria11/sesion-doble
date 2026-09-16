@@ -363,7 +363,6 @@ input::placeholder { color: #61539A; }
   background: rgba(8, 4, 16, .72); backdrop-filter: blur(8px);
   border-radius: 20px; padding: 7px 13px; font-size: 12px; font-weight: 800;
 }
-.chip.izq { left: 15px; color: var(--ambar); }
 .chip.der { right: 15px; color: var(--papel); }
 
 /* ---------- carrusel vertical (Estrenos y Votar) ----------
@@ -427,8 +426,10 @@ input::placeholder { color: #61539A; }
 }
 
 /* mandos discretos del vídeo, arriba a la derecha */
+/* siempre a la izquierda, en todas las pantallas: a la derecha chocaba
+   con la cruz de cerrar en las fichas */
 .mandos-video {
-  position: absolute; top: 14px; right: 14px; z-index: 5;
+  position: absolute; top: 14px; left: 14px; z-index: 5;
   display: flex; gap: 7px;
 }
 .mandos-video button {
@@ -897,9 +898,7 @@ textarea::placeholder { color: #61539A; }
   scroll-snap-align: none;
 }
 .diapo.suelta .cerrar { top: 12px; right: 12px; z-index: 9; }
-/* el altavoz y la pausa se van a la izquierda: a la derecha chocaban
-   con la cruz de cerrar */
-.diapo.suelta .mandos-video { right: auto; left: 12px; top: 12px; }
+.diapo.suelta .mandos-video { top: 12px; left: 12px; }
 
 /* el bloque de texto sube y deja hueco para la barra inferior, que si no
    recortaba los botones */

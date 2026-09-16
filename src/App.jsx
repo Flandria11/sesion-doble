@@ -4,6 +4,11 @@ import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
 import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
 
+/** Supabase manda el motivo repartido en varios campos; sin ellos un 400
+ *  no dice nada. */
+const detalle = e =>
+  [e.message, e.details, e.hint, e.code && `(${e.code})`].filter(Boolean).join(' · ')
+
 /* ======================= raíz ======================= */
 export default function App() {
   const [sesion, setSesion] = useState(undefined)
@@ -259,7 +264,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       sinopsis: p.sinopsis, trailer: p.trailer, genero: p.genero,
       nota: nota || null
     }).select().single()
-    if (error) { setAviso(`No se ha podido proponer: ${error.message}`); return null }
+    if (error) { console.error('titulos:', error); setAviso('No se ha podido proponer: ' + detalle(error)); return null }
     recargar()
     return data
   }
@@ -284,7 +289,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 
     if (error) {
       console.error('descartes:', error)
-      setAviso(`No se ha podido guardar el descarte: ${error.message}`)
+      setAviso('No se ha podido guardar: ' + detalle(error))
       setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
       return
     }
@@ -315,7 +320,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     setGuardados(l => [fila, ...l])
     const { error } = await supabase.from('guardados').upsert(fila, { onConflict: 'usuario_id,tmdb_id,tipo' })
     if (error) {
-      setAviso(`No se ha podido guardar: ${error.message}`)
+      setAviso('No se ha podido guardar: ' + detalle(error))
       setGuardados(l => l.filter(x => !(x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)))
     }
   }
@@ -330,7 +335,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   async function comentar(id, nota) {
     setTitulos(l => l.map(t => (t.id === id ? { ...t, nota } : t)))
     const { error } = await supabase.from('titulos').update({ nota }).eq('id', id)
-    if (error) setAviso(`No se ha podido guardar el comentario: ${error.message}`)
+    if (error) setAviso('No se ha podido guardar el comentario: ' + detalle(error))
   }
 
   /**
@@ -790,6 +795,11 @@ function Comentario({ inicial = '', titulo, onGuardar, onCerrar }) {
  * recargar el vídeo y no se reinicia. Si la API no carga, cae a un
  * reproductor normal sin botones.
  */
+/** El sonido se recuerda en este dispositivo entre tarjetas y sesiones. */
+const leerSonido = () => {
+  try { return localStorage.getItem('sd:sonido') === '1' } catch (e) { return false }
+}
+
 function Trailer({ clave, titulo, cartel }) {
   const caja = useRef(null)
   const player = useRef(null)
@@ -816,7 +826,16 @@ function Trailer({ clave, titulo, cartel }) {
             enablejsapi: 1, origin: window.location.origin
           },
           events: {
-            onReady: () => vivo && setApi(true),
+            onReady: e => {
+              if (!vivo) return
+              setApi(true)
+              // Arranca mudo siempre (iOS no admite otra cosa) y, si ya
+              // habías pedido sonido, se lo quitamos una vez está en marcha.
+              if (leerSonido()) {
+                try { e.target.unMute(); e.target.setVolume(70); setMudo(false) }
+                catch (err) { /* si el navegador lo impide, sigue mudo */ }
+              }
+            },
             // Al terminar, YouTube enseña su pantalla final con vídeos
             // sugeridos y su logo. Rebobinamos antes de que aparezca.
             onStateChange: e => {
@@ -843,8 +862,10 @@ function Trailer({ clave, titulo, cartel }) {
     accion(pl)
   }
   const volumen = mando(pl => {
-    if (pl.isMuted()) { pl.unMute(); pl.setVolume(70); setMudo(false) }
+    const encender = pl.isMuted()
+    if (encender) { pl.unMute(); pl.setVolume(70); setMudo(false) }
     else { pl.mute(); setMudo(true) }
+    try { localStorage.setItem('sd:sonido', encender ? '1' : '0') } catch (e) { /* privada */ }
   })
   const play = mando(pl => {
     if (pl.getPlayerState() === 1) { pl.pauseVideo(); setParado(true) }
@@ -1271,7 +1292,7 @@ function Votar({ cola, nombres, onVotar }) {
             </div>
             <div className="velo" />
 
-            <div className="chip izq">{nombres[p.propuesto_por] || 'Alguien'}</div>
+            <div className="chip der">{nombres[p.propuesto_por] || 'Alguien'}</div>
             <div className="torre">
               <button className="redondo principal" onClick={() => onVotar(p.id, 'si')}>
                 <span>♥</span><i>Me apetece</i>
