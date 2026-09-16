@@ -358,6 +358,11 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
         <div className="bombillas"><i /><i /><i /><i /><i /><i /><i /></div>
         <h1>DOS BUTACAS</h1>
         <div className="sub">Código {pareja.codigo}</div>
+        <button className="perfil" onClick={() => setAjustes(true)}
+          aria-label="Tu cuenta y ajustes">
+          {(nombres[yo] && nombres[yo] !== 'Tu pareja' ? nombres[yo] : sesion.user.email)
+            .trim().charAt(0).toUpperCase()}
+        </button>
       </header>
       <main key={vista} className="entra">
         {aviso && (
@@ -377,8 +382,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
-                onAjustes={() => setAjustes(true)}
-                onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
+                codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
                 todos={titulos} votos={votos} nombres={nombres} yo={yo} />}
           </>
@@ -386,7 +390,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       </main>
       {ajustes && (
         <Ajustes yo={yo} nombres={nombres} parejas={parejas} pareja={pareja}
+          email={sesion.user.email}
           onCambiarPareja={onCambiarPareja} onRecargarParejas={onRecargarParejas}
+          onSalir={() => supabase.auth.signOut()}
           onCerrar={() => setAjustes(false)} />
       )}
 
@@ -1261,7 +1267,8 @@ function Votar({ cola, nombres, onVotar }) {
 }
 
 /* ======================= ajustes ======================= */
-function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarParejas, onCerrar }) {
+function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecargarParejas, onSalir, onCerrar }) {
+  const [seccion, setSeccion] = useState('cuenta')
   const [nombre, setNombre] = useState(nombres[yo] === 'Tu pareja' ? '' : (nombres[yo] || ''))
   const [pass, setPass] = useState('')
   const [codigo, setCodigo] = useState('')
@@ -1269,8 +1276,10 @@ function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarPare
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(false)
 
+  const limpiar = () => { setOk(''); setError('') }
+
   async function guardarNombre() {
-    setOcupado(true); setError(''); setOk('')
+    setOcupado(true); limpiar()
     const { error } = await supabase.from('perfiles').update({ nombre: nombre.trim() }).eq('id', yo)
     setOcupado(false)
     if (error) setError(error.message)
@@ -1279,7 +1288,7 @@ function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarPare
 
   async function cambiarPass() {
     if (pass.length < 8) return setError('La contraseña necesita 8 caracteres como mínimo.')
-    setOcupado(true); setError(''); setOk('')
+    setOcupado(true); limpiar()
     const { error } = await supabase.auth.updateUser({ password: pass })
     setOcupado(false)
     if (error) setError(error.message)
@@ -1287,16 +1296,16 @@ function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarPare
   }
 
   async function crearGrupo() {
-    setOcupado(true); setError(''); setOk('')
+    setOcupado(true); limpiar()
     const { data, error } = await supabase.rpc('crear_pareja')
     setOcupado(false)
     if (error) return setError(error.message)
-    setOk(`Grupo creado. Código: ${data}`)
+    setOk(`Grupo creado. Su código es ${data}`)
     await onRecargarParejas()
   }
 
   async function unirseGrupo() {
-    setOcupado(true); setError(''); setOk('')
+    setOcupado(true); limpiar()
     const { error } = await supabase.rpc('unirse_pareja', { cod: codigo })
     setOcupado(false)
     if (error) return setError('No existe ningún grupo con ese código.')
@@ -1309,49 +1318,91 @@ function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarPare
       <div className="panel chico" onClick={e => e.stopPropagation()}>
         <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
         <div className="detalle">
-          <h3>Ajustes</h3>
-          {ok && <div className="ok" style={{ marginTop: 12 }}>{ok}</div>}
+          <h3>Tu cuenta</h3>
+
+          <div className="pestanas fina" style={{ marginTop: 14 }}>
+            <button className={seccion === 'cuenta' ? 'activo' : ''}
+              onClick={() => { setSeccion('cuenta'); limpiar() }}>Cuenta</button>
+            <button className={seccion === 'grupos' ? 'activo' : ''}
+              onClick={() => { setSeccion('grupos'); limpiar() }}>
+              Grupos <em>{parejas.length}</em>
+            </button>
+          </div>
+
+          {ok && <div className="ok" style={{ marginTop: 14 }}>{ok}</div>}
           {error && <div className="error">{error}</div>}
 
-          <div className="bloque-ajuste">
-            <label>Tu nombre</label>
-            <div className="ayuda">Es el que ve la otra persona en sus propuestas.</div>
-            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
-              placeholder="Tu nombre" />
-            <button className="btn suave" onClick={guardarNombre}
-              disabled={ocupado || !nombre.trim()}>Guardar nombre</button>
-          </div>
+          {seccion === 'cuenta' && (
+            <>
+              <div className="bloque-ajuste">
+                <label>Correo</label>
+                <div className="dato">{email}</div>
+                <div className="ayuda" style={{ marginTop: 6, marginBottom: 0 }}>
+                  El correo no se puede cambiar desde aquí.
+                </div>
+              </div>
 
-          <div className="bloque-ajuste">
-            <label>Contraseña</label>
-            <input type="password" value={pass} onChange={e => setPass(e.target.value)}
-              placeholder="Nueva contraseña" autoComplete="new-password" />
-            <button className="btn suave" onClick={cambiarPass}
-              disabled={ocupado || !pass}>Cambiar contraseña</button>
-          </div>
+              <div className="bloque-ajuste">
+                <label>Nombre</label>
+                <div className="ayuda">Es el que ve la otra persona en tus propuestas.</div>
+                <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+                  placeholder="Tu nombre" />
+                <button className="btn suave" onClick={guardarNombre}
+                  disabled={ocupado || !nombre.trim()}>Guardar nombre</button>
+              </div>
 
-          <div className="bloque-ajuste">
-            <label>Tus grupos</label>
-            <div className="ayuda">Cada grupo tiene sus propias listas y coincidencias.</div>
-            <div className="grupos">
-              {parejas.map(p => (
-                <button key={p.id}
-                  className={`grupo-fila${p.id === pareja.id ? ' activo' : ''}`}
-                  onClick={() => { onCambiarPareja(p); onCerrar() }}>
-                  <span>Código {p.codigo}</span>
-                  {p.id === pareja.id && <i>En uso</i>}
+              <div className="bloque-ajuste">
+                <label>Contraseña</label>
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)}
+                  placeholder="Nueva contraseña" autoComplete="new-password" />
+                <button className="btn suave" onClick={cambiarPass}
+                  disabled={ocupado || !pass}>Cambiar contraseña</button>
+              </div>
+
+              <div className="bloque-ajuste">
+                <button className="btn suave peligro" onClick={onSalir}>Cerrar sesión</button>
+              </div>
+            </>
+          )}
+
+          {seccion === 'grupos' && (
+            <>
+              <div className="bloque-ajuste">
+                <label>Tus grupos</label>
+                <div className="ayuda">
+                  Cada grupo lleva sus propias listas y coincidencias, separadas del resto.
+                </div>
+                <div className="grupos">
+                  {parejas.map(p => (
+                    <button key={p.id}
+                      className={`grupo-fila${p.id === pareja.id ? ' activo' : ''}`}
+                      onClick={() => { onCambiarPareja(p); onCerrar() }}>
+                      <span>Código {p.codigo}</span>
+                      {p.id === pareja.id && <i>En uso</i>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bloque-ajuste">
+                <label>Unirte a otro</label>
+                <div className="ayuda">Pide el código a quien ya esté dentro.</div>
+                <div className="anadir">
+                  <input type="text" value={codigo} placeholder="Código del grupo"
+                    onChange={e => setCodigo(e.target.value.toUpperCase())} />
+                  <button onClick={unirseGrupo} disabled={ocupado || codigo.length < 4}>+</button>
+                </div>
+              </div>
+
+              <div className="bloque-ajuste">
+                <label>Empezar uno nuevo</label>
+                <div className="ayuda">Te dará un código para pasárselo a quien quieras.</div>
+                <button className="btn suave" onClick={crearGrupo} disabled={ocupado}>
+                  Crear un grupo
                 </button>
-              ))}
-            </div>
-            <button className="btn suave" onClick={crearGrupo} disabled={ocupado}>
-              Crear un grupo nuevo
-            </button>
-            <div className="anadir" style={{ marginTop: 10 }}>
-              <input type="text" value={codigo} placeholder="Código de otro grupo"
-                onChange={e => setCodigo(e.target.value.toUpperCase())} />
-              <button onClick={unirseGrupo} disabled={ocupado || codigo.length < 4}>+</button>
-            </div>
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1359,7 +1410,7 @@ function Ajustes({ yo, nombres, parejas, pareja, onCambiarPareja, onRecargarPare
 }
 
 /* ======================= mis pelis ======================= */
-function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSalir, codigo, onAjustes }) {
+function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, codigo }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
   const [editando, setEditando] = useState(null)
@@ -1451,10 +1502,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
         </>
       )}
 
-      <div className="pie">
-        Código del grupo: <b>{codigo}</b><br />
-        <button onClick={onAjustes}>Ajustes</button> · <button onClick={onSalir}>Cerrar sesión</button>
-      </div>
+      <div className="pie">Código del grupo: <b>{codigo}</b></div>
 
       {editando && (
         <Comentario titulo={(lista.find(x => x.id === editando) || {}).titulo}

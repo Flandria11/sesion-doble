@@ -881,6 +881,24 @@ textarea::placeholder { color: #61539A; }
 .anadir button:disabled { opacity: .45; }
 
 /* ---------- ajustes ---------- */
+/* botón de perfil, en la esquina de la cabecera */
+.perfil {
+  position: absolute; top: 50%; right: 14px; transform: translateY(-50%);
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--terciopelo); border: 1px solid var(--borde);
+  color: var(--ambar); font-family: 'Anton', sans-serif; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s ease;
+}
+.perfil:hover, .perfil:focus-visible { border-color: var(--ambar); }
+
+.dato {
+  padding: 11px 13px; border-radius: 10px;
+  background: var(--noche); border: 1px solid var(--borde);
+  font-size: 13.5px; color: var(--papel); word-break: break-all;
+}
+.btn.peligro { color: var(--no); border-color: rgba(240, 96, 126, .4); }
+
 .bloque-ajuste {
   margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--terciopelo);
 }
