@@ -390,17 +390,19 @@ input::placeholder { color: #61539A; }
    reproduce queda casi transparente; al pausar se hace bien visible. */
 .centro {
   position: absolute; top: 42%; left: 50%; z-index: 6;
-  transform: translate(-50%, -50%);
-  width: 72px; height: 72px; border-radius: 50%;
-  background: rgba(8, 4, 16, .42); backdrop-filter: blur(6px);
+  transform: translate(-50%, -50%) scale(.8);
+  width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(8, 4, 16, .45); backdrop-filter: blur(6px);
   border: 1.5px solid rgba(247, 242, 233, .3);
   display: flex; align-items: center; justify-content: center;
-  color: var(--papel); font-size: 22px; line-height: 1;
-  opacity: .18; transition: opacity .2s ease, transform .2s ease;
+  color: var(--papel); font-size: 18px; line-height: 1;
+  /* mientras se reproduce no se ve, pero sigue recibiendo el toque:
+     así el gesto natural de tocar el centro funciona igual */
+  opacity: 0; transition: opacity .22s ease, transform .22s ease;
 }
-.centro.visible { opacity: 1; }
-.centro:hover, .centro:focus-visible {
-  opacity: 1; transform: translate(-50%, -50%) scale(1.06);
+.centro.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.centro.visible:hover, .centro:focus-visible {
+  transform: translate(-50%, -50%) scale(1.06);
 }
 
 /* mandos discretos del vídeo, arriba a la derecha */
