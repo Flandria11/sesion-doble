@@ -475,6 +475,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   const [fiesta, setFiesta] = useState(null)
   const [verTodo, setVerTodo] = useState(false)
   const [panel, setPanel] = useState(false)
+  const filaPlats = useRef(null)
 
   // catálogos de filtros: cambian según sean pelis o series
   useEffect(() => {
@@ -507,15 +508,21 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     if (q.trim().length >= 2) return
     let vivo = true
     setCargando(true)
-    explorar({ tipo, modo, proveedores: provs, genero, anio, calidad, pagina })
-      .then(r => {
-        if (!vivo) return
-        setRes(ant => (pagina === 1 ? r : [...ant, ...r]))
-        setError('')
-      })
-      .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
-      .finally(() => vivo && setCargando(false))
-    return () => { vivo = false }
+    // pequeño respiro antes de pedir y redibujar: sin esto, mover el
+    // desplegable de año/género con las flechas del teclado disparaba
+    // una petición y un vaciado de la lista por cada tecla, y ese trabajo
+    // competía con el propio desplegable nativo hasta hacerlo ir a saltos
+    const t = setTimeout(() => {
+      explorar({ tipo, modo, proveedores: provs, genero, anio, calidad, pagina })
+        .then(r => {
+          if (!vivo) return
+          setRes(ant => (pagina === 1 ? r : [...ant, ...r]))
+          setError('')
+        })
+        .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
+        .finally(() => vivo && setCargando(false))
+    }, 220)
+    return () => { vivo = false; clearTimeout(t) }
   }, [tipo, modo, provs, genero, anio, calidad, pagina, q])
 
   const estado = p => {
@@ -547,6 +554,11 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
   // cualquier cambio de filtro devuelve a la primera página
   const cambiar = fn => (...a) => { fn(...a); setPagina(1); setRes([]) }
+  // año y género van en un <select>: con las flechas del teclado cada
+  // paso dispara este cambio, y vaciar la lista al vuelo en cada uno
+  // competía con el propio desplegable nativo. Se deja lo de antes a la
+  // vista un instante y la petición (ya con su respiro) la sustituye sola.
+  const cambiarSuave = fn => (...a) => { fn(...a); setPagina(1) }
   const cambiarTipo = cambiar(t => {
     setTipo(t); setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
     if (t === 'tv' && modo === 'cines') setModo('tendencias')
@@ -567,8 +579,8 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     const m = MODOS.find(x => x.id === modo)
     if (m && !m.filtrable) setModo('populares')
   }
-  const cambiarGenero = cambiar(g => { setGenero(g); if (g) saltarSiHaceFalta() })
-  const cambiarAnio = cambiar(a => { setAnio(a); if (a) saltarSiHaceFalta() })
+  const cambiarGenero = cambiarSuave(g => { setGenero(g); if (g) saltarSiHaceFalta() })
+  const cambiarAnio = cambiarSuave(a => { setAnio(a); if (a) saltarSiHaceFalta() })
   const alternarCalidad = cambiar(() => {
     setCalidad(v => { if (!v) saltarSiHaceFalta(); return !v })
   })
@@ -622,16 +634,36 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
           </div>
 
           {plats.length > 0 && !ocultarPlataformas && (
-            <div className="plataformas">
-              {plats.map(pl => (
-                <button key={pl.id}
-                  className={provs.includes(pl.id) ? 'activo' : ''}
-                  onClick={() => alternarPlat(pl.id)}
-                  title={pl.nombre} aria-label={pl.nombre}
-                  aria-pressed={provs.includes(pl.id)}>
-                  <img src={pl.logo} alt="" loading="lazy" />
-                </button>
-              ))}
+            <div className="fila-plataformas">
+              {/* la fila no tenía scrollbar ni pista alguna de que seguía
+                  hacia la derecha: con ratón, sin arrastre táctil, no
+                  había forma de saber que se podía desplazar */}
+              <button type="button" className="flecha-plats izq"
+                aria-label="Ver plataformas anteriores"
+                onClick={() => filaPlats.current?.scrollBy({ left: -160, behavior: 'smooth' })}>
+                ‹
+              </button>
+              <div className="plataformas" ref={filaPlats}
+                onWheel={e => {
+                  if (e.deltaY === 0) return
+                  e.currentTarget.scrollLeft += e.deltaY
+                  e.preventDefault()
+                }}>
+                {plats.map(pl => (
+                  <button key={pl.id}
+                    className={provs.includes(pl.id) ? 'activo' : ''}
+                    onClick={() => alternarPlat(pl.id)}
+                    title={pl.nombre} aria-label={pl.nombre}
+                    aria-pressed={provs.includes(pl.id)}>
+                    <img src={pl.logo} alt="" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="flecha-plats der"
+                aria-label="Ver más plataformas"
+                onClick={() => filaPlats.current?.scrollBy({ left: 160, behavior: 'smooth' })}>
+                ›
+              </button>
             </div>
           )}
 
@@ -929,7 +961,12 @@ function Trailer({ clave, titulo, cartel }) {
             {parado ? '▶' : '❚❚'}
           </button>
           <div className="mandos-video">
-            <button onClick={volumen} aria-label={mudo ? 'Activar el sonido' : 'Silenciar'}>
+            {/* en iOS el intento automático de sonido (onReady) casi
+                siempre falla y el vídeo se queda mudo aunque ya lo
+                hubieras activado antes: el botón lo avisa pulsando,
+                para que se note que hace falta un toque más */}
+            <button className={mudo && leerSonido() ? 'pedir' : ''}
+              onClick={volumen} aria-label={mudo ? 'Activar el sonido' : 'Silenciar'}>
               {mudo ? '🔇' : '🔊'}
             </button>
           </div>
