@@ -119,7 +119,9 @@ input:focus { border-color: var(--ambar); outline: none; }
 
 /* buscador de Añadir: más bajo, para dejar sitio a las carátulas.
    16px de letra es el mínimo que evita que el móvil haga zoom al tocarlo. */
-.busca { padding: 9px 13px; font-size: 16px; border-radius: 9px; }
+/* 16px es el mínimo: por debajo, Safari en iPhone hace zoom al tocarlo.
+   Lo que se reduce es la altura y el peso visual. */
+.busca { padding: 6px 11px; font-size: 16px; border-radius: 8px; border-color: var(--terciopelo); }
 input::placeholder { color: #61539A; }
 
 .btn {
@@ -189,10 +191,10 @@ input::placeholder { color: #61539A; }
 /* los filtros secundarios se pliegan: si no, antes de las carátulas hay
    media pantalla de controles */
 .plegable {
-  flex: 1; display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border-radius: 9px;
-  border: 1px solid var(--borde); color: var(--apagado);
-  font-size: 13px; font-weight: 700;
+  flex: 1; display: flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: 8px;
+  border: 1px solid var(--terciopelo); color: var(--apagado);
+  font-size: 11.5px; font-weight: 700;
 }
 .plegable.abierto { color: var(--papel); border-color: var(--ambar); }
 .plegable em {
@@ -210,7 +212,7 @@ input::placeholder { color: #61539A; }
 .panel-filtros .interruptor { flex: none; }
 
 .limpiar {
-  flex-shrink: 0; padding: 8px 12px; border-radius: 9px;
+  flex-shrink: 0; padding: 5px 11px; border-radius: 8px; font-size: 11.5px;
   border: 1px solid var(--borde); color: var(--ambar);
   font-size: 12.5px; font-weight: 700; white-space: nowrap;
 }
@@ -895,21 +897,21 @@ textarea::placeholder { color: #61539A; }
 
 /* el bloque de texto sube y deja hueco para la barra inferior, que si no
    recortaba los botones */
-.diapo.suelta .cuerpo { padding: 14px 16px 84px; }
+.diapo.suelta .cuerpo { padding: 14px 16px 76px; }
 .diapo.suelta .tit { font-size: 22px; }
 .diapo.suelta .sin { -webkit-line-clamp: 3; }
 .diapo.suelta .donde { margin-top: 10px; }
 .diapo.suelta .donde img { width: 24px; height: 24px; }
 .diapo.suelta .donde span { font-size: 10.5px; }
-.diapo.suelta .nota-corta { margin-top: 10px; min-height: 48px; font-size: 13px; }
+.diapo.suelta .nota-corta { margin-top: 10px; min-height: 36px; font-size: 12.5px; padding: 8px 11px; }
 
 /* botones más bajos para que entren todos */
 .diapo.suelta .btn {
-  margin-top: 10px; padding: 11px; font-size: 13.5px; border-radius: 9px;
+  margin-top: 8px; padding: 9px; font-size: 12.5px; border-radius: 8px;
 }
 .diapo.suelta .rectificar { margin-top: 8px; gap: 8px; }
 .diapo.suelta .rectificar button {
-  padding: 10px 6px; font-size: 12px; border-radius: 9px;
+  padding: 8px 5px; font-size: 11px; border-radius: 8px;
 }
 
 @media (min-width: 620px) {

@@ -48,7 +48,7 @@ export default function App() {
   if (sesion === undefined) return <Marco><div className="cargando">Abriendo la taquilla…</div></Marco>
   if (!sesion) return <Marco sub="Dos listas, un plan"><Acceso /></Marco>
   if (pareja === undefined) return <Marco><div className="cargando">Cargando…</div></Marco>
-  if (!pareja) return <Marco sub="Falta emparejar"><Emparejar alUnir={cargarPareja} /></Marco>
+  if (!pareja) return <Marco sub="Falta entrar en un grupo"><Emparejar alUnir={cargarPareja} /></Marco>
 
   return (
     <Principal key={pareja.id} sesion={sesion} pareja={pareja}
@@ -90,7 +90,7 @@ function Acceso() {
   return (
     <div className="acceso">
       <h2>{modo === 'entrar' ? 'Entrar' : 'Crear cuenta'}</h2>
-      <p>Tú apuntas pelis y series. La otra persona las desliza y dice sí o no. Y al revés.</p>
+      <p>Cada uno apunta pelis y series; los demás dicen sí o no. Cuando coincidís, hay plan.</p>
       {error && <div className="error">{error}</div>}
       {modo === 'registro' && (
         <input type="text" placeholder="Tu nombre" value={nombre}
@@ -139,7 +139,7 @@ function Emparejar({ alUnir }) {
     setError(''); setOcupado(true)
     const { error } = await supabase.rpc('unirse_pareja', { cod: codigo })
     setOcupado(false)
-    if (error) return setError('No existe ninguna pareja con ese código.')
+    if (error) return setError('No existe ningún grupo con ese código.')
     alUnir()
   }
 
@@ -147,7 +147,7 @@ function Emparejar({ alUnir }) {
     return (
       <div className="acceso">
         <h2>Tu código</h2>
-        <p>Pásaselo a la otra persona. Lo mete al entrar y quedáis conectados.</p>
+        <p>Pásaselo a quien quieras. Lo mete al entrar y quedáis conectados.</p>
         <div className="codigo">{mio}</div>
         <button className="btn" onClick={alUnir}>Ya se lo he pasado</button>
       </div>
@@ -156,12 +156,12 @@ function Emparejar({ alUnir }) {
 
   return (
     <div className="acceso">
-      <h2>Emparejar</h2>
-      <p>Uno de los dos crea el código y el otro lo introduce. Solo hay que hacerlo una vez.</p>
+      <h2>Tu grupo</h2>
+      <p>Uno crea el código y los demás lo introducen. Solo hay que hacerlo una vez.</p>
       {error && <div className="error">{error}</div>}
       <button className="btn" onClick={crear} disabled={ocupado}>Crear un código</button>
       <div style={{ margin: '26px 0 10px', color: 'var(--paso)', fontSize: 13 }}>o</div>
-      <input type="text" placeholder="Código de tu pareja" value={codigo}
+      <input type="text" placeholder="Código del grupo" value={codigo}
         onChange={e => setCodigo(e.target.value.toUpperCase())}
         onKeyDown={e => e.key === 'Enter' && unirse()} />
       <button className="btn suave" onClick={unirse} disabled={ocupado || codigo.length < 4}>
@@ -206,7 +206,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     ])
     setTitulos(t.data || [])
     setVotos(v.data || [])
-    setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Tu pareja'])))
+    setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Alguien'])))
     setDescartes(d.data || [])
     setGuardados(g.data || [])
     setCargando(false)
@@ -237,9 +237,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 
   const matches = [
     ...mios.filter(t => suVoto(t.id) === 'si')
-      .map(t => ({ ...t, quien: `Le gusta a ${nombres[quienDijoSi(t.id)] || 'tu pareja'}` })),
+      .map(t => ({ ...t, quien: `Le gusta a ${nombres[quienDijoSi(t.id)] || 'alguien del grupo'}` })),
     ...suyos.filter(t => miVoto(t.id) === 'si')
-      .map(t => ({ ...t, quien: `De ${nombres[t.propuesto_por] || 'tu pareja'}` }))
+      .map(t => ({ ...t, quien: `De ${nombres[t.propuesto_por] || 'alguien del grupo'}` }))
   ]
 
   async function votar(tituloId, voto) {
@@ -364,7 +364,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
         <div className="sub">Código {pareja.codigo}</div>
         <button className="perfil" onClick={() => setAjustes(true)}
           aria-label="Tu cuenta y ajustes">
-          {(nombres[yo] && nombres[yo] !== 'Tu pareja' ? nombres[yo] : sesion.user.email)
+          {(nombres[yo] && nombres[yo] !== 'Alguien' ? nombres[yo] : sesion.user.email)
             .trim().charAt(0).toUpperCase()}
         </button>
       </header>
@@ -768,7 +768,7 @@ function Comentario({ inicial = '', titulo, onGuardar, onCerrar }) {
         <div className="detalle">
           <h3>Tu comentario</h3>
           <div className="ayuda" style={{ marginBottom: 12 }}>
-            {titulo ? `Sobre ${titulo}. ` : ''}Lo verá la otra persona al votarla.
+            {titulo ? `Sobre ${titulo}. ` : ''}Lo verán al votar esta propuesta.
           </div>
           <textarea value={texto} onChange={e => setTexto(e.target.value)}
             placeholder="Esta es de mis favoritas…" maxLength={200} autoFocus />
@@ -1180,7 +1180,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           {!ocultarBoton && conNota && !puesta && (
             <textarea className="nota-corta" value={nota}
               onChange={e => setNota(e.target.value)} maxLength={200}
-              placeholder="Comentario para tu pareja (opcional)" />
+              placeholder="Comentario (opcional)" />
           )}
           {!ocultarBoton && (
             <button className={`btn${puesta ? ' suave' : ''}`}
@@ -1223,7 +1223,7 @@ function Votar({ cola, nombres, onVotar }) {
     return (
       <div className="vacio">
         <b>Nada que votar</b>
-        Cuando la otra persona proponga algo nuevo, aparecerá aquí.
+        Cuando alguien proponga algo nuevo, aparecerá aquí.
       </div>
     )
   }
@@ -1243,7 +1243,7 @@ function Votar({ cola, nombres, onVotar }) {
             </div>
             <div className="velo" />
 
-            <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
+            <div className="chip izq">{nombres[p.propuesto_por] || 'Alguien'}</div>
             <div className="torre">
               <button className="redondo principal" onClick={() => onVotar(p.id, 'si')}>
                 <span>♥</span><i>Me apetece</i>
@@ -1264,7 +1264,7 @@ function Votar({ cola, nombres, onVotar }) {
               <div className="tit">{p.titulo}</div>
               {p.nota && (
                 <div className="comentario">
-                  <b>{nombres[p.propuesto_por] || 'Tu pareja'}:</b> {p.nota}
+                  <b>{nombres[p.propuesto_por] || 'Alguien'}:</b> {p.nota}
                 </div>
               )}
               {p.sinopsis && (
@@ -1285,7 +1285,7 @@ function Votar({ cola, nombres, onVotar }) {
 /* ======================= ajustes ======================= */
 function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecargarParejas, onSalir, onCerrar }) {
   const [seccion, setSeccion] = useState('cuenta')
-  const [nombre, setNombre] = useState(nombres[yo] === 'Tu pareja' ? '' : (nombres[yo] || ''))
+  const [nombre, setNombre] = useState(nombres[yo] === 'Alguien' ? '' : (nombres[yo] || ''))
   const [pass, setPass] = useState('')
   const [codigo, setCodigo] = useState('')
   const [ok, setOk] = useState('')
@@ -1360,7 +1360,7 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 
               <div className="bloque-ajuste">
                 <label>Nombre</label>
-                <div className="ayuda">Es el que ve la otra persona en tus propuestas.</div>
+                <div className="ayuda">Es el que ven los demás en tus propuestas.</div>
                 <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
                   placeholder="Tu nombre" />
                 <button className="btn suave" onClick={guardarNombre}
@@ -1490,7 +1490,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, codig
 
       {pestana === 'propuestas' && (
         <>
-          <div className="ayuda">Lo que has propuesto y qué ha dicho la otra persona.</div>
+          <div className="ayuda">Lo que has propuesto y qué han dicho.</div>
           {lista.length === 0
             ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
             : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
@@ -1499,7 +1499,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, codig
 
       {pestana === 'mias' && (
         <>
-          <div className="ayuda">Solo para ti. La otra persona no ve esta lista.</div>
+          <div className="ayuda">Solo para ti. Nadie más ve esta lista.</div>
           {guardados.length === 0
             ? <div className="vacio"><b>Nada guardado</b>Usa «Para mí» en Estrenos o en la ficha de cualquier título.</div>
             : (
@@ -1563,7 +1563,7 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
     return (
       <div className="vacio">
         <b>Todavía ninguna</b>
-        En cuanto uno vote que sí a una propuesta del otro, aparece aquí.
+        En cuanto dos digáis que sí a lo mismo, aparece aquí.
       </div>
     )
   }
