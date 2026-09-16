@@ -1,23 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './lib/supabase'
+import { cargarYT } from './lib/youtube'
 import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
-
-/**
- * El sonido se recuerda entre pantallas y entre sesiones. La primera vez
- * hace falta un toque: los navegadores no dejan arrancar un vídeo con
- * audio si el usuario no ha interactuado antes con la página.
- */
-function useSonido() {
-  const [sonido, setSonido] = useState(() => {
-    try { return localStorage.getItem('sd:sonido') === '1' } catch (e) { return false }
-  })
-  const alternar = () => setSonido(v => {
-    const n = !v
-    try { localStorage.setItem('sd:sonido', n ? '1' : '0') } catch (e) { /* privada */ }
-    return n
-  })
-  return [sonido, alternar]
-}
 
 /* ======================= raíz ======================= */
 export default function App() {
@@ -697,6 +681,92 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   )
 }
 
+/* ---- tráiler del carrusel ----
+ * Arranca SIEMPRE en silencio. iOS bloquea del todo un vídeo que intente
+ * sonar sin un gesto previo, y entonces no se reproduce nada: por eso en
+ * el iPhone no se veía. El sonido se activa con la API de YouTube desde
+ * el propio toque, que sí es un gesto válido, y además así no hay que
+ * recargar el vídeo y no se reinicia. Si la API no carga, cae a un
+ * reproductor normal sin botones.
+ */
+function Trailer({ clave, titulo, cartel }) {
+  const caja = useRef(null)
+  const player = useRef(null)
+  const [api, setApi] = useState(null)
+  const [mudo, setMudo] = useState(true)
+  const [parado, setParado] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    // YouTube sustituye el elemento que recibe, así que le damos un hijo
+    // creado a mano: React no controla ese nodo y no hay conflicto
+    const nido = document.createElement('div')
+
+    cargarYT()
+      .then(YT => {
+        if (!vivo || !caja.current) return
+        caja.current.appendChild(nido)
+        player.current = new YT.Player(nido, {
+          videoId: clave,
+          playerVars: {
+            autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1,
+            playsinline: 1, disablekb: 1, iv_load_policy: 3,
+            loop: 1, playlist: clave,
+            enablejsapi: 1, origin: window.location.origin
+          },
+          events: { onReady: () => vivo && setApi(true) }
+        })
+      })
+      .catch(() => vivo && setApi(false))
+
+    return () => {
+      vivo = false
+      if (player.current && player.current.destroy) player.current.destroy()
+      player.current = null
+      if (nido.parentNode) nido.parentNode.removeChild(nido)
+    }
+  }, [clave])
+
+  // el reproductor se consulta al pulsar, nunca una copia guardada
+  const mando = accion => () => {
+    const pl = player.current
+    if (!pl || typeof pl.getPlayerState !== 'function') return
+    accion(pl)
+  }
+  const volumen = mando(pl => {
+    if (pl.isMuted()) { pl.unMute(); pl.setVolume(70); setMudo(false) }
+    else { pl.mute(); setMudo(true) }
+  })
+  const play = mando(pl => {
+    if (pl.getPlayerState() === 1) { pl.pauseVideo(); setParado(true) }
+    else { pl.playVideo(); setParado(false) }
+  })
+
+  return (
+    <>
+      {api === false ? (
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${clave}?autoplay=1&mute=1` +
+               `&controls=0&loop=1&playlist=${clave}&playsinline=1&rel=0&modestbranding=1`}
+          title={titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+      ) : (
+        <div ref={caja} className="marco" />
+      )}
+      <div className="cortina" style={{ backgroundImage: `url(${cartel})` }} />
+      {api === true && (
+        <div className="mandos-video">
+          <button onClick={play} aria-label={parado ? 'Reproducir' : 'Pausar'}>
+            {parado ? '▶' : '❚❚'}
+          </button>
+          <button onClick={volumen} aria-label={mudo ? 'Activar el sonido' : 'Silenciar'}>
+            {mudo ? '🔇' : '🔊'}
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 /* ======================= estrenos en vertical ======================= */
 function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) {
   const [lista, setLista] = useState([])
@@ -705,8 +775,6 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
   const [error, setError] = useState('')
   const [activo, setActivo] = useState(0)
   const [trailers, setTrailers] = useState({})
-  const [sonido, alternarSonido] = useSonido()
-  const [parado, setParado] = useState(false)
   const [anadiendo, setAnadiendo] = useState(null)
   const [fiesta, setFiesta] = useState(null)
   const [abierta, setAbierta] = useState(null)
@@ -823,33 +891,11 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar }) 
               key={clave} data-i={i}>
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-                {i === activo && tr && !parado && (
-                  <>
-                    <iframe key={sonido ? 'con' : 'sin'}
-                      src={`https://www.youtube-nocookie.com/embed/${tr}?autoplay=1&mute=${sonido ? 0 : 1}` +
-                           `&controls=0&loop=1&playlist=${tr}&playsinline=1&rel=0&modestbranding=1`}
-                      title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
-                    {/* YouTube enseña sus iconos el primer instante y no hay
-                        forma de desactivarlos: los tapamos con la carátula */}
-                    <div className="cortina" key={`c-${sonido ? 'con' : 'sin'}`}
-                      style={{ backgroundImage: `url(${p.fondo || p.cartel})` }} />
-                  </>
+                {i === activo && tr && (
+                  <Trailer clave={tr} titulo={p.titulo} cartel={p.fondo || p.cartel} />
                 )}
               </div>
               <div className="velo" />
-
-              <div className="mandos-video">
-                {tr && (
-                  <button onClick={() => setParado(v => !v)}
-                    aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'}>
-                    {parado ? '▶' : '❚❚'}
-                  </button>
-                )}
-                <button onClick={alternarSonido}
-                  aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
-                  {sonido ? '🔊' : '🔇'}
-                </button>
-              </div>
 
               <div className="torre">
                 <button className={`redondo principal${puesto ? ' hecho' : ''}`}
@@ -934,7 +980,6 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [donde, setDonde] = useState([])
-  const [sonido, alternarSonido] = useSonido()
   const [abierta, setAbierta] = useState(false)
 
   useEffect(() => {
@@ -963,17 +1008,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           {trailer === null && <div className="cargando">Buscando tráiler…</div>}
           {trailer === '' && (p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
           {trailer && (
-            <iframe key={sonido ? 'con' : 'sin'}
-              src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
-                   `&controls=0&playsinline=1&rel=0&modestbranding=1`}
-              title={`Tráiler de ${p.titulo}`}
-              allow="autoplay; encrypted-media" />
-          )}
-          {trailer && (
-            <button className="altavoz" onClick={alternarSonido}
-              aria-label={sonido ? 'Silenciar el tráiler' : 'Activar el sonido'}>
-              {sonido ? '🔊' : '🔇'}
-            </button>
+            <Trailer clave={trailer} titulo={p.titulo} cartel={p.fondo || p.cartel} />
           )}
         </div>
         <div className="detalle">
@@ -1013,8 +1048,6 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
    así que aquí no hay que pedirle nada a TMDB. */
 function Votar({ cola, nombres, onVotar }) {
   const [activo, setActivo] = useState(0)
-  const [sonido, alternarSonido] = useSonido()
-  const [parado, setParado] = useState(false)
   const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
 
@@ -1049,33 +1082,13 @@ function Votar({ cola, nombres, onVotar }) {
             key={clave} data-i={i}>
             <div className="lienzo">
               {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-              {i === activo && p.trailer && !parado && (
-                <>
-                  <iframe key={sonido ? 'con' : 'sin'}
-                    src={`https://www.youtube-nocookie.com/embed/${p.trailer}?autoplay=1&mute=${sonido ? 0 : 1}` +
-                         `&controls=0&loop=1&playlist=${p.trailer}&playsinline=1&rel=0&modestbranding=1`}
-                    title={p.titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
-                  <div className="cortina" key={`c-${sonido ? 'con' : 'sin'}`}
-                    style={{ backgroundImage: `url(${p.fondo || p.cartel})` }} />
-                </>
+              {i === activo && p.trailer && (
+                <Trailer clave={p.trailer} titulo={p.titulo} cartel={p.fondo || p.cartel} />
               )}
             </div>
             <div className="velo" />
 
             <div className="chip izq">{nombres[p.propuesto_por] || 'Tu pareja'}</div>
-            <div className="mandos-video">
-              {p.trailer && (
-                <button onClick={() => setParado(v => !v)}
-                  aria-label={parado ? 'Reproducir el tráiler' : 'Pausar el tráiler'}>
-                  {parado ? '▶' : '❚❚'}
-                </button>
-              )}
-              <button onClick={alternarSonido}
-                aria-label={sonido ? 'Silenciar' : 'Activar el sonido'}>
-                {sonido ? '🔊' : '🔇'}
-              </button>
-            </div>
-
             <div className="torre">
               <button className="redondo principal" onClick={() => onVotar(p.id, 'si')}>
                 <span>♥</span><i>Me apetece</i>
