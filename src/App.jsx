@@ -524,7 +524,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     <>
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
-      <input type="text" placeholder="Buscar una peli o serie…"
+      <input className="busca" type="text" placeholder="Buscar una peli o serie…"
         value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
 
       {explorando && (

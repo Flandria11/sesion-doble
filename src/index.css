@@ -116,6 +116,10 @@ input[type=text], input[type=email], input[type=password] {
   color: var(--papel); font-size: 16px;
 }
 input:focus { border-color: var(--ambar); outline: none; }
+
+/* buscador de Añadir: más bajo, para dejar sitio a las carátulas.
+   16px de letra es el mínimo que evita que el móvil haga zoom al tocarlo. */
+.busca { padding: 9px 13px; font-size: 16px; border-radius: 9px; }
 input::placeholder { color: #61539A; }
 
 .btn {
