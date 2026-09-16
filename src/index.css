@@ -119,9 +119,14 @@ input:focus { border-color: var(--ambar); outline: none; }
 
 /* buscador de Añadir: más bajo, para dejar sitio a las carátulas.
    16px de letra es el mínimo que evita que el móvil haga zoom al tocarlo. */
-/* 16px es el mínimo: por debajo, Safari en iPhone hace zoom al tocarlo.
-   Lo que se reduce es la altura y el peso visual. */
-.busca { padding: 6px 11px; font-size: 16px; border-radius: 8px; border-color: var(--terciopelo); }
+/* El texto escrito se queda en 16px porque por debajo Safari en iPhone
+   hace zoom al tocar el campo. Lo que sí se puede encoger es la altura y
+   el tamaño del texto de ejemplo, que es lo que se ve casi siempre. */
+.busca {
+  padding: 3px 10px; font-size: 16px; line-height: 1.5;
+  border-radius: 7px; border-color: var(--terciopelo);
+}
+.busca::placeholder { font-size: 12px; }
 input::placeholder { color: #61539A; }
 
 .btn {
