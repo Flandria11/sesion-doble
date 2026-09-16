@@ -333,7 +333,8 @@ input::placeholder { color: #61539A; }
 }
 .chip.izq { left: 15px; color: var(--ambar); }
 .chip.der { right: 15px; color: var(--papel); }
-.diapo /* ---------- carrusel vertical (Estrenos y Votar) ----------
+
+/* ---------- carrusel vertical (Estrenos y Votar) ----------
    Una tarjeta por pantalla con anclaje al desplazar: sueltas el dedo y la
    siguiente se coloca sola. El tráiler solo se monta en la que estás
    viendo, para no cargar veinte vídeos a la vez. */
