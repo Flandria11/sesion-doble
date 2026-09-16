@@ -28,6 +28,7 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
   position: relative;
 }
 
@@ -380,6 +381,8 @@ input::placeholder { color: #61539A; }
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
   scrollbar-width: none;
 }
 .pista::-webkit-scrollbar { display: none; }
