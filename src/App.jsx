@@ -200,7 +200,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado'),
       supabase.from('votos').select('*'),
       supabase.from('perfiles').select('id, nombre'),
-      supabase.from('descartes').select('tmdb_id, tipo, motivo'),
+      supabase.from('descartes').select('*'),
       supabase.from('guardados').select('*').order('creado', { ascending: false })
     ])
     setTitulos(t.data || [])
@@ -269,7 +269,10 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     (descartes.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo) || {}).motivo
 
   async function descartar(p, motivo = 'no_interesa') {
-    const fila = { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo, motivo }
+    const fila = {
+      usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo, motivo,
+      titulo: p.titulo || '', cartel: p.cartel || '', anio: p.anio || ''
+    }
     setDescartes(l => [
       ...l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)),
       fila
@@ -384,7 +387,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
                 codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
-                todos={titulos} votos={votos} nombres={nombres} yo={yo} />}
+                todos={titulos} votos={votos} descartes={descartes} yo={yo}
+                onRecuperar={recuperar} onVotarTitulo={votar} />}
           </>
         )}
       </main>
@@ -1109,6 +1113,10 @@ function Fiesta({ p, onCerrar }) {
 }
 
 /* ---- ficha con tráiler ---- */
+/* La ficha usa el mismo formato que Estrenos y Votar: una tarjeta a
+ * pantalla completa con el tráiler de fondo. La diferencia es que aquí no
+ * se desliza: es una sola y se cierra con la X o tocando fuera.
+ */
 function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
@@ -1135,33 +1143,35 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   }, [onCerrar])
 
   return (
-    <div className="telon" onClick={onCerrar}>
-      <div className="panel" onClick={e => e.stopPropagation()}>
-        <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
-        <div className="pantallita">
-          {trailer === null && <div className="cargando">Buscando tráiler…</div>}
-          {trailer === '' && (p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-          {trailer && (
-            <Trailer clave={trailer} titulo={p.titulo} cartel={p.fondo || p.cartel} />
-          )}
+    <div className="telon grande" onClick={onCerrar}>
+      <section className={`diapo suelta${abierta ? ' abierta' : ''}`}
+        onClick={e => e.stopPropagation()}>
+        <div className="lienzo">
+          {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
+          {trailer && <Trailer clave={trailer} titulo={p.titulo} cartel={p.fondo || p.cartel} />}
         </div>
-        <div className="detalle">
-          <h3>{p.titulo}</h3>
+        <div className="velo" />
+
+        <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
+
+        <div className="cuerpo">
           <div className="meta">
-            {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, gen, p.voto && `★ ${p.voto} en TMDB`]
+            {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, gen, p.voto && `★ ${p.voto}`]
               .filter(Boolean).join(' · ')}
           </div>
-          <button className={`resumen${abierta ? ' abierta' : ''}`}
-            onClick={() => setAbierta(a => !a)}>
+          <div className="tit">{p.titulo}</div>
+
+          <button className="sin" onClick={() => setAbierta(a => !a)}>
             {p.sinopsis || 'Sin sinopsis disponible en español.'}
           </button>
+
           {donde.length > 0 && (
             <div className="donde">
-              <span>Incluida en</span>
+              <span>En</span>
               {donde.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
             </div>
           )}
-          {trailer === '' && <div className="aviso">No hay tráiler disponible para este título.</div>}
+
           {!ocultarBoton && conNota && !puesta && (
             <textarea className="nota-corta" value={nota}
               onChange={e => setNota(e.target.value)} maxLength={200}
@@ -1175,12 +1185,11 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           )}
           {acciones}
         </div>
-      </div>
+      </section>
     </div>
   )
 }
 
-/* ---- reproductor con barra propia ---- */
 /* ======================= votar ======================= */
 /* Mismo formato que Estrenos: una tarjeta por pantalla, el tráiler sonando
    y las tres opciones abajo. El tráiler ya viene guardado con el título,
@@ -1532,7 +1541,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, codig
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, todos, votos, nombres, yo }) {
+function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar, onVotarTitulo }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
 
@@ -1592,7 +1601,8 @@ function Matches({ lista, onRectificar, todos, votos, nombres, yo }) {
       {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
       {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
       {juego === 'historial' && (
-        <Historial todos={todos} votos={votos} nombres={nombres} yo={yo} onFicha={setFicha} />
+        <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
+          onFicha={setFicha} onRecuperar={onRecuperar} onVotar={onVotarTitulo} />
       )}
 
       {ficha && (
@@ -1614,61 +1624,80 @@ function Matches({ lista, onRectificar, todos, votos, nombres, yo }) {
  * Coincidencias solo guarda lo que os gusta a los dos. Aquí se ve todo
  * lo demás: lo descartado y lo ya visto, y de quién es cada voto.
  */
-function Historial({ todos, votos, nombres, yo, onFicha }) {
-  const [estado, setEstado] = useState('si')
+function Historial({ todos, votos, descartes, yo, onFicha, onRecuperar, onVotar }) {
+  const [estado, setEstado] = useState('no')
 
-  const voto = (tituloId, usuario) => {
-    const v = votos.find(x => x.titulo_id === tituloId && x.usuario_id === usuario)
+  const miVoto = id => {
+    const v = votos.find(x => x.titulo_id === id && x.usuario_id === yo)
     return v ? v.voto : null
   }
-  const nombre = u => (u === yo ? 'Tú' : (nombres[u] || 'Tu pareja'))
 
-  // por cada título, quién ha dicho qué (quien propone dice que sí)
-  const fichas = todos.map(t => {
-    const gente = [...new Set([t.propuesto_por, ...votos.filter(v => v.titulo_id === t.id).map(v => v.usuario_id)])]
-    const marcas = gente.map(u => ({
-      usuario: u,
-      voto: u === t.propuesto_por ? (voto(t.id, u) || 'si') : voto(t.id, u)
-    })).filter(m => m.voto)
-    return { ...t, marcas }
-  })
+  /**
+   * Tus decisiones vienen de dos sitios: lo que apartaste en Estrenos o en
+   * Añadir (tabla de descartes, que solo ves tú) y lo que votaste que no o
+   * que ya habías visto sobre las propuestas de la otra persona.
+   */
+  const deDescartes = descartes
+    .filter(d => d.titulo)     // las guardadas antes de tener título no se pueden pintar
+    .map(d => ({
+      clave: `d-${d.tipo}-${d.tmdb_id}`,
+      titulo: d.titulo, cartel: d.cartel, anio: d.anio,
+      tipo: d.tipo, tmdb_id: d.tmdb_id,
+      estado: d.motivo === 'vista' ? 'vista' : 'no',
+      origen: 'descarte',
+      dato: d
+    }))
 
-  const ESTADOS = [
-    ['si', 'Les gustan'],
-    ['vista', 'Ya vistas'],
-    ['no', 'Descartadas']
-  ]
-  const visibles = fichas.filter(f => f.marcas.some(m => m.voto === estado))
+  const deVotos = todos
+    .filter(t => t.propuesto_por !== yo && ['no', 'vista'].includes(miVoto(t.id)))
+    .map(t => ({
+      clave: `v-${t.id}`,
+      titulo: t.titulo, cartel: t.cartel, anio: t.anio,
+      tipo: t.tipo, tmdb_id: t.tmdb_id,
+      estado: miVoto(t.id),
+      origen: 'voto',
+      dato: t
+    }))
+
+  const fichas = [...deDescartes, ...deVotos]
+  const cuenta = e => fichas.filter(f => f.estado === e).length
+  const visibles = fichas.filter(f => f.estado === estado)
+
+  async function deshacer(f) {
+    if (f.origen === 'descarte') await onRecuperar(f.dato)
+    else await onVotar(f.dato.id, 'si')
+  }
 
   return (
     <>
+      <div className="ayuda">
+        Tus decisiones. La otra persona no ve esta pantalla.
+      </div>
+
       <div className="filtros">
-        {ESTADOS.map(([id, nombreEstado]) => (
+        {[['no', 'No me interesan'], ['vista', 'Ya vistas']].map(([id, nombre]) => (
           <button key={id} className={estado === id ? 'activo' : ''}
             onClick={() => setEstado(id)}>
-            {nombreEstado} · {fichas.filter(f => f.marcas.some(m => m.voto === id)).length}
+            {nombre} · {cuenta(id)}
           </button>
         ))}
       </div>
 
       {visibles.length === 0
-        ? <div className="vacio"><b>Nada aquí</b>Todavía no hay títulos en este estado.</div>
+        ? <div className="vacio"><b>Nada aquí</b>Todavía no has apartado nada en este apartado.</div>
         : (
           <div className="catalogo">
-            {visibles.map(p => (
-              <div className="tarjeta" key={p.id}>
-                <button className="lamina" onClick={() => onFicha(p)}
-                  aria-label={`Ver información de ${p.titulo}`}>
-                  <img src={p.cartel} alt="" loading="lazy" />
-                  <span className="marcas">
-                    {p.marcas.map(m => (
-                      <i key={m.usuario} className={m.voto}>
-                        {nombre(m.usuario)}
-                      </i>
-                    ))}
+            {visibles.map(f => (
+              <div className="tarjeta" key={f.clave}>
+                <button className="lamina puesta" onClick={() => onFicha(f.dato)}
+                  aria-label={`Ver información de ${f.titulo}`}>
+                  {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
+                  <span className={`sello-foto ${f.estado}`}>
+                    {f.estado === 'vista' ? 'Ya vista' : 'Descartada'}
                   </span>
                 </button>
-                <div className="rotulo">{p.titulo}</div>
+                <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
+                <button className="comentar" onClick={() => deshacer(f)}>Recuperar</button>
               </div>
             ))}
           </div>
