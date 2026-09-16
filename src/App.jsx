@@ -203,7 +203,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 
   const recargar = useCallback(async () => {
     const [t, v, p, d, g] = await Promise.all([
-      supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado'),
+      supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado', { ascending: false }),
       supabase.from('votos').select('*'),
       supabase.from('perfiles').select('id, nombre'),
       supabase.from('descartes').select('*'),
@@ -244,9 +244,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 
   const matches = [
     ...mios.filter(t => suVoto(t.id) === 'si')
-      .map(t => ({ ...t, quien: `Le gusta a ${nombres[quienDijoSi(t.id)] || 'alguien del grupo'}` })),
+      .map(t => ({ ...t, quien: `♥ ${nombres[quienDijoSi(t.id)] || 'alguien del grupo'}` })),
     ...suyos.filter(t => miVoto(t.id) === 'si')
-      .map(t => ({ ...t, quien: `De ${nombres[t.propuesto_por] || 'alguien del grupo'}` }))
+      .map(t => ({ ...t, quien: `♥ ${nombres[t.propuesto_por] || 'alguien del grupo'}` }))
   ]
 
   async function votar(tituloId, voto) {
@@ -425,8 +425,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
-                guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
-                codigo={pareja.codigo} />}
+                guardados={guardados} guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
+                onComentar={comentar} codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
                 todos={titulos} votos={votos} descartes={descartes} yo={yo}
                 onRecuperar={recuperar} onVotarTitulo={votar} />}
@@ -1534,16 +1534,16 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 }
 
 /* ======================= mis pelis ======================= */
-function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, codigo }) {
+function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvidar, onComentar, codigo }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
   const [editando, setEditando] = useState(null)
   const [texto, setTexto] = useState('')
 
   const texto_voto = v =>
-    v === 'si' ? 'Le gusta'
-    : v === 'vista' ? 'Ya la ha visto'
-    : v === 'no' ? 'Descartada'
+    v === 'si' ? '♥ Le gusta'
+    : v === 'vista' ? '👁 Vista'
+    : v === 'no' ? '✕ Descartada'
     : 'Sin votar'
 
   function abrirComentario(p) {
@@ -1642,9 +1642,14 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, codig
           acciones={
             <div className="rectificar">
               {ficha.id
-                ? <button onClick={async () => { await onQuitar(ficha.id); setFicha(null) }}>
-                    Retirar mi propuesta
-                  </button>
+                ? <>
+                    {guardada(ficha)
+                      ? <button onClick={() => onOlvidar(ficha)}>Quitar de mi lista</button>
+                      : <button onClick={() => onGuardar(ficha)}>Guardar para mí</button>}
+                    <button onClick={async () => { await onQuitar(ficha.id); setFicha(null) }}>
+                      Retirar mi propuesta
+                    </button>
+                  </>
                 : <button onClick={() => { onOlvidar(ficha); setFicha(null) }}>
                     Quitar de mi lista
                   </button>}
@@ -1808,7 +1813,7 @@ function Historial({ todos, votos, descartes, yo, onFicha, onRecuperar, onVotar 
                   aria-label={`Ver información de ${f.titulo}`}>
                   {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
                   <span className={`sello-foto ${f.estado}`}>
-                    {f.estado === 'vista' ? 'Ya vista' : 'Descartada'}
+                    {f.estado === 'vista' ? '👁 Vista' : '✕ Descartada'}
                   </span>
                 </button>
                 <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
