@@ -244,6 +244,42 @@ function Principal({ sesion, pareja }) {
     return data
   }
 
+  // Los descartes son personales: lo que tú apartas, ella lo sigue viendo.
+  const descartada = p => descartes.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+  const motivoDescarte = p =>
+    (descartes.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo) || {}).motivo
+
+  async function descartar(p, motivo = 'no_interesa') {
+    const fila = { usuario_id: yo, tmdb_id: p.tmdb_id, tipo: p.tipo, motivo }
+    setDescartes(l => [
+      ...l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)),
+      fila
+    ])
+
+    const { error } = await supabase.from('descartes')
+      .upsert(fila, { onConflict: 'usuario_id,tmdb_id,tipo' })
+
+    if (error) {
+      console.error('descartes:', error)
+      setAviso(`No se ha podido guardar el descarte: ${error.message}`)
+      setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
+      return
+    }
+    setAviso('')
+
+    // si la habías propuesto tú, se retira: no tiene sentido seguir
+    // proponiendo algo que acabas de apartar
+    const mia = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo && t.propuesto_por === yo)
+    if (mia) await quitar(mia.id)
+  }
+
+  async function recuperar(p) {
+    setDescartes(l => l.filter(d => !(d.tmdb_id === p.tmdb_id && d.tipo === p.tipo)))
+    const { error } = await supabase.from('descartes').delete()
+      .eq('usuario_id', yo).eq('tmdb_id', p.tmdb_id).eq('tipo', p.tipo)
+    if (error) setAviso(`No se ha podido deshacer: ${error.message}`)
+  }
+
   // Lista personal: lo que te apetece a ti y no quieres proponer todavía.
   const guardada = p => guardados.some(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
 
@@ -272,6 +308,16 @@ function Principal({ sesion, pareja }) {
     setTitulos(l => l.map(t => (t.id === id ? { ...t, nota } : t)))
     const { error } = await supabase.from('titulos').update({ nota }).eq('id', id)
     if (error) setAviso(`No se ha podido guardar el comentario: ${error.message}`)
+  }
+
+  /**
+   * Rectificar desde coincidencias: si la propuse yo, no puedo cambiar el
+   * voto de la otra persona, así que retiro mi propuesta. Si la propuso
+   * ella, cambio mi voto. En los dos casos sale de coincidencias.
+   */
+  async function rectificar(p, voto) {
+    if (p.propuesto_por === yo) await quitar(p.id)
+    else await votar(p.id, voto)
   }
 
   async function quitar(id) {
