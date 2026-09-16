@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
 import { buscar, explorar, estrenos, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla } from './lib/tmdb'
@@ -761,7 +762,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 /* ---- ventana de comentario, usada al proponer y al editar ---- */
 function Comentario({ inicial = '', titulo, onGuardar, onCerrar }) {
   const [texto, setTexto] = useState(inicial)
-  return (
+  return createPortal(
     <div className="telon" onClick={onCerrar}>
       <div className="panel chico" onClick={e => e.stopPropagation()}>
         <div className="detalle">
@@ -776,6 +777,8 @@ function Comentario({ inicial = '', titulo, onGuardar, onCerrar }) {
         </div>
       </div>
     </div>
+    ,
+    document.body
   )
 }
 
@@ -1088,7 +1091,7 @@ function Fiesta({ p, onCerrar }) {
     }
   }, [onCerrar])
 
-  return (
+  return createPortal(
     <div className="telon fiesta" onClick={onCerrar}>
       <div className={`confeti ${fase}`} onClick={e => e.stopPropagation()}>
         <div className="destellos" aria-hidden="true">
@@ -1109,6 +1112,8 @@ function Fiesta({ p, onCerrar }) {
         <button className="btn" onClick={onCerrar}>Seguir mirando</button>
       </div>
     </div>
+    ,
+    document.body
   )
 }
 
@@ -1142,7 +1147,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
     }
   }, [onCerrar])
 
-  return (
+  return createPortal(
     <div className="telon grande" onClick={onCerrar}>
       <section className={`diapo suelta${abierta ? ' abierta' : ''}`}
         onClick={e => e.stopPropagation()}>
@@ -1187,6 +1192,8 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
         </div>
       </section>
     </div>
+    ,
+    document.body
   )
 }
 
@@ -1322,7 +1329,7 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
     await onRecargarParejas()
   }
 
-  return (
+  return createPortal(
     <div className="telon" onClick={onCerrar}>
       <div className="panel chico" onClick={e => e.stopPropagation()}>
         <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
@@ -1415,6 +1422,8 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
         </div>
       </div>
     </div>
+    ,
+    document.body
   )
 }
 

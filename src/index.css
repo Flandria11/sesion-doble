@@ -888,13 +888,29 @@ textarea::placeholder { color: #61539A; }
   height: 100dvh; max-height: 100dvh; margin: 0 auto;
   scroll-snap-align: none;
 }
-.diapo.suelta .cerrar { top: 14px; right: 14px; z-index: 9; }
-.diapo.suelta .cuerpo { padding: 16px 18px 26px; }
-.diapo.suelta .donde { margin-top: 12px; }
-.diapo.suelta .donde img { width: 26px; height: 26px; }
-.diapo.suelta .btn { margin-top: 12px; }
-.diapo.suelta .rectificar { margin-top: 10px; }
-.diapo.suelta .nota-corta { margin-top: 12px; min-height: 54px; }
+.diapo.suelta .cerrar { top: 12px; right: 12px; z-index: 9; }
+/* el altavoz y la pausa se van a la izquierda: a la derecha chocaban
+   con la cruz de cerrar */
+.diapo.suelta .mandos-video { right: auto; left: 12px; top: 12px; }
+
+/* el bloque de texto sube y deja hueco para la barra inferior, que si no
+   recortaba los botones */
+.diapo.suelta .cuerpo { padding: 14px 16px 84px; }
+.diapo.suelta .tit { font-size: 22px; }
+.diapo.suelta .sin { -webkit-line-clamp: 3; }
+.diapo.suelta .donde { margin-top: 10px; }
+.diapo.suelta .donde img { width: 24px; height: 24px; }
+.diapo.suelta .donde span { font-size: 10.5px; }
+.diapo.suelta .nota-corta { margin-top: 10px; min-height: 48px; font-size: 13px; }
+
+/* botones más bajos para que entren todos */
+.diapo.suelta .btn {
+  margin-top: 10px; padding: 11px; font-size: 13.5px; border-radius: 9px;
+}
+.diapo.suelta .rectificar { margin-top: 8px; gap: 8px; }
+.diapo.suelta .rectificar button {
+  padding: 10px 6px; font-size: 12px; border-radius: 9px;
+}
 
 @media (min-width: 620px) {
   .telon.grande { padding: 16px; align-items: center; }
