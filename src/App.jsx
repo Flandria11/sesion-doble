@@ -359,7 +359,7 @@ function Principal({ sesion, pareja }) {
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} onOlvidar={olvidar} onComentar={comentar}
                 onSalir={() => supabase.auth.signOut()} codigo={pareja.codigo} />}
-            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} yo={yo} />}
+            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar} />}
           </>
         )}
       </main>
@@ -1359,10 +1359,9 @@ function Mias({ lista, suVoto, onQuitar, guardados, onOlvidar, onComentar, onSal
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, yo }) {
+function Matches({ lista, onRectificar }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
-  const [dequien, setDequien] = useState('todas')
 
   async function marcar(voto) {
     await onRectificar(ficha, voto)
@@ -1378,13 +1377,8 @@ function Matches({ lista, onRectificar, yo }) {
     )
   }
 
-  // filtro por autor: con muchas coincidencias ayuda a acotar
-  const visible = dequien === 'todas' ? lista
-    : dequien === 'mias' ? lista.filter(p => p.propuesto_por === yo)
-    : lista.filter(p => p.propuesto_por !== yo)
-
-  const pelis = visible.filter(p => p.tipo !== 'tv')
-  const series = visible.filter(p => p.tipo === 'tv')
+  const pelis = lista.filter(p => p.tipo !== 'tv')
+  const series = lista.filter(p => p.tipo === 'tv')
 
   const bloque = (titulo, grupo) => grupo.length > 0 && (
     <section className="grupo">
@@ -1417,18 +1411,8 @@ function Matches({ lista, onRectificar, yo }) {
 
       {juego === 'lista' && (
         <>
-          <div className="filtros">
-            {[['todas', 'Todas', lista.length],
-              ['mias', 'Tuyas', lista.filter(p => p.propuesto_por === yo).length],
-              ['suyas', 'Suyas', lista.filter(p => p.propuesto_por !== yo).length]]
-              .map(([id, nombre, n]) => (
-                <button key={id} className={dequien === id ? 'activo' : ''}
-                  onClick={() => setDequien(id)}>{nombre} · {n}</button>
-              ))}
-          </div>
-          {visible.length === 0
-            ? <div className="vacio"><b>Nada aquí</b>Prueba con otro filtro.</div>
-            : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+          {bloque('Películas', pelis)}
+          {bloque('Series', series)}
         </>
       )}
       {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
