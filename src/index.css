@@ -407,13 +407,13 @@ input::placeholder { color: #61539A; }
 
 /* sello que aparece al arrastrar la tarjeta hacia un lado, como Tinder */
 .sello {
-  position: absolute; top: 34px; z-index: 7;
-  padding: 7px 16px; border-radius: 8px; border: 3px solid;
-  font-family: 'Anton', sans-serif; font-size: 20px; letter-spacing: .04em;
+  position: absolute; top: 40%; left: 50%; z-index: 7;
+  padding: 9px 20px; border-radius: 8px; border: 3px solid;
+  font-family: 'Anton', sans-serif; font-size: 24px; letter-spacing: .04em;
   text-transform: uppercase; pointer-events: none;
 }
-.sello.si { right: 24px; color: var(--si); border-color: var(--si); transform: rotate(12deg); }
-.sello.no { left: 24px; color: var(--no); border-color: var(--no); transform: rotate(-12deg); }
+.sello.si { color: var(--si); border-color: var(--si); transform: translate(-50%, -50%) rotate(-10deg); }
+.sello.no { color: var(--no); border-color: var(--no); transform: translate(-50%, -50%) rotate(10deg); }
 
 .lienzo { position: absolute; inset: 0; }
 .lienzo img { width: 100%; height: 100%; object-fit: cover; display: block; }
