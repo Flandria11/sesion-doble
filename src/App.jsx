@@ -426,10 +426,13 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
                 guardados={guardados} guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
+                descartada={descartada} motivoDescarte={motivoDescarte}
+                onDescartar={descartar} onRecuperar={recuperar}
                 onComentar={comentar} codigo={pareja.codigo} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
                 todos={titulos} votos={votos} descartes={descartes} yo={yo}
-                onRecuperar={recuperar} onVotarTitulo={votar} />}
+                onRecuperar={recuperar} onVotarTitulo={votar}
+                guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
           </>
         )}
       </main>
@@ -1680,7 +1683,8 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 }
 
 /* ======================= mis pelis ======================= */
-function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvidar, onComentar, codigo }) {
+function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvidar,
+  descartada, motivoDescarte, onDescartar, onRecuperar, onComentar, codigo }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
   const [editando, setEditando] = useState(null)
@@ -1762,6 +1766,11 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
                       aria-label={`Ver información de ${p.titulo}`}>
                       <img src={p.cartel} alt="" loading="lazy" />
                       <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
+                      {descartada(p) && (
+                        <span className={`sello-foto ${motivoDescarte(p) === 'vista' ? 'vista' : 'no'}`}>
+                          {motivoDescarte(p) === 'vista' ? '👁 Vista' : '✕ No interesa'}
+                        </span>
+                      )}
                     </button>
                     <div className="rotulo">{p.titulo}<i>{p.anio}</i></div>
                     <button className="comentar" onClick={() => onOlvidar(p)}>Quitar</button>
@@ -1796,9 +1805,17 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
                       Retirar mi propuesta
                     </button>
                   </>
-                : <button onClick={() => { onOlvidar(ficha); setFicha(null) }}>
-                    Quitar de mi lista
-                  </button>}
+                : <>
+                    <button onClick={() => onOlvidar(ficha)}>Quitar de mi lista</button>
+                    {descartada(ficha)
+                      ? <button onClick={() => onRecuperar(ficha)}>
+                          {motivoDescarte(ficha) === 'vista' ? 'Marcada como vista' : 'No te interesa'} · deshacer
+                        </button>
+                      : <>
+                          <button onClick={() => onDescartar(ficha, 'no_interesa')}>No me interesa</button>
+                          <button onClick={() => onDescartar(ficha, 'vista')}>Ya vista</button>
+                        </>}
+                  </>}
             </div>
           } />
       )}
@@ -1807,7 +1824,8 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar, onVotarTitulo }) {
+function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar, onVotarTitulo,
+  guardada, onGuardar, onOlvidar }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
 
@@ -1868,7 +1886,8 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
       {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
       {juego === 'historial' && (
         <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
-          onRecuperar={onRecuperar} onVotar={onVotarTitulo} />
+          onRecuperar={onRecuperar} onVotar={onVotarTitulo}
+          guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
       )}
 
       {ficha && (
@@ -1878,6 +1897,9 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
           acciones={
             <div className="rectificar">
               <button onClick={() => marcar('vista')}>Ya la hemos visto</button>
+              {guardada(ficha)
+                ? <button onClick={() => onOlvidar(ficha)}>Quitar de mi lista</button>
+                : <button onClick={() => onGuardar(ficha)}>Guardar para mí</button>}
               <button onClick={() => marcar('no')}>Ya no me apetece</button>
             </div>
           } />
@@ -1890,7 +1912,7 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
  * Coincidencias solo guarda lo que os gusta a los dos. Aquí se ve todo
  * lo demás: lo descartado y lo ya visto, y de quién es cada voto.
  */
-function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar }) {
+function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada, onGuardar, onOlvidar }) {
   const [estado, setEstado] = useState('no')
   const [ficha, setFicha] = useState(null)
 
@@ -1968,6 +1990,9 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar }) {
                 </button>
                 <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
                 <button className="comentar" onClick={() => deshacer(f)}>{etiquetaDeshacer(f)}</button>
+                {guardada(f.dato)
+                  ? <button className="comentar" onClick={() => onOlvidar(f.dato)}>Quitar de mi lista</button>
+                  : <button className="comentar" onClick={() => onGuardar(f.dato)}>Guardar para mí</button>}
               </div>
             ))}
           </div>
@@ -1978,10 +2003,13 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar }) {
           onCerrar={() => setFicha(null)}
           onProponer={() => setFicha(null)}
           acciones={
-            <div className="rectificar solo">
+            <div className="rectificar">
               <button onClick={async () => { await deshacer(ficha); setFicha(null) }}>
                 {etiquetaDeshacer(ficha)}
               </button>
+              {guardada(ficha.dato)
+                ? <button onClick={() => onOlvidar(ficha.dato)}>Quitar de mi lista</button>
+                : <button onClick={() => onGuardar(ficha.dato)}>Guardar para mí</button>}
             </div>
           } />
       )}

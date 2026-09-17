@@ -590,8 +590,6 @@ input::placeholder { color: #61539A; }
 }
 .rectificar button:first-child { color: var(--si); border-color: rgba(79, 209, 153, .4); }
 .rectificar button:last-child { color: var(--no); border-color: rgba(240, 96, 126, .4); }
-/* un único botón para deshacer (Historial): siempre en positivo, no en rojo */
-.rectificar.solo button:last-child { color: var(--si); border-color: rgba(79, 209, 153, .4); }
 
 /* ---------- celebración de coincidencia ---------- */
 .telon.fiesta { align-items: center; }
