@@ -1850,7 +1850,7 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
       {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
       {juego === 'historial' && (
         <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
-          onFicha={setFicha} onRecuperar={onRecuperar} onVotar={onVotarTitulo} />
+          onRecuperar={onRecuperar} onVotar={onVotarTitulo} />
       )}
 
       {ficha && (
@@ -1872,8 +1872,9 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
  * Coincidencias solo guarda lo que os gusta a los dos. Aquí se ve todo
  * lo demás: lo descartado y lo ya visto, y de quién es cada voto.
  */
-function Historial({ todos, votos, descartes, yo, onFicha, onRecuperar, onVotar }) {
+function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar }) {
   const [estado, setEstado] = useState('no')
+  const [ficha, setFicha] = useState(null)
 
   const miVoto = id => {
     const v = votos.find(x => x.titulo_id === id && x.usuario_id === yo)
@@ -1916,6 +1917,9 @@ function Historial({ todos, votos, descartes, yo, onFicha, onRecuperar, onVotar 
     else await onVotar(f.dato.id, 'si')
   }
 
+  // "Recuperar" no decía qué iba a pasar; con el estado delante queda claro
+  const etiquetaDeshacer = f => f.estado === 'vista' ? 'Me apetece verla de nuevo' : 'Sí me apetece'
+
   return (
     <>
       <div className="ayuda">
@@ -1937,7 +1941,7 @@ function Historial({ todos, votos, descartes, yo, onFicha, onRecuperar, onVotar 
           <div className="catalogo">
             {visibles.map(f => (
               <div className="tarjeta" key={f.clave}>
-                <button className="lamina puesta" onClick={() => onFicha(f.dato)}
+                <button className="lamina puesta" onClick={() => setFicha(f)}
                   aria-label={`Ver información de ${f.titulo}`}>
                   {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
                   <span className={`sello-foto ${f.estado}`}>
@@ -1945,11 +1949,24 @@ function Historial({ todos, votos, descartes, yo, onFicha, onRecuperar, onVotar 
                   </span>
                 </button>
                 <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
-                <button className="comentar" onClick={() => deshacer(f)}>Recuperar</button>
+                <button className="comentar" onClick={() => deshacer(f)}>{etiquetaDeshacer(f)}</button>
               </div>
             ))}
           </div>
         )}
+
+      {ficha && (
+        <Ficha p={ficha.dato} puesta ocultarBoton
+          onCerrar={() => setFicha(null)}
+          onProponer={() => setFicha(null)}
+          acciones={
+            <div className="rectificar solo">
+              <button onClick={async () => { await deshacer(ficha); setFicha(null) }}>
+                {etiquetaDeshacer(ficha)}
+              </button>
+            </div>
+          } />
+      )}
     </>
   )
 }
