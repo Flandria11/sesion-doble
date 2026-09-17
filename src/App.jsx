@@ -1057,23 +1057,36 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
  * nada, y antes sí lo hacía (se reordenaba el fondo aunque no aparecía
  * ni una palabra nueva). Se mide una vez montada, comparando lo que
  * ocupa el texto con lo que se deja ver en su estado normal. */
-function Sinopsis({ texto, onAlternar }) {
+function Sinopsis({ texto, abierta, onAlternar }) {
   const ref = useRef(null)
   const [truncado, setTruncado] = useState(false)
 
   useEffect(() => {
+    // desplegada no hace falta medir: lo único que importa entonces es
+    // poder volver a cerrarla, y eso ya lo cubre "abierta" más abajo. Si
+    // se sigue midiendo aquí, al desplegar cabe entera (hay mucho más
+    // sitio) y se marcaba como "no truncada", perdiendo el toque para
+    // volver a cerrarla
+    if (abierta) return
     const el = ref.current
     if (!el) return
-    const id = requestAnimationFrame(() => {
-      // más de un par de píxeles: a veces el redondeo del navegador deja
-      // 2-3px de diferencia aunque el texto quepa entero
-      setTruncado(el.scrollHeight - el.clientHeight > 8)
-    })
-    return () => cancelAnimationFrame(id)
-  }, [texto])
+    // más de un par de píxeles: a veces el redondeo del navegador deja
+    // 2-3px de diferencia aunque el texto quepa entero
+    const medir = () => setTruncado(el.scrollHeight - el.clientHeight > 8)
+    medir()
+    // la tipografía (Anton/Karla) llega por @import y puede tardar en
+    // cargar: si se mide antes, el texto cambia de alto al llegar la
+    // fuente real y la medida se queda desfasada (parecía "tocable"
+    // aunque ya se viera entero, o al revés)
+    document.fonts && document.fonts.ready.then(medir)
+    const obs = new ResizeObserver(medir)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [texto, abierta])
 
   if (!texto) return null
-  if (!truncado) return <div className="sin" ref={ref}>{texto}</div>
+  const interactivo = truncado || abierta
+  if (!interactivo) return <div className="sin" ref={ref}>{texto}</div>
 
   return (
     <div className="sin" ref={ref} role="button" tabIndex={0}
@@ -1268,7 +1281,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
                     .filter(Boolean).join(' · ')}
                 </div>
                 <div className="tit">{p.titulo}</div>
-                <Sinopsis texto={p.sinopsis}
+                <Sinopsis texto={p.sinopsis} abierta={abierta === clave}
                   onAlternar={() => setAbierta(a => (a === clave ? null : clave))} />
 
               </div>
@@ -1409,7 +1422,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           </div>
           <div className="tit">{p.titulo}</div>
 
-          <Sinopsis texto={p.sinopsis || 'Sin sinopsis disponible en español.'}
+          <Sinopsis texto={p.sinopsis || 'Sin sinopsis disponible en español.'} abierta={abierta}
             onAlternar={() => setAbierta(a => !a)} />
 
           {donde.length > 0 && (
@@ -1526,7 +1539,7 @@ function Votar({ cola, nombres, onVotar }) {
                   <b>{nombres[p.propuesto_por] || 'Alguien'}:</b> {p.nota}
                 </div>
               )}
-              <Sinopsis texto={p.sinopsis}
+              <Sinopsis texto={p.sinopsis} abierta={abierta === clave}
                 onAlternar={() => setAbierta(a => (a === clave ? null : clave))} />
 
             </div>
