@@ -1049,6 +1049,37 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
   )
 }
 
+/* La sinopsis solo se puede "abrir" si de verdad hay texto oculto: si ya
+ * se ve entera (cabe en el hueco de siempre), tocarla no debía cambiar
+ * nada, y antes sí lo hacía (se reordenaba el fondo aunque no aparecía
+ * ni una palabra nueva). Se mide una vez montada, comparando lo que
+ * ocupa el texto con lo que se deja ver en su estado normal. */
+function Sinopsis({ texto, onAlternar }) {
+  const ref = useRef(null)
+  const [truncado, setTruncado] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const id = requestAnimationFrame(() => {
+      // más de un par de píxeles: a veces el redondeo del navegador deja
+      // 2-3px de diferencia aunque el texto quepa entero
+      setTruncado(el.scrollHeight - el.clientHeight > 8)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [texto])
+
+  if (!texto) return null
+  if (!truncado) return <div className="sin" ref={ref}>{texto}</div>
+
+  return (
+    <div className="sin" ref={ref} role="button" tabIndex={0}
+      onClick={onAlternar} onKeyDown={e => e.key === 'Enter' && onAlternar()}>
+      {texto}
+    </div>
+  )
+}
+
 /* ======================= estrenos en vertical ======================= */
 function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar, onComentar }) {
   const [lista, setLista] = useState(memoriaReel.lista)
@@ -1234,13 +1265,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
                     .filter(Boolean).join(' · ')}
                 </div>
                 <div className="tit">{p.titulo}</div>
-                {p.sinopsis && (
-                  <div className="sin" role="button" tabIndex={0}
-                    onClick={() => setAbierta(a => (a === clave ? null : clave))}
-                    onKeyDown={e => e.key === 'Enter' && setAbierta(a => (a === clave ? null : clave))}>
-                    {p.sinopsis}
-                  </div>
-                )}
+                <Sinopsis texto={p.sinopsis}
+                  onAlternar={() => setAbierta(a => (a === clave ? null : clave))} />
 
               </div>
             </Deslizable>
@@ -1380,11 +1406,8 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           </div>
           <div className="tit">{p.titulo}</div>
 
-          <div className="sin" role="button" tabIndex={0}
-            onClick={() => setAbierta(a => !a)}
-            onKeyDown={e => e.key === 'Enter' && setAbierta(a => !a)}>
-            {p.sinopsis || 'Sin sinopsis disponible en español.'}
-          </div>
+          <Sinopsis texto={p.sinopsis || 'Sin sinopsis disponible en español.'}
+            onAlternar={() => setAbierta(a => !a)} />
 
           {donde.length > 0 && (
             <div className="donde">
@@ -1500,13 +1523,8 @@ function Votar({ cola, nombres, onVotar }) {
                   <b>{nombres[p.propuesto_por] || 'Alguien'}:</b> {p.nota}
                 </div>
               )}
-              {p.sinopsis && (
-                <div className="sin" role="button" tabIndex={0}
-                  onClick={() => setAbierta(a => (a === clave ? null : clave))}
-                  onKeyDown={e => e.key === 'Enter' && setAbierta(a => (a === clave ? null : clave))}>
-                  {p.sinopsis}
-                </div>
-              )}
+              <Sinopsis texto={p.sinopsis}
+                onAlternar={() => setAbierta(a => (a === clave ? null : clave))} />
 
             </div>
           </Deslizable>
