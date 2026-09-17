@@ -499,22 +499,29 @@ input::placeholder { color: #61539A; }
    YouTube dibuja en la parte baja del vídeo. */
 /* deja sitio a la columna de botones de la derecha y sube el texto para
    tapar la parte baja del reproductor */
-.cuerpo { position: relative; z-index: 3; padding: 14px 98px 94px 16px; }
+.cuerpo {
+  position: relative; z-index: 3; padding: 14px 98px 94px 16px;
+  /* la sinopsis ya no tiene un número de líneas fijo: ocupa lo que quede
+     por debajo del título dentro de este tope, así que un título corto
+     deja más sitio para la sinopsis y uno largo se lo quita. Este tope
+     es lo que nunca se puede pasar. */
+  display: flex; flex-direction: column; max-height: 46%; overflow: hidden;
+}
 .meta {
   font-size: 10.5px; color: var(--ambar); font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; margin-bottom: 5px;
+  flex-shrink: 0;
 }
 .tit {
   font-family: 'Anton', sans-serif; font-size: 18px; line-height: 1.12;
-  text-transform: uppercase; margin-bottom: 6px;
+  text-transform: uppercase; margin-bottom: 6px; flex-shrink: 0;
 }
 .sin {
-  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
   overflow: hidden; width: 100%; text-align: left; padding: 0;
   font-size: 12.5px; line-height: 1.5; color: #DDD4F0;
-  /* Safari ignora a veces el recorte por líneas y el texto salía entero,
-     tapando el tráiler. Con el tope de altura queda cortado igualmente. */
-  max-height: calc(12.5px * 1.5 * 4);
+  /* rellena lo que quede en .cuerpo (ver arriba); si no le llega el
+     texto para tanto, se queda con su alto normal, sin huecos raros */
+  flex: 1 1 auto; min-height: 0;
 }
 /* Desplegada se limita a un tercio de la pantalla: así el tráiler sigue
    viéndose arriba en vez de quedar tapado del todo. */
@@ -935,13 +942,12 @@ textarea::placeholder { color: #61539A; }
 
 /* el bloque de texto sube y deja hueco para la barra inferior, que si no
    recortaba los botones */
-.diapo.suelta .cuerpo { padding: 14px 16px 76px; }
+.diapo.suelta .cuerpo { padding: 14px 16px 76px; max-height: 40%; }
 .diapo.suelta .tit { font-size: 22px; }
-.diapo.suelta .sin { -webkit-line-clamp: 3; max-height: calc(12.5px * 1.5 * 3); }
 /* misma especificidad que la regla de arriba: sin esto, al abrir la
    sinopsis en la ficha (que siempre lleva "suelta") ganaba esta regla
    por ir después en el archivo y el texto no llegaba a desplegarse */
-.diapo.suelta.abierta .sin { -webkit-line-clamp: unset; max-height: 32vh; }
+.diapo.suelta.abierta .sin { max-height: 32vh; }
 .diapo.suelta .donde { margin-top: 10px; }
 .diapo.suelta .donde img { width: 24px; height: 24px; }
 .diapo.suelta .donde span { font-size: 10.5px; }
