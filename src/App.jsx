@@ -1241,6 +1241,25 @@ function Fiesta({ p, onCerrar }) {
   )
 }
 
+/* Para que el botón de "atrás" del móvil cierre la ficha en vez de salir
+ * de la app: al abrirla metemos un paso de historial, y "atrás" lo
+ * consume y dispara el cierre en vez de navegar fuera. Si se cierra de
+ * otra forma (la cruz, tocar fuera), deshacemos ese paso para que la
+ * historia no se quede con un hueco apuntando aquí. */
+function useCerrarConAtras(onCerrar) {
+  useEffect(() => {
+    let porAtras = false
+    window.history.pushState({ ficha: true }, '')
+    const atras = () => { porAtras = true; onCerrar() }
+    window.addEventListener('popstate', atras)
+    return () => {
+      window.removeEventListener('popstate', atras)
+      if (!porAtras) window.history.back()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+}
+
 /* ---- ficha con tráiler ---- */
 /* La ficha usa el mismo formato que Estrenos y Votar: una tarjeta a
  * pantalla completa con el tráiler de fondo. La diferencia es que aquí no
@@ -1270,6 +1289,8 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
       document.body.style.overflow = ''
     }
   }, [onCerrar])
+
+  useCerrarConAtras(onCerrar)
 
   return createPortal(
     <div className="telon grande" onClick={onCerrar}>
