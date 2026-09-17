@@ -981,6 +981,74 @@ function Trailer({ clave, titulo, cartel }) {
  * volvías a la primera tarjeta. */
 const memoriaReel = { lista: [], pagina: 1, scroll: 0 }
 
+/* Tarjeta que se puede deslizar a los lados, como Tinder: a la derecha
+ * cuenta como "sí" y a la izquierda como "paso". El desplazamiento
+ * vertical (pasar a la siguiente tarjeta) lo sigue llevando la pista con
+ * su propio scroll; aquí solo se atiende el gesto cuando es más
+ * horizontal que vertical, así los dos conviven sin pisarse. */
+const UMBRAL_DESLIZAR = 110
+
+function Deslizable({ className, dataI, onSi, onNo, children }) {
+  const [dx, setDx] = useState(0)
+  const [modo, setModo] = useState('quieto') // quieto | arrastrando | volando
+  const inicio = useRef(null)
+  const arrastro = useRef(false)
+
+  const empezar = e => {
+    // los botones y controles del vídeo siguen funcionando con su propio toque
+    if (e.target.closest('button, .mandos-video, .centro')) return
+    inicio.current = { x: e.clientX, y: e.clientY }
+    arrastro.current = false
+    setModo('arrastrando')
+    setDx(0)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const mover = e => {
+    if (!inicio.current) return
+    const dif = e.clientX - inicio.current.x
+    const alto = e.clientY - inicio.current.y
+    if (Math.abs(dif) > 6 || Math.abs(alto) > 6) arrastro.current = true
+    // si el gesto es más vertical que horizontal, se deja para el scroll
+    // de la pista y no se mueve la tarjeta
+    if (Math.abs(dif) >= Math.abs(alto)) setDx(dif)
+  }
+  const volar = (lado, accion) => {
+    setModo('volando')
+    setDx(lado === 'si' ? 900 : -900)
+    setTimeout(() => accion && accion(), 220)
+  }
+  const soltar = () => {
+    if (!inicio.current) return
+    inicio.current = null
+    if (dx > UMBRAL_DESLIZAR) volar('si', onSi)
+    else if (dx < -UMBRAL_DESLIZAR) volar('no', onNo)
+    else { setModo('quieto'); setDx(0) }
+  }
+  // si la sinopsis estaba abierta y el usuario solo tocó para arrastrar
+  // (sin llegar al umbral), evita que el toque cuente como un clic normal
+  const clicDurante = e => { if (arrastro.current) { e.preventDefault(); e.stopPropagation() } }
+
+  const estilo = dx === 0 ? undefined : {
+    transform: `translateX(${dx}px) rotate(${dx / 18}deg)`,
+    transition: modo === 'arrastrando' ? 'none' : 'transform .25s ease'
+  }
+
+  return (
+    <section className={className} data-i={dataI} style={estilo}
+      onPointerDown={empezar} onPointerMove={mover}
+      onPointerUp={soltar} onPointerCancel={soltar}
+      onClickCapture={clicDurante}>
+      {Math.abs(dx) > 12 && (
+        <div className={`sello ${dx > 0 ? 'si' : 'no'}`}
+          style={{ opacity: Math.min(Math.abs(dx) / UMBRAL_DESLIZAR, 1) }}>
+          {dx > 0 ? 'Me gusta' : 'Paso'}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
 /* ======================= estrenos en vertical ======================= */
 function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar, onComentar }) {
   const [lista, setLista] = useState(memoriaReel.lista)
@@ -1130,8 +1198,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
           const e = estado(p)
           const puesto = e && (e.tipo === 'mio' || e.tipo === 'coincide')
           return (
-            <section className={`diapo${abierta === clave ? ' abierta' : ''}`}
-              key={clave} data-i={i}>
+            <Deslizable className={`diapo${abierta === clave ? ' abierta' : ''}`}
+              dataI={i} key={clave}
+              onSi={() => proponer(p)} onNo={() => onDescartar(p, 'no_interesa')}>
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
                 {i === activo && tr && (
@@ -1174,7 +1243,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
                 )}
 
               </div>
-            </section>
+            </Deslizable>
           )
         })}
       </div>
@@ -1396,8 +1465,9 @@ function Votar({ cola, nombres, onVotar }) {
       {cola.map((p, i) => {
         const clave = p.id
         return (
-          <section className={`diapo${abierta === clave ? ' abierta' : ''}`}
-            key={clave} data-i={i}>
+          <Deslizable className={`diapo${abierta === clave ? ' abierta' : ''}`}
+            dataI={i} key={clave}
+            onSi={() => onVotar(p.id, 'si')} onNo={() => onVotar(p.id, 'no')}>
             <div className="lienzo">
               {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
               {i === activo && (
@@ -1439,7 +1509,7 @@ function Votar({ cola, nombres, onVotar }) {
               )}
 
             </div>
-          </section>
+          </Deslizable>
         )
       })}
     </div>
