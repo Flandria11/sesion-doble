@@ -524,7 +524,10 @@ input::placeholder { color: #61539A; }
   flex: 1 1 auto; min-height: 0;
 }
 /* Desplegada se limita a un tercio de la pantalla: así el tráiler sigue
-   viéndose arriba en vez de quedar tapado del todo. */
+   viéndose arriba en vez de quedar tapado del todo. El tope del 46% de
+   .cuerpo es para cuando está cerrada; abierta, se quita para que el
+   texto pueda subir y no se corte por ese límite. */
+.diapo.abierta .cuerpo { max-height: none; overflow: visible; }
 .diapo.abierta .sin {
   display: block; -webkit-line-clamp: unset;
   max-height: 32vh; overflow-y: auto;
@@ -947,6 +950,7 @@ textarea::placeholder { color: #61539A; }
 /* misma especificidad que la regla de arriba: sin esto, al abrir la
    sinopsis en la ficha (que siempre lleva "suelta") ganaba esta regla
    por ir después en el archivo y el texto no llegaba a desplegarse */
+.diapo.suelta.abierta .cuerpo { max-height: none; overflow: visible; }
 .diapo.suelta.abierta .sin { max-height: 32vh; }
 .diapo.suelta .donde { margin-top: 10px; }
 .diapo.suelta .donde img { width: 24px; height: 24px; }
