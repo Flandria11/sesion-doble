@@ -938,6 +938,10 @@ textarea::placeholder { color: #61539A; }
 .diapo.suelta .cuerpo { padding: 14px 16px 76px; }
 .diapo.suelta .tit { font-size: 22px; }
 .diapo.suelta .sin { -webkit-line-clamp: 3; max-height: calc(12.5px * 1.5 * 3); }
+/* misma especificidad que la regla de arriba: sin esto, al abrir la
+   sinopsis en la ficha (que siempre lleva "suelta") ganaba esta regla
+   por ir después en el archivo y el texto no llegaba a desplegarse */
+.diapo.suelta.abierta .sin { -webkit-line-clamp: unset; max-height: 32vh; }
 .diapo.suelta .donde { margin-top: 10px; }
 .diapo.suelta .donde img { width: 24px; height: 24px; }
 .diapo.suelta .donde span { font-size: 10.5px; }
