@@ -500,7 +500,7 @@ input::placeholder { color: #61539A; }
 /* deja sitio a la columna de botones de la derecha y sube el texto para
    tapar la parte baja del reproductor */
 .cuerpo {
-  position: relative; z-index: 3; padding: 14px 98px 94px 16px;
+  position: relative; z-index: 3; padding: 14px 98px 44px 16px;
   /* la sinopsis ya no tiene un número de líneas fijo: ocupa lo que quede
      por debajo del título dentro de este tope, así que un título corto
      deja más sitio para la sinopsis y uno largo se lo quita. Este tope
