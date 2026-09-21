@@ -1039,12 +1039,26 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
     setDx(lado === 'si' ? 900 : -900)
     setTimeout(() => accion && accion(), 220)
   }
-  const soltar = () => {
+  const soltar = e => {
     if (!inicio.current) return
     inicio.current = null
+    // se libera a mano en vez de fiarse del navegador: dentro de una pista
+    // con scroll-snap, en Android a veces el pointerup no suelta la
+    // captura del todo, y el siguiente toque (aunque fuera en un botón)
+    // se quedaba sin respuesta hasta que algo más lo desatascaba
+    try { e && e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* ya liberado */ }
     if (dx > UMBRAL_DESLIZAR) volar('si', onSi)
     else if (dx < -UMBRAL_DESLIZAR) volar('no', onNo)
     else { setModo('quieto'); setDx(0) }
+  }
+  // red de seguridad: si el navegador suelta la captura por su cuenta
+  // (cambia de gesto, pierde el foco...) sin pasar por soltar(), el
+  // estado se queda a medias y bloquea el siguiente toque. Esto lo repone.
+  const perderCaptura = () => {
+    inicio.current = null
+    arrastro.current = false
+    setModo('quieto')
+    setDx(0)
   }
   // si la sinopsis estaba abierta y el usuario solo tocó para arrastrar
   // (sin llegar al umbral), evita que el toque cuente como un clic normal.
@@ -1066,6 +1080,7 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
     <section className={className} data-i={dataI} style={estilo}
       onPointerDown={empezar} onPointerMove={mover}
       onPointerUp={soltar} onPointerCancel={soltar}
+      onLostPointerCapture={perderCaptura}
       onClickCapture={clicDurante}>
       {Math.abs(dx) > 12 && (
         <div className={`sello ${dx > 0 ? 'si' : 'no'}`}
