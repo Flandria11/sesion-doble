@@ -311,14 +311,17 @@ export async function estrenos(pagina = 1) {
 /**
  * Lo mejor valorado de hace más de año y medio: el complemento de
  * Estrenos, que ya cubre hasta ahí, así que aquí no hace falta elegir
- * año ni repetir lo que se ve del otro lado. Pelis y series se piden
- * por separado pero se devuelven ya mezcladas y ordenadas por nota.
+ * año ni repetir lo que se ve del otro lado. Igual que en Estrenos, se
+ * pide una página al azar entre las primeras y se baraja: si no, al
+ * ordenar siempre por nota saldrían las mismas en el mismo orden cada
+ * vez que se abre.
  */
 export async function topValoradas(pagina = 1) {
   const hace = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10)
+  const pagBase = pagina === 1 ? 1 + Math.floor(Math.random() * 3) : pagina + 2
 
   const comun = {
-    page: String(pagina),
+    page: String(pagBase),
     watch_region: REGION,
     include_adult: 'false',
     'vote_count.gte': '300',
@@ -332,7 +335,7 @@ export async function topValoradas(pagina = 1) {
       .then(d => limpiar(d.results, 'tv')).catch(() => [])
   ])
 
-  return [...pelis, ...series].sort((a, b) => Number(b.voto) - Number(a.voto))
+  return barajar([...pelis, ...series])
 }
 
 /**
