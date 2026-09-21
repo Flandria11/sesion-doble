@@ -1138,6 +1138,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
    */
   const visibles = lista.filter(p => {
     if (descartada(p)) return false
+    if (guardada(p)) return false
     const e = estado(p)
     return !(e && (e.tipo === 'mio' || e.tipo === 'coincide'))
   })
