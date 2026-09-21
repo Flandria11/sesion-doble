@@ -541,17 +541,22 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     const e = estado(p)
     if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
     setAnadiendo(p.tmdb_id)
-    if (e) {
-      await onVotar(e.t.id, 'si')
-      setAnadiendo(null)
-      setFiesta(p)
-    } else {
-      const ok = await onAdd(p, nota)
-      setAnadiendo(null)
-      if (ok) {
-        setFlash(`${p.titulo} está en tu lista`)
-        setTimeout(() => setFlash(''), 2600)
+    // el finally es el que importa: si onVotar/onAdd fallara sin avisar,
+    // anadiendo se quedaba puesto para siempre y ya no dejaba tocar nada
+    // más, aunque fuera en otra tarjeta
+    try {
+      if (e) {
+        await onVotar(e.t.id, 'si')
+        setFiesta(p)
+      } else {
+        const ok = await onAdd(p, nota)
+        if (ok) {
+          setFlash(`${p.titulo} está en tu lista`)
+          setTimeout(() => setFlash(''), 2600)
+        }
       }
+    } finally {
+      setAnadiendo(null)
     }
   }
 
@@ -1239,17 +1244,22 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     const e = estado(p)
     if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
     setAnadiendo(p.tmdb_id)
-    if (e) {
-      await onVotar(e.t.id, 'si')
-      setAnadiendo(null)
-      setFiesta(p)
-    } else {
-      const fila = await onAdd(p)
-      setAnadiendo(null)
-      if (fila) {
-        setRecien({ ...fila, titulo: p.titulo })
-        setTimeout(() => setRecien(r => (r && r.id === fila.id ? null : r)), 6000)
+    // el finally es el que importa: si onVotar/onAdd fallara sin avisar,
+    // anadiendo se quedaba puesto para siempre y ya no dejaba tocar nada
+    // más, aunque fuera en otra tarjeta
+    try {
+      if (e) {
+        await onVotar(e.t.id, 'si')
+        setFiesta(p)
+      } else {
+        const fila = await onAdd(p)
+        if (fila) {
+          setRecien({ ...fila, titulo: p.titulo })
+          setTimeout(() => setRecien(r => (r && r.id === fila.id ? null : r)), 6000)
+        }
       }
+    } finally {
+      setAnadiendo(null)
     }
   }
 
