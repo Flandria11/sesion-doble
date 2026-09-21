@@ -1047,8 +1047,15 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
     else { setModo('quieto'); setDx(0) }
   }
   // si la sinopsis estaba abierta y el usuario solo tocó para arrastrar
-  // (sin llegar al umbral), evita que el toque cuente como un clic normal
-  const clicDurante = e => { if (arrastro.current) { e.preventDefault(); e.stopPropagation() } }
+  // (sin llegar al umbral), evita que el toque cuente como un clic normal.
+  // Los botones quedan fuera: un dedo real casi nunca toca del todo quieto,
+  // y sin esta excepción ese temblor de unos pocos píxeles bastaba para que
+  // Proponer/Paso/Vista no respondieran, aunque el dedo acabara soltando
+  // justo encima del botón.
+  const clicDurante = e => {
+    if (e.target.closest('button, .mandos-video, .centro')) return
+    if (arrastro.current) { e.preventDefault(); e.stopPropagation() }
+  }
 
   const estilo = dx === 0 ? undefined : {
     transform: `translateX(${dx}px) rotate(${dx / 18}deg)`,
