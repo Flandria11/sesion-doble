@@ -55,7 +55,8 @@ export const MODOS = [
   { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: false, sinPlataforma: true },
   { id: 'novedades', nombre: 'Novedades', filtrable: true },
   { id: 'populares', nombre: 'Populares', filtrable: true },
-  { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true }
+  { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true },
+  { id: 'joyas', nombre: 'Joyas', filtrable: true }
 ]
 
 /**
@@ -257,7 +258,8 @@ export async function estrenos(pagina = 1) {
   const ventanas = [
     { desde: dia(92),  hasta: dia(0),   votos: '100' },
     { desde: dia(184), hasta: dia(93),  votos: '200' },
-    { desde: dia(400), hasta: dia(185), votos: '400' }
+    { desde: dia(400), hasta: dia(185), votos: '400' },
+    { desde: dia(548), hasta: dia(401), votos: '600' }
   ]
 
   // Se pide una página al azar dentro de las primeras y luego se baraja:
@@ -305,6 +307,42 @@ export async function estrenos(pagina = 1) {
     }
   }
   return salida
+}
+
+/**
+ * Lo mejor de un año o una época, para el modo "Joyas": no busca lo
+ * recién salido sino lo mejor valorado de la fecha elegida. Pelis y
+ * series se piden por separado pero se devuelven ya mezcladas y
+ * ordenadas por nota, así lo mejor sale primero sin importar el tipo.
+ */
+export async function joyas(anioId, pagina = 1) {
+  const op = ANOS.find(a => a.id === anioId)
+  if (!anioId || !op) return []
+  const desde = op.desde || `${anioId}-01-01`
+  const hasta = op.hasta || `${anioId}-12-31`
+
+  const comun = {
+    page: String(pagina),
+    watch_region: REGION,
+    include_adult: 'false',
+    'vote_count.gte': '300',
+    sort_by: 'vote_average.desc'
+  }
+
+  const [pelis, series] = await Promise.all([
+    pedir('/discover/movie', {
+      ...comun,
+      'primary_release_date.gte': desde,
+      'primary_release_date.lte': hasta
+    }).then(d => limpiar(d.results, 'movie')).catch(() => []),
+    pedir('/discover/tv', {
+      ...comun,
+      'first_air_date.gte': desde,
+      'first_air_date.lte': hasta
+    }).then(d => limpiar(d.results, 'tv')).catch(() => [])
+  ])
+
+  return [...pelis, ...series].sort((a, b) => Number(b.voto) - Number(a.voto))
 }
 
 /**
