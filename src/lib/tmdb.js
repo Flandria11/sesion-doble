@@ -55,8 +55,7 @@ export const MODOS = [
   { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: false, sinPlataforma: true },
   { id: 'novedades', nombre: 'Novedades', filtrable: true },
   { id: 'populares', nombre: 'Populares', filtrable: true },
-  { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true },
-  { id: 'joyas', nombre: 'Joyas', filtrable: true }
+  { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true }
 ]
 
 /**
@@ -310,16 +309,13 @@ export async function estrenos(pagina = 1) {
 }
 
 /**
- * Lo mejor de un año o una época, para el modo "Joyas": no busca lo
- * recién salido sino lo mejor valorado de la fecha elegida. Pelis y
- * series se piden por separado pero se devuelven ya mezcladas y
- * ordenadas por nota, así lo mejor sale primero sin importar el tipo.
+ * Lo mejor valorado de hace más de año y medio: el complemento de
+ * Estrenos, que ya cubre hasta ahí, así que aquí no hace falta elegir
+ * año ni repetir lo que se ve del otro lado. Pelis y series se piden
+ * por separado pero se devuelven ya mezcladas y ordenadas por nota.
  */
-export async function joyas(anioId, pagina = 1) {
-  const op = ANOS.find(a => a.id === anioId)
-  if (!anioId || !op) return []
-  const desde = op.desde || `${anioId}-01-01`
-  const hasta = op.hasta || `${anioId}-12-31`
+export async function topValoradas(pagina = 1) {
+  const hace = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10)
 
   const comun = {
     page: String(pagina),
@@ -330,16 +326,10 @@ export async function joyas(anioId, pagina = 1) {
   }
 
   const [pelis, series] = await Promise.all([
-    pedir('/discover/movie', {
-      ...comun,
-      'primary_release_date.gte': desde,
-      'primary_release_date.lte': hasta
-    }).then(d => limpiar(d.results, 'movie')).catch(() => []),
-    pedir('/discover/tv', {
-      ...comun,
-      'first_air_date.gte': desde,
-      'first_air_date.lte': hasta
-    }).then(d => limpiar(d.results, 'tv')).catch(() => [])
+    pedir('/discover/movie', { ...comun, 'primary_release_date.lte': hace })
+      .then(d => limpiar(d.results, 'movie')).catch(() => []),
+    pedir('/discover/tv', { ...comun, 'first_air_date.lte': hace })
+      .then(d => limpiar(d.results, 'tv')).catch(() => [])
   ])
 
   return [...pelis, ...series].sort((a, b) => Number(b.voto) - Number(a.voto))

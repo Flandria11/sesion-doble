@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, explorar, estrenos, joyas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla, barajar } from './lib/tmdb'
+import { buscar, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -390,7 +390,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 
   const pestanas = [
     ['buscar', 'Añadir', 0],
-    ['reel', 'Estrenos', 0],
+    ['reel', 'Ver', 0],
     ['votar', 'Votar', cola.length],
     ['mias', 'Mis pelis', 0],
     ['match', 'Coinciden', matches.length]
@@ -418,9 +418,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
                 descartada={descartada} motivoDescarte={motivoDescarte}
                 onDescartar={descartar} onRecuperar={recuperar}
-                guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
-                onComentar={comentar} />}
-            {vista === 'reel' && <Reel titulos={titulos} yo={yo}
+                guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
+            {vista === 'reel' && <Ver titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
                 descartada={descartada} onDescartar={descartar}
                 guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
@@ -458,7 +457,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 }
 
 /* ======================= añadir ======================= */
-function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar, onComentar }) {
+function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('movie')
   const [modo, setModo] = useState('tendencias')
@@ -467,10 +466,6 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   const [anio, setAnio] = useState('')
   const [calidad, setCalidad] = useState(false)
   const [pagina, setPagina] = useState(1)
-  // "Joyas" guarda su progreso por año en memoriaJoyasPorAnio (fuera del
-  // componente, junto a memoriaReel): así, si vuelves a un año que ya
-  // habías mirado, sigues donde lo dejaste
-  const memoriaJoyas = anio ? obtenerMemoriaJoyas(anio) : null
 
   const [plats, setPlats] = useState([])
   const [gens, setGens] = useState([])
@@ -514,8 +509,6 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   // exploración con filtros
   useEffect(() => {
     if (q.trim().length >= 2) return
-    // Joyas no usa este catálogo: trae sus propios títulos (ver <Reel>)
-    if (modo === 'joyas') return
     let vivo = true
     setCargando(true)
     // pequeño respiro antes de pedir y redibujar: sin esto, mover el
@@ -619,10 +612,6 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   )
   const modoActual = MODOS.find(m => m.id === modo)
   const ocultarPlataformas = !!(modoActual && modoActual.sinPlataforma)
-  // Joyas mezcla pelis y series de un año a la vez: la pestaña de tipo no
-  // pinta nada ahí, y en vez del catálogo normal usa las tarjetas con
-  // tráiler de Estrenos.
-  const esJoyas = modo === 'joyas'
 
   return (
     <>
@@ -633,14 +622,12 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
       {explorando && (
         <>
-          {!esJoyas && (
-            <div className="pestanas">
-              <button className={tipo === 'movie' ? 'activo' : ''}
-                onClick={() => cambiarTipo('movie')}>Películas</button>
-              <button className={tipo === 'tv' ? 'activo' : ''}
-                onClick={() => cambiarTipo('tv')}>Series</button>
-            </div>
-          )}
+          <div className="pestanas">
+            <button className={tipo === 'movie' ? 'activo' : ''}
+              onClick={() => cambiarTipo('movie')}>Películas</button>
+            <button className={tipo === 'tv' ? 'activo' : ''}
+              onClick={() => cambiarTipo('tv')}>Series</button>
+          </div>
 
           <div className="filtros">
             {modosVisibles.map(m => (
@@ -649,22 +636,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
             ))}
           </div>
 
-          {esJoyas && (
-            <>
-              <div className="barra-filtros">
-                <select value={anio} onChange={e => cambiarAnio(e.target.value)}
-                  aria-label="Elegir año">
-                  <option value="">Elige un año…</option>
-                  {ANOS.filter(a => a.id).map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                </select>
-              </div>
-              <div className="ayuda" style={{ marginTop: 12, marginBottom: 0 }}>
-                Lo mejor valorado de esa época, pelis y series mezcladas. No hace falta que esté en tus plataformas.
-              </div>
-            </>
-          )}
-
-          {!esJoyas && plats.length > 0 && !ocultarPlataformas && (
+          {plats.length > 0 && !ocultarPlataformas && (
             <div className="fila-plataformas">
               {/* la fila no tenía scrollbar ni pista alguna de que seguía
                   hacia la derecha: con ratón, sin arrastre táctil, no
@@ -698,13 +670,13 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
             </div>
           )}
 
-          {!esJoyas && ocultarPlataformas && (
+          {ocultarPlataformas && (
             <div className="ayuda" style={{ marginTop: 12, marginBottom: 0 }}>
               Estrenos en salas de España. Aquí no aplican las plataformas.
             </div>
           )}
 
-          {!esJoyas && !ocultarPlataformas && (
+          {!ocultarPlataformas && (
             <>
               <div className="barra-filtros">
                 <button className={`plegable${panel ? ' abierto' : ''}`}
@@ -761,7 +733,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
             </>
           )}
 
-          {!esJoyas && provs.length > 0 && (
+          {provs.length > 0 && (
             <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
               Solo lo incluido en la suscripción de {provs.length === 1 ? 'esa plataforma' : 'esas plataformas'} en España.
             </div>
@@ -769,25 +741,9 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
         </>
       )}
 
-      {esJoyas ? (
-        anio
-          ? <Reel key={anio} titulos={titulos} yo={yo} miVoto={miVoto}
-              onAdd={onAdd} onVotar={onVotar} descartada={descartada}
-              onDescartar={onDescartar} guardada={guardada} onGuardar={onGuardar}
-              onComentar={onComentar}
-              cargar={pag => joyas(anio, pag)} memoria={memoriaJoyas}
-              textoCargando="Buscando joyas de ese año…"
-              textoError="No se han podido cargar los títulos."
-              vacioTitulo="No hay más"
-              vacioTexto="Ya has mirado todo lo mejor de ese año. Prueba con otro." />
-          : <div className="ayuda" style={{ marginTop: 16 }}>
-              Elige un año arriba para ver lo mejor de esa época.
-            </div>
-      ) : (
-        <>
-          {error && <div className="error">{error}</div>}
+      {error && <div className="error">{error}</div>}
 
-          <div className="catalogo">
+      <div className="catalogo">
         {visibles.map(p => {
           const e = estado(p)
           const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
@@ -837,8 +793,6 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
           {res.length > 0 ? 'Ya has decidido sobre todas. Activa el interruptor para verlas.'
             : explorando ? 'Prueba a quitar algún filtro.' : 'Prueba con otro título.'}
         </div>
-      )}
-        </>
       )}
 
       {ficha && (() => {
@@ -1030,13 +984,8 @@ function Trailer({ clave, titulo, cartel }) {
  * volvías a la primera tarjeta. */
 const memoriaReel = { lista: [], pagina: 1, scroll: 0 }
 
-/* Lo mismo, pero para "Joyas" (Añadir): una por año, para que cambiar de
- * año y volver no borre lo que ya habías mirado en el anterior. */
-const memoriaJoyasPorAnio = {}
-function obtenerMemoriaJoyas(anio) {
-  if (!memoriaJoyasPorAnio[anio]) memoriaJoyasPorAnio[anio] = { lista: [], pagina: 1, scroll: 0 }
-  return memoriaJoyasPorAnio[anio]
-}
+/* Lo mismo, pero para el apartado "Top" de esa misma pantalla. */
+const memoriaTop = { lista: [], pagina: 1, scroll: 0 }
 
 /* Tarjeta que se puede deslizar a los lados, como Tinder: a la derecha
  * cuenta como "sí" y a la izquierda como "paso". El desplazamiento
@@ -1217,7 +1166,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
   }, [pagina])
 
   // se guarda lo cargado y dónde estabas, para el regreso: memoria vive
-  // fuera de React a propósito (ver memoriaReel/memoriaJoyas), así que
+  // fuera de React a propósito (ver memoriaReel/memoriaTop), así que
   // mutarla aquí es justo el mecanismo, no un descuido
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability
@@ -1373,6 +1322,36 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
       )}
 
       {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
+    </>
+  )
+}
+
+/* ======================= pestaña "Ver" =======================
+ * Dos apartados sobre las mismas tarjetas: Estrenos (lo más reciente,
+ * hasta año y medio) y Top (lo mejor valorado de ahí para atrás, sin
+ * repetir lo que ya sale en Estrenos). El interruptor flota encima del
+ * tráiler en vez de ir en el flujo normal, para no robarle alto a la
+ * tarjeta: .pista ya tiene su alto calculado y un elemento más ahí
+ * arriba la dejaría cortada por abajo.
+ */
+function Ver(props) {
+  const [sub, setSub] = useState('estrenos')
+  return (
+    <>
+      <div className="sub-ver">
+        <button className={sub === 'estrenos' ? 'activo' : ''}
+          onClick={() => setSub('estrenos')}>Estrenos</button>
+        <button className={sub === 'top' ? 'activo' : ''}
+          onClick={() => setSub('top')}>Top</button>
+      </div>
+      {sub === 'estrenos'
+        ? <Reel key="estrenos" {...props} />
+        : <Reel key="top" {...props}
+            cargar={topValoradas} memoria={memoriaTop}
+            textoCargando="Buscando lo mejor…"
+            textoError="No se han podido cargar los títulos."
+            vacioTitulo="No hay más"
+            vacioTexto="Ya has mirado todo lo mejor de más de año y medio. Vuelve en unos días." />}
     </>
   )
 }
