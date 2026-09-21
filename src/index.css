@@ -439,14 +439,18 @@ input::placeholder { color: #61539A; }
    YouTube dibuja en su borde superior queden fuera de la vista. El
    desplazamiento va SOLO en el contenedor: si se aplica también al iframe
    de dentro, se suma dos veces y el vídeo sube el doble. */
+/* El !important es a propósito: el propio reproductor de YouTube toca el
+   estilo del iframe que crea, y sin esto a veces se reactivaba el toque
+   ahí dentro mientras el vídeo estaba en marcha, dejando sin respuesta
+   los botones de encima (Proponer, Paso, Vista...) hasta pausarlo. */
 .diapo .marco, .diapo > .lienzo > iframe {
   position: absolute; left: 0; top: -10%;
   width: 100%; height: 100%;
-  border: 0; pointer-events: none;
+  border: 0; pointer-events: none !important;
 }
 .diapo .marco iframe {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  border: 0; pointer-events: none;
+  border: 0; pointer-events: none !important;
 }
 
 /* Botón central de reproducción: se coloca justo donde YouTube pinta el
@@ -463,6 +467,7 @@ input::placeholder { color: #61539A; }
   /* mientras se reproduce no se ve, pero sigue recibiendo el toque:
      así el gesto natural de tocar el centro funciona igual */
   opacity: 0; transition: opacity .22s ease, transform .22s ease;
+  pointer-events: auto;
 }
 .centro.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .centro.visible:hover, .centro:focus-visible {
@@ -474,7 +479,7 @@ input::placeholder { color: #61539A; }
    con la cruz de cerrar en las fichas */
 .mandos-video {
   position: absolute; top: 14px; left: 14px; z-index: 5;
-  display: flex; gap: 7px;
+  display: flex; gap: 7px; pointer-events: auto;
 }
 .mandos-video button {
   width: 44px; height: 44px; border-radius: 50%;
@@ -498,7 +503,7 @@ input::placeholder { color: #61539A; }
 
 /* cortina de arranque: tapa el instante en que YouTube dibuja sus iconos */
 .cortina {
-  position: absolute; inset: 0; z-index: 1;
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background-size: cover; background-position: center;
   animation: descubrir .5s ease-out 1.7s both;
 }
@@ -820,6 +825,7 @@ nav .num {
 .torre {
   position: absolute; right: 10px; bottom: 152px; z-index: 5;
   display: flex; flex-direction: column; gap: 16px; align-items: center;
+  pointer-events: auto;
 }
 .redondo {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
