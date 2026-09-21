@@ -399,15 +399,17 @@ input::placeholder { color: #61539A; }
 
 /* interruptor Estrenos/Top de la pestaña "Ver": flota sobre la tarjeta
    en vez de ocupar su propia fila, para que .pista conserve el alto de
-   siempre y el tráiler se vea exactamente igual que antes */
+   siempre y el tráiler se vea exactamente igual que antes. Abajo a la
+   derecha, pequeño, junto a la descripción y por debajo de la columna
+   de botones (que no baja de los 152px desde el borde). */
 .sub-ver {
-  position: fixed; top: 92px; left: 50%; transform: translateX(-50%);
+  position: fixed; right: 14px; bottom: 70px;
   z-index: 8; display: flex; gap: 3px;
   background: rgba(8, 4, 16, .55); backdrop-filter: blur(6px);
-  border: 1px solid var(--borde); border-radius: 999px; padding: 3px;
+  border: 1px solid var(--borde); border-radius: 999px; padding: 2px;
 }
 .sub-ver button {
-  padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  padding: 4px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
   color: var(--papel); opacity: .72;
 }
 .sub-ver button.activo { background: var(--ambar); color: var(--noche); opacity: 1; }
