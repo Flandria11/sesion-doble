@@ -1315,7 +1315,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
 
               <div className="cuerpo">
                 <div className="meta">
-                  {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.voto && `★ ${p.voto}`]
+                  {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero, p.voto && `★ ${p.voto}`]
                     .filter(Boolean).join(' · ')}
                 </div>
                 <div className="tit">{p.titulo}</div>

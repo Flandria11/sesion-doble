@@ -13,9 +13,12 @@ async function pedir(ruta, params = {}) {
   return r.json()
 }
 
-function normalizar(x, tipoForzado) {
+function normalizar(x, tipoForzado, mapaGeneros) {
   const tipo = tipoForzado || x.media_type
   const esPeli = tipo === 'movie'
+  const genero = mapaGeneros && x.genre_ids
+    ? x.genre_ids.slice(0, 2).map(id => mapaGeneros[id]).filter(Boolean).join(' · ')
+    : ''
   return {
     tmdb_id: x.id,
     tipo: esPeli ? 'movie' : 'tv',
@@ -24,15 +27,30 @@ function normalizar(x, tipoForzado) {
     cartel: cartel(x.poster_path),
     fondo: fondo(x.backdrop_path),
     sinopsis: x.overview || '',
-    voto: x.vote_average ? x.vote_average.toFixed(1) : ''
+    voto: x.vote_average ? x.vote_average.toFixed(1) : '',
+    genero
   }
 }
 
-const limpiar = (lista, tipo) =>
+const limpiar = (lista, tipo, mapaGeneros) =>
   (lista || [])
     .filter(x => tipo || x.media_type === 'movie' || x.media_type === 'tv')
     .filter(x => x.poster_path)
-    .map(x => normalizar(x, tipo))
+    .map(x => normalizar(x, tipo, mapaGeneros))
+
+/**
+ * Nombres de género por id, para pintarlos en las tarjetas sin pedirlos
+ * uno a uno: /discover ya trae genre_ids, solo falta el nombre. La
+ * lista es fija (apenas cambia), así que se pide una sola vez por sesión.
+ */
+const cacheGeneros = {}
+async function mapaGeneros(tipo) {
+  if (cacheGeneros[tipo]) return cacheGeneros[tipo]
+  const d = await pedir(`/genre/${tipo === 'tv' ? 'tv' : 'movie'}/list`)
+  const mapa = Object.fromEntries((d.genres || []).map(g => [g.id, g.name]))
+  cacheGeneros[tipo] = mapa
+  return mapa
+}
 
 /** Busca películas y series a la vez. */
 export async function buscar(texto) {
@@ -273,6 +291,8 @@ export async function estrenos(pagina = 1) {
     'vote_average.gte': '6.2'
   }
 
+  const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
+
   const tandas = await Promise.all(
     ventanas.flatMap(v => [
       pedir('/discover/movie', {
@@ -281,14 +301,14 @@ export async function estrenos(pagina = 1) {
         sort_by: 'primary_release_date.desc',
         'primary_release_date.gte': v.desde,
         'primary_release_date.lte': v.hasta
-      }).then(d => limpiar(d.results, 'movie')).catch(() => []),
+      }).then(d => limpiar(d.results, 'movie', mapaPelis)).catch(() => []),
       pedir('/discover/tv', {
         ...comun,
         'vote_count.gte': v.votos,
         sort_by: 'first_air_date.desc',
         'first_air_date.gte': v.desde,
         'first_air_date.lte': v.hasta
-      }).then(d => limpiar(d.results, 'tv')).catch(() => [])
+      }).then(d => limpiar(d.results, 'tv', mapaSeries)).catch(() => [])
     ])
   )
 
@@ -328,11 +348,13 @@ export async function topValoradas(pagina = 1) {
     sort_by: 'vote_average.desc'
   }
 
+  const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
+
   const [pelis, series] = await Promise.all([
     pedir('/discover/movie', { ...comun, 'primary_release_date.lte': hace })
-      .then(d => limpiar(d.results, 'movie')).catch(() => []),
+      .then(d => limpiar(d.results, 'movie', mapaPelis)).catch(() => []),
     pedir('/discover/tv', { ...comun, 'first_air_date.lte': hace })
-      .then(d => limpiar(d.results, 'tv')).catch(() => [])
+      .then(d => limpiar(d.results, 'tv', mapaSeries)).catch(() => [])
   ])
 
   return barajar([...pelis, ...series])
