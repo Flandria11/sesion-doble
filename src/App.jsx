@@ -876,6 +876,11 @@ function Trailer({ clave, titulo, cartel }) {
   const [api, setApi] = useState(null)
   const [mudo, setMudo] = useState(true)
   const [parado, setParado] = useState(false)
+  // Algunos tráilers de TMDB no se pueden incrustar (el estudio lo impide):
+  // YouTube entonces no reproduce nada y se queda con su propio aviso de
+  // "vídeo no disponible" dentro del marco. Mejor no enseñarlo: se cae a
+  // la carátula, como si no hubiera tráiler.
+  const [fallo, setFallo] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -913,7 +918,11 @@ function Trailer({ clave, titulo, cartel }) {
             onStateChange: e => {
               if (!vivo) return
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
-            }
+            },
+            // 101/150: el embed está bloqueado para este vídeo. 100: lo
+            // han quitado o es privado. En cualquier caso no hay nada que
+            // reproducir aquí.
+            onError: () => { if (vivo) setFallo(true) }
           }
         })
       })
@@ -943,6 +952,8 @@ function Trailer({ clave, titulo, cartel }) {
     if (pl.getPlayerState() === 1) { pl.pauseVideo(); setParado(true) }
     else { pl.playVideo(); setParado(false) }
   })
+
+  if (fallo) return null
 
   return (
     <>

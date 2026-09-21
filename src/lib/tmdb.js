@@ -347,9 +347,9 @@ export async function buscarTrailer(tmdbId, tipo) {
   for (const idioma of ['es-ES', 'en-US']) {
     try {
       const d = await pedir(ruta, { language: idioma })
-      const v = (d.results || []).find(
-        x => x.site === 'YouTube' && (x.type === 'Trailer' || x.type === 'Teaser')
-      )
+      const videos = (d.results || []).filter(x => x.site === 'YouTube')
+      // un "Trailer" de verdad antes que un simple teaser, si hay de los dos
+      const v = videos.find(x => x.type === 'Trailer') || videos.find(x => x.type === 'Teaser')
       if (v) return v.key
     } catch (e) {
       /* probamos el siguiente idioma */
