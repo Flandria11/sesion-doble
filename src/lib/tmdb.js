@@ -144,14 +144,30 @@ export const ANOS = [
  * No lo subo más porque el cine español recibe muchos menos votos que el
  * americano, y un listón alto se lo lleva por delante.
  */
-const VOTOS = { valoradas: 1000, calidad: 350, normal: 40 }
+const VOTOS = { valoradas: 1000, calidad: 350, normal: 80 }
 const NOTA_MINIMA = 6
+const NOTA_MINIMA_TV = 6.5
+const NOTA_MINIMA_ANADIR = 5
+const NOTA_MINIMA_ANADIR_TV = 5.5
 const NOTA_MINIMA_TOP = 7
 const NOTA_MINIMA_TOP_TV = 7.7
 const NOTA_MINIMA_ESTRENOS = 6.2
 const NOTA_MINIMA_ESTRENOS_TV = 6.7
 const NOTA_MINIMA_ANIMACION_TOP = 7.5
 const NOTA_MINIMA_ANIMACION_TOP_TV = 8.1
+
+/**
+ * Suelo de calidad en Añadir aunque no se active el interruptor: sin
+ * esto colaban pelis de serie Z con nota de 2 con tal de tener algo de
+ * votos. Tendencias/Populares/Cines/Valoradas siguen ordenados como
+ * los da TMDB (por eso salen antes las más populares); esto solo
+ * recorta lo que se cuela por detrás.
+ */
+const filtrarBase = (lista, esPeli) =>
+  lista.filter(x =>
+    x.vote_average >= (esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV) &&
+    x.vote_count >= VOTOS.normal
+  )
 
 export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
@@ -161,19 +177,19 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
       const d = await pedir('/movie/now_playing', { ...base, region: REGION })
-      return limpiar(d.results, 'movie')
+      return limpiar(filtrarBase(d.results, true), 'movie')
     }
     if (modo === 'tendencias') {
       const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)
-      return limpiar(d.results, esPeli ? 'movie' : 'tv')
+      return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
     }
     if (modo === 'populares') {
       const d = await pedir(`/${esPeli ? 'movie' : 'tv'}/popular`, { ...base, region: REGION })
-      return limpiar(d.results, esPeli ? 'movie' : 'tv')
+      return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
     }
     if (modo === 'valoradas') {
       const d = await pedir(`/${esPeli ? 'movie' : 'tv'}/top_rated`, { ...base, region: REGION })
-      return limpiar(d.results, esPeli ? 'movie' : 'tv')
+      return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
     }
   }
 
@@ -184,9 +200,13 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     include_adult: 'false',
     'vote_count.gte': String(
       modo === 'valoradas' ? VOTOS.valoradas : calidad ? VOTOS.calidad : VOTOS.normal
+    ),
+    'vote_average.gte': String(
+      calidad
+        ? (esPeli ? NOTA_MINIMA : NOTA_MINIMA_TV)
+        : (esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV)
     )
   }
-  if (calidad) p['vote_average.gte'] = String(NOTA_MINIMA)
 
   // filtro de año: los sueltos por año exacto, las décadas por rango
   if (anio) {
