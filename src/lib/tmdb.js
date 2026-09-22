@@ -150,6 +150,7 @@ const NOTA_MINIMA_TOP = 7
 const NOTA_MINIMA_TOP_TV = 7.7
 const NOTA_MINIMA_ESTRENOS = 6.2
 const NOTA_MINIMA_ESTRENOS_TV = 6.7
+const NOTA_MINIMA_ANIMACION_TOP = 8.1
 
 export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
@@ -339,11 +340,12 @@ const GENERO_ANIMACION = 16
 
 /**
  * La animación (sobre todo el anime) copa el top por nota: tiene un
- * público muy fiel que puntúa alto y en masa. Se deja pasar como mucho
- * 1 de cada 6 para que siga saliendo, pero sin comerse el resto.
+ * público muy fiel que puntúa alto y en masa. Se le exige más nota que
+ * al resto (8.1) y además se deja pasar como mucho 1 de cada 6, para que
+ * siga saliendo pero sin comerse el resto.
  */
 function limitarAnimacion(resultados) {
-  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION))
+  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION) && x.vote_average >= NOTA_MINIMA_ANIMACION_TOP)
   const resto = resultados.filter(x => !x.genre_ids?.includes(GENERO_ANIMACION))
   const maxAnim = Math.ceil(resto.length / 5)
   return [...resto, ...anim.slice(0, maxAnim)]
