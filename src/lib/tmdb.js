@@ -150,7 +150,8 @@ const NOTA_MINIMA_TOP = 7
 const NOTA_MINIMA_TOP_TV = 7.7
 const NOTA_MINIMA_ESTRENOS = 6.2
 const NOTA_MINIMA_ESTRENOS_TV = 6.7
-const NOTA_MINIMA_ANIMACION_TOP = 8.1
+const NOTA_MINIMA_ANIMACION_TOP = 7.5
+const NOTA_MINIMA_ANIMACION_TOP_TV = 8.1
 
 export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
@@ -339,13 +340,14 @@ export async function estrenos(pagina = 1) {
 const GENERO_ANIMACION = 16
 
 /**
- * La animación (sobre todo el anime) copa el top por nota: tiene un
- * público muy fiel que puntúa alto y en masa. Se le exige más nota que
- * al resto (8.1) y además se deja pasar como mucho 1 de cada 6, para que
- * siga saliendo pero sin comerse el resto.
+ * La animación (sobre todo el anime en series) copa el top por nota:
+ * tiene un público muy fiel que puntúa alto y en masa. Se le exige más
+ * nota que al resto (distinta para pelis y series) y además se deja
+ * pasar como mucho 1 de cada 6, para que siga saliendo pero sin
+ * comerse el resto.
  */
-function limitarAnimacion(resultados) {
-  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION) && x.vote_average >= NOTA_MINIMA_ANIMACION_TOP)
+function limitarAnimacion(resultados, notaMinima) {
+  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION) && x.vote_average >= notaMinima)
   const resto = resultados.filter(x => !x.genre_ids?.includes(GENERO_ANIMACION))
   const maxAnim = Math.ceil(resto.length / 5)
   return [...resto, ...anim.slice(0, maxAnim)]
@@ -385,10 +387,10 @@ export async function topValoradas(pagina = 1) {
   const [pelis, series] = await Promise.all([
     pedir('/discover/movie', {
       ...comun, 'vote_count.gte': '3000', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace
-    }).then(d => limpiar(limitarAnimacion(d.results), 'movie', mapaPelis)).catch(() => []),
+    }).then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP), 'movie', mapaPelis)).catch(() => []),
     pedir('/discover/tv', {
       ...comun, 'vote_count.gte': '2000', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace
-    }).then(d => limpiar(limitarAnimacion(d.results), 'tv', mapaSeries)).catch(() => [])
+    }).then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP_TV), 'tv', mapaSeries)).catch(() => [])
   ])
 
   return barajar([...pelis, ...series])
