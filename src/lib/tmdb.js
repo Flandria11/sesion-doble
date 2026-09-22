@@ -144,7 +144,7 @@ export const ANOS = [
  * No lo subo más porque el cine español recibe muchos menos votos que el
  * americano, y un listón alto se lo lleva por delante.
  */
-const VOTOS = { valoradas: 1000, calidad: 250, normal: 40 }
+const VOTOS = { valoradas: 1000, calidad: 350, normal: 40 }
 const NOTA_MINIMA = 6
 const NOTA_MINIMA_TOP = 7
 const NOTA_MINIMA_TOP_TV = 7.7
