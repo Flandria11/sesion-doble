@@ -399,9 +399,14 @@ input::placeholder { color: #61539A; }
 
 /* interruptor Estrenos/Top de la pestaña "Ver": flota sobre la tarjeta
    en vez de ocupar su propia fila, para que .pista conserve el alto de
-   siempre y el tráiler se vea exactamente igual que antes. */
+   siempre y el tráiler se vea exactamente igual que antes.
+   translateZ(0) + will-change fuerzan su propia capa: en Chrome de
+   Android a veces un fixed con backdrop-filter no se pintaba justo
+   después del fade de entrada de <main> y quedaba invisible hasta el
+   siguiente repintado (por ejemplo al hacer scroll). */
 .sub-ver {
-  position: fixed; top: 92px; left: 50%; transform: translateX(-50%);
+  position: fixed; top: 92px; left: 50%; transform: translateX(-50%) translateZ(0);
+  will-change: transform;
   z-index: 8; display: flex; gap: 3px;
   background: rgba(8, 4, 16, .55); backdrop-filter: blur(6px);
   border: 1px solid var(--borde); border-radius: 999px; padding: 2px;
