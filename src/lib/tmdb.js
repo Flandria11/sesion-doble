@@ -146,6 +146,7 @@ export const ANOS = [
  */
 const VOTOS = { valoradas: 1000, calidad: 250, normal: 40 }
 const NOTA_MINIMA = 6
+const NOTA_MINIMA_TOP = 7
 
 export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
@@ -335,6 +336,13 @@ export async function estrenos(pagina = 1) {
  * pide una página al azar entre las primeras y se baraja: si no, al
  * ordenar siempre por nota saldrían las mismas en el mismo orden cada
  * vez que se abre.
+ *
+ * El mínimo de votos es alto (3000) a propósito: con 300 se colaban
+ * títulos de nicho (un drama coreano, una serie infantil...) con nota
+ * muy alta pero votados por un puñado de fans, compitiendo de tú a tú
+ * con películas que ha visto todo el mundo. Se ordena por popularidad
+ * y no por nota para que, dentro de ese grupo ya filtrado por calidad,
+ * salgan antes los títulos que la gente realmente conoce.
  */
 export async function topValoradas(pagina = 1) {
   const hace = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10)
@@ -344,8 +352,9 @@ export async function topValoradas(pagina = 1) {
     page: String(pagBase),
     watch_region: REGION,
     include_adult: 'false',
-    'vote_count.gte': '300',
-    sort_by: 'vote_average.desc'
+    'vote_count.gte': '3000',
+    'vote_average.gte': String(NOTA_MINIMA_TOP),
+    sort_by: 'popularity.desc'
   }
 
   const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
