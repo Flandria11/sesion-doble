@@ -335,6 +335,20 @@ export async function estrenos(pagina = 1) {
   return salida
 }
 
+const GENERO_ANIMACION = 16
+
+/**
+ * La animación (sobre todo el anime) copa el top por nota: tiene un
+ * público muy fiel que puntúa alto y en masa. Se deja pasar como mucho
+ * 1 de cada 6 para que siga saliendo, pero sin comerse el resto.
+ */
+function limitarAnimacion(resultados) {
+  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION))
+  const resto = resultados.filter(x => !x.genre_ids?.includes(GENERO_ANIMACION))
+  const maxAnim = Math.ceil(resto.length / 5)
+  return [...resto, ...anim.slice(0, maxAnim)]
+}
+
 /**
  * Lo mejor valorado de hace más de año y medio: el complemento de
  * Estrenos, que ya cubre hasta ahí, así que aquí no hace falta elegir
@@ -369,10 +383,10 @@ export async function topValoradas(pagina = 1) {
   const [pelis, series] = await Promise.all([
     pedir('/discover/movie', {
       ...comun, 'vote_count.gte': '3000', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace
-    }).then(d => limpiar(d.results, 'movie', mapaPelis)).catch(() => []),
+    }).then(d => limpiar(limitarAnimacion(d.results), 'movie', mapaPelis)).catch(() => []),
     pedir('/discover/tv', {
       ...comun, 'vote_count.gte': '2000', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace
-    }).then(d => limpiar(d.results, 'tv', mapaSeries)).catch(() => [])
+    }).then(d => limpiar(limitarAnimacion(d.results), 'tv', mapaSeries)).catch(() => [])
   ])
 
   return barajar([...pelis, ...series])
