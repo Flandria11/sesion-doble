@@ -530,7 +530,12 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
         // quedaban dos o tres tarjetas. Se encadenan páginas hasta reunir
         // un puñado de novedades de verdad, con un tope para no disparar
         // peticiones sin fin si los filtros son muy estrechos.
+        // TMDB puede repetir un título entre páginas consecutivas (el orden
+        // por popularidad se reordena entre peticiones), así que se filtran
+        // duplicados por id además de por lo ya decidido
+        const clave = p => `${p.tipo}-${p.tmdb_id}`
         let nuevos = []
+        const vistos = new Set()
         let novedades = 0
         let vueltas = 0
         let agotadas = false
@@ -539,11 +544,19 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
           vueltas++
           proximaPaginaTmdb.current++
           if (!r.length) { agotadas = true; break }
-          nuevos = [...nuevos, ...r]
-          novedades += verTodo ? r.length : r.filter(p => !decidido(p)).length
+          for (const p of r) {
+            if (vistos.has(clave(p))) continue
+            vistos.add(clave(p))
+            nuevos.push(p)
+            if (verTodo || !decidido(p)) novedades++
+          }
         }
         if (!vivo) return
-        setRes(ant => (pagina === 1 ? nuevos : [...ant, ...nuevos]))
+        setRes(ant => {
+          if (pagina === 1) return nuevos
+          const previos = new Set(ant.map(clave))
+          return [...ant, ...nuevos.filter(p => !previos.has(clave(p)))]
+        })
         setAgotado(agotadas)
         setError('')
       } catch (e) {
