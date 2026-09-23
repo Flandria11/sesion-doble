@@ -387,8 +387,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     ['buscar', 'Añadir', 0],
     ['reel', 'Ver', 0],
     ['votar', 'Votar', cola.length],
-    ['mias', 'Mis pelis', 0],
-    ['match', 'Coinciden', matches.length]
+    ['match', 'Coinciden', matches.length],
+    ['mias', 'Mis pelis', 0]
   ]
 
   return (
