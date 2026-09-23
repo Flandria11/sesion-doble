@@ -552,10 +552,16 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
           }
         }
         if (!vivo) return
+        // Tendencias/Populares/Cines siempre traen el mismo orden de TMDB, así
+        // que cada visita repetía exactamente las mismas primeras tarjetas.
+        // Se baraja aquí (no en Valoradas ni Novedades, donde el orden sí
+        // significa algo: nota o fecha de estreno).
+        const barajable = modo !== 'valoradas' && modo !== 'novedades'
+        const listos = barajable ? barajar(nuevos) : nuevos
         setRes(ant => {
-          if (pagina === 1) return nuevos
+          if (pagina === 1) return listos
           const previos = new Set(ant.map(clave))
-          return [...ant, ...nuevos.filter(p => !previos.has(clave(p)))]
+          return [...ant, ...listos.filter(p => !previos.has(clave(p)))]
         })
         setAgotado(agotadas)
         setError('')
@@ -589,6 +595,15 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     // más, aunque fuera en otra tarjeta
     try {
       if (e) {
+        // esta ya la propuso la otra persona: si ya habías votado que no o
+        // que vista, el botón de proponer no debe pisar ese voto sin avisar
+        const v = miVoto(e.t.id)
+        if (v === 'no' || v === 'vista') {
+          setFlash(v === 'no' ? `Ya dijiste que ${p.titulo} no te interesa`
+            : `Ya habías marcado ${p.titulo} como vista`)
+          setTimeout(() => setFlash(''), 3200)
+          return
+        }
         await onVotar(e.t.id, 'si')
         setFiesta(p)
       } else {
@@ -645,13 +660,13 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
   /**
    * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
-   * ya coincide, lo descartado y lo que has guardado para ti. Lo que
-   * propuso ella sigue a la vista, camuflado, porque ahí aún te toca
-   * decidir.
+   * ya coincide, lo que ya votaste que no o que vista sobre una propuesta
+   * suya, lo descartado y lo que has guardado para ti.
    */
   const decidido = p => {
     const e = estado(p)
     if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return true
+    if (e && ['no', 'vista'].includes(miVoto(e.t.id))) return true
     return descartada(p) || guardada(p)
   }
   const visibles = verTodo ? res : res.filter(p => !decidido(p))
@@ -1203,6 +1218,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
   const [abierta, setAbierta] = useState(null)
   const [recien, setRecien] = useState(null)   // recién propuesta, por si quieres comentarla
   const [comentando, setComentando] = useState(null)
+  const [avisoVoto, setAvisoVoto] = useState('')
   const pista = useRef(null)
 
   const estado = p => {
@@ -1222,7 +1238,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     if (descartada(p)) return false
     if (guardada(p)) return false
     const e = estado(p)
-    return !(e && (e.tipo === 'mio' || e.tipo === 'coincide'))
+    if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return false
+    if (e && ['no', 'vista'].includes(miVoto(e.t.id))) return false
+    return true
   })
 
   useEffect(() => {
@@ -1315,6 +1333,15 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     // más, aunque fuera en otra tarjeta
     try {
       if (e) {
+        // esta ya la propuso la otra persona: si ya habías votado que no o
+        // que vista, el botón de proponer no debe pisar ese voto sin avisar
+        const v = miVoto(e.t.id)
+        if (v === 'no' || v === 'vista') {
+          setAvisoVoto(v === 'no' ? `Ya dijiste que ${p.titulo} no te interesa`
+            : `Ya habías marcado ${p.titulo} como vista`)
+          setTimeout(() => setAvisoVoto(''), 3200)
+          return
+        }
         await onVotar(e.t.id, 'si')
         setFiesta(p)
       } else {
@@ -1398,6 +1425,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
           <span>{recien.titulo} está en tu lista</span>
           <button onClick={() => setComentando(recien)}>Comentar</button>
         </div>
+      )}
+      {avisoVoto && (
+        <div className="propuesta-hecha"><span>{avisoVoto}</span></div>
       )}
 
       {comentando && (
