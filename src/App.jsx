@@ -523,7 +523,17 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   // exploración con filtros
   useEffect(() => {
     if (q.trim().length >= 2) return
-    if (pagina === 1) proximaPaginaTmdb.current = 1
+    if (pagina === 1) {
+      // Sin esto, la tarjeta más popular (la última superproducción, por
+      // ejemplo) salía siempre en la primera pantalla, solo cambiando de
+      // posición entre 1ª y 12ª por el barajado. Al arrancar a veces desde
+      // una página más allá, algunas cargas no la traen en absoluto. Solo
+      // se hace con filtros anchos (sin plataforma/género/año/nota): con
+      // filtros estrechos hay pocas páginas y arrancar lejos podía dejar
+      // la exploración vacía a la primera.
+      const barajable = modo !== 'valoradas' && modo !== 'novedades'
+      proximaPaginaTmdb.current = (barajable && !hayFiltros) ? 1 + Math.floor(Math.random() * 4) : 1
+    }
     let vivo = true
     setCargando(true)
     // pequeño respiro antes de pedir y redibujar: sin esto, mover el
