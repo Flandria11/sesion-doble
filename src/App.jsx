@@ -876,24 +876,25 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
             onCerrar={() => setFicha(null)}
             onProponer={async nota => { setFicha(null); await actuar(ficha, nota) }}
             acciones={
-              <div className="rectificar">
-                {guardada(ficha)
-                  ? <button onClick={() => { onOlvidar(ficha); setFicha(null) }}>
-                      Quitar de mi lista
-                    </button>
-                  : <button onClick={() => { onGuardar(ficha); setFicha(null) }}>
-                      Guardar para mí
-                    </button>}
+              <div className="acciones-redondas">
+                <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
+                  onClick={() => { (guardada(ficha) ? onOlvidar : onGuardar)(ficha); setFicha(null) }}>
+                  <span>🔖</span><i>{guardada(ficha) ? 'Guardada' : 'Para mí'}</i>
+                </button>
                 {descartada(ficha)
-                  ? <button onClick={() => { onRecuperar(ficha); setFicha(null) }}>
-                      {motivoDescarte(ficha) === 'vista' ? 'Marcada como vista' : 'Descartada'} · deshacer
+                  ? <button className="redondo"
+                      aria-label={motivoDescarte(ficha) === 'vista' ? 'Marcada como vista · deshacer' : 'Descartada · deshacer'}
+                      onClick={() => { onRecuperar(ficha); setFicha(null) }}>
+                      <span>↺</span><i>Deshacer</i>
                     </button>
                   : <>
-                      <button onClick={() => { onDescartar(ficha, 'no_interesa'); setFicha(null) }}>
-                        No me interesa
+                      <button className="redondo"
+                        onClick={() => { onDescartar(ficha, 'no_interesa'); setFicha(null) }}>
+                        <span>✕</span><i>Paso</i>
                       </button>
-                      <button onClick={() => { onDescartar(ficha, 'vista'); setFicha(null) }}>
-                        Ya vista
+                      <button className="redondo"
+                        onClick={() => { onDescartar(ficha, 'vista'); setFicha(null) }}>
+                        <span>👁</span><i>Vista</i>
                       </button>
                     </>}
               </div>
@@ -1991,25 +1992,35 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
           onCerrar={() => setFicha(null)}
           onProponer={() => setFicha(null)}
           acciones={
-            <div className="rectificar">
+            <div className="acciones-redondas">
               {ficha.id
                 ? <>
-                    {guardada(ficha)
-                      ? <button onClick={() => onOlvidar(ficha)}>Quitar de mi lista</button>
-                      : <button onClick={() => onGuardar(ficha)}>Guardar para mí</button>}
-                    <button onClick={async () => { await onQuitar(ficha.id); setFicha(null) }}>
-                      Retirar mi propuesta
+                    <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
+                      onClick={() => (guardada(ficha) ? onOlvidar : onGuardar)(ficha)}>
+                      <span>🔖</span><i>{guardada(ficha) ? 'Guardada' : 'Para mí'}</i>
+                    </button>
+                    <button className="redondo"
+                      onClick={async () => { await onQuitar(ficha.id); setFicha(null) }}>
+                      <span>🗑</span><i>Retirar</i>
                     </button>
                   </>
                 : <>
-                    <button onClick={() => onOlvidar(ficha)}>Quitar de mi lista</button>
+                    <button className="redondo marcado" onClick={() => onOlvidar(ficha)}>
+                      <span>🔖</span><i>Guardada</i>
+                    </button>
                     {descartada(ficha)
-                      ? <button onClick={() => onRecuperar(ficha)}>
-                          {motivoDescarte(ficha) === 'vista' ? 'Marcada como vista' : 'No te interesa'} · deshacer
+                      ? <button className="redondo"
+                          aria-label={motivoDescarte(ficha) === 'vista' ? 'Marcada como vista · deshacer' : 'No te interesa · deshacer'}
+                          onClick={() => onRecuperar(ficha)}>
+                          <span>↺</span><i>Deshacer</i>
                         </button>
                       : <>
-                          <button onClick={() => onDescartar(ficha, 'no_interesa')}>No me interesa</button>
-                          <button onClick={() => onDescartar(ficha, 'vista')}>Ya vista</button>
+                          <button className="redondo" onClick={() => onDescartar(ficha, 'no_interesa')}>
+                            <span>✕</span><i>Paso</i>
+                          </button>
+                          <button className="redondo" onClick={() => onDescartar(ficha, 'vista')}>
+                            <span>👁</span><i>Vista</i>
+                          </button>
                         </>}
                   </>}
             </div>
@@ -2088,12 +2099,17 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
           onCerrar={() => setFicha(null)}
           onProponer={() => setFicha(null)}
           acciones={
-            <div className="rectificar">
-              <button onClick={() => marcar('vista')}>Ya la hemos visto</button>
-              {guardada(ficha)
-                ? <button onClick={() => onOlvidar(ficha)}>Quitar de mi lista</button>
-                : <button onClick={() => onGuardar(ficha)}>Guardar para mí</button>}
-              <button onClick={() => marcar('no')}>Ya no me apetece</button>
+            <div className="acciones-redondas">
+              <button className="redondo" onClick={() => marcar('vista')}>
+                <span>👁</span><i>Vista</i>
+              </button>
+              <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
+                onClick={() => (guardada(ficha) ? onOlvidar : onGuardar)(ficha)}>
+                <span>🔖</span><i>{guardada(ficha) ? 'Guardada' : 'Para mí'}</i>
+              </button>
+              <button className="redondo" onClick={() => marcar('no')}>
+                <span>✕</span><i>Paso</i>
+              </button>
             </div>
           } />
       )}
@@ -2189,13 +2205,15 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
           onCerrar={() => setFicha(null)}
           onProponer={() => setFicha(null)}
           acciones={
-            <div className="rectificar">
-              <button onClick={async () => { await deshacer(ficha); setFicha(null) }}>
-                {etiquetaDeshacer(ficha)}
+            <div className="acciones-redondas">
+              <button className="redondo" aria-label={etiquetaDeshacer(ficha)}
+                onClick={async () => { await deshacer(ficha); setFicha(null) }}>
+                <span>↺</span><i>{ficha.estado === 'vista' ? 'De nuevo' : 'Me interesa'}</i>
               </button>
-              {guardada(ficha.dato)
-                ? <button onClick={() => onOlvidar(ficha.dato)}>Quitar de mi lista</button>
-                : <button onClick={() => onGuardar(ficha.dato)}>Guardar para mí</button>}
+              <button className={`redondo${guardada(ficha.dato) ? ' marcado' : ''}`}
+                onClick={() => (guardada(ficha.dato) ? onOlvidar : onGuardar)(ficha.dato)}>
+                <span>🔖</span><i>{guardada(ficha.dato) ? 'Guardada' : 'Para mí'}</i>
+              </button>
             </div>
           } />
       )}
