@@ -407,7 +407,7 @@ input::placeholder { color: #61539A; }
    después del fade de entrada de <main> y quedaba invisible hasta el
    siguiente repintado (por ejemplo al hacer scroll). */
 .sub-ver {
-  position: fixed; top: 92px; left: 50%; transform: translateX(-50%) translateZ(0);
+  position: fixed; top: 118px; left: 50%; transform: translateX(-50%) translateZ(0);
   will-change: transform;
   z-index: 8; display: flex; gap: 3px;
   background: rgba(8, 4, 16, .55); backdrop-filter: blur(6px);
@@ -832,7 +832,7 @@ nav .num {
    Más abajo y más pequeña que antes, a la altura de la descripción en
    vez de quedar flotando a media tarjeta. */
 .torre {
-  position: absolute; right: 8px; bottom: 90px; z-index: 5;
+  position: absolute; right: 8px; bottom: 66px; z-index: 5;
   display: flex; flex-direction: column; gap: 10px; align-items: center;
   pointer-events: auto;
 }
