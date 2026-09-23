@@ -1014,10 +1014,14 @@ textarea::placeholder { color: #61539A; }
 .diapo.suelta .donde span { font-size: 10.5px; }
 .diapo.suelta .nota-corta { margin-top: 10px; min-height: 36px; font-size: 12.5px; padding: 8px 11px; }
 
-/* botones más bajos para que entren todos */
+/* la barra ancha de siempre quedaba pesada aquí: una píldora centrada,
+   más pequeña y con algo de sombra, en vez de un bloque de lado a lado */
 .diapo.suelta .btn {
-  margin-top: 8px; padding: 9px; font-size: 12.5px; border-radius: 8px;
+  display: block; width: auto; margin: 10px auto 0; padding: 10px 28px;
+  font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: 999px; box-shadow: 0 8px 18px rgba(245, 196, 81, .3);
 }
+.diapo.suelta .btn.suave { box-shadow: none; }
 .diapo.suelta .acciones-redondas { margin-top: 8px; }
 
 @media (min-width: 620px) {
