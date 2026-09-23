@@ -645,13 +645,14 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
   /**
    * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
-   * ya coincide y lo descartado. Lo que propuso ella sigue a la vista,
-   * camuflado, porque ahí aún te toca decidir.
+   * ya coincide, lo descartado y lo que has guardado para ti. Lo que
+   * propuso ella sigue a la vista, camuflado, porque ahí aún te toca
+   * decidir.
    */
   const decidido = p => {
     const e = estado(p)
     if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return true
-    return descartada(p)
+    return descartada(p) || guardada(p)
   }
   const visibles = verTodo ? res : res.filter(p => !decidido(p))
   const escondidas = res.length - visibles.length
@@ -1984,7 +1985,7 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
   if (historial) {
     return (
       <>
-        <button className="enlace" onClick={() => setHistorial(false)}>← Coincidencias</button>
+        <button className="chip-juego" onClick={() => setHistorial(false)}>← Coincidencias</button>
         <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
           onRecuperar={onRecuperar} onVotar={onVotarTitulo}
           guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
@@ -1999,7 +2000,7 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
           <b>Todavía ninguna</b>
           En cuanto dos digáis que sí a lo mismo, aparece aquí.
         </div>
-        <button className="enlace" onClick={() => setHistorial(true)}>🕘 Historial</button>
+        <button className="chip-juego" onClick={() => setHistorial(true)}>🕘 Historial</button>
       </>
     )
   }
@@ -2031,9 +2032,9 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
 
       <div className="accesos-match">
         {juego === 'lista'
-          ? <button className="enlace" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
-          : <button className="enlace" onClick={() => setJuego('lista')}>← Lista</button>}
-        <button className="enlace" onClick={() => setHistorial(true)}>🕘 Historial</button>
+          ? <button className="chip-juego" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
+          : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
+        <button className="chip-juego" onClick={() => setHistorial(true)}>🕘 Historial</button>
       </div>
 
       {juego !== 'lista' && (
