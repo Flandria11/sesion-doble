@@ -18,8 +18,16 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSesion(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSesion(s)
-      setPareja(undefined)
+      // Supabase refresca el token solo con recuperar el foco de la
+      // pestaña o volver de otra app: si eso resetea `pareja`, toda la
+      // pantalla se desmonta (por el "if (pareja === undefined)" de más
+      // abajo) y se pierde el estado en marcha, como los filtros puestos
+      // en Añadir. Si sigue siendo el mismo usuario, no hay nada que
+      // recargar.
+      setSesion(prev => {
+        if (!(prev && s && prev.user.id === s.user.id)) setPareja(undefined)
+        return s
+      })
     })
     return () => sub.subscription.unsubscribe()
   }, [])
