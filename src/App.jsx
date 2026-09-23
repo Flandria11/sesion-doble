@@ -1922,8 +1922,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar, onVotarTitulo,
-  guardada, onGuardar, onOlvidar }) {
+function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
 
@@ -1966,12 +1965,15 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
       <h2>Coincidencias</h2>
       <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
 
-      <div className="pestanas">
-        <button className={juego === 'lista' ? 'activo' : ''} onClick={() => setJuego('lista')}>Lista</button>
-        <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
-        <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
-        <button className={juego === 'historial' ? 'activo' : ''} onClick={() => setJuego('historial')}>Historial</button>
-      </div>
+      {juego === 'lista' ? (
+        <button className="btn suave" onClick={() => setJuego('ruleta')}>🎲 Elegir con un juego</button>
+      ) : (
+        <div className="pestanas">
+          <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
+          <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
+          <button onClick={() => setJuego('lista')}>← Lista</button>
+        </div>
+      )}
 
       {juego === 'lista' && (
         <>
@@ -1981,11 +1983,6 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
       )}
       {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
       {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
-      {juego === 'historial' && (
-        <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
-          onRecuperar={onRecuperar} onVotar={onVotarTitulo}
-          guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
-      )}
 
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
