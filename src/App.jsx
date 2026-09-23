@@ -2081,15 +2081,8 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
                 <button className="lamina puesta" onClick={() => setFicha(f)}
                   aria-label={`Ver información de ${f.titulo}`}>
                   {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
-                  <span className={`sello-foto ${f.estado}`}>
-                    {f.estado === 'vista' ? '👁 Vista' : '✕ Descartada'}
-                  </span>
                 </button>
                 <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
-                <button className="comentar" onClick={() => deshacer(f)}>{etiquetaDeshacer(f)}</button>
-                {guardada(f.dato)
-                  ? <button className="comentar" onClick={() => onOlvidar(f.dato)}>Quitar de mi lista</button>
-                  : <button className="comentar" onClick={() => onGuardar(f.dato)}>Guardar para mí</button>}
               </div>
             ))}
           </div>
