@@ -575,7 +575,10 @@ input::placeholder { color: #61539A; }
     rgba(8, 4, 16, .97) 52%, rgba(8, 4, 16, .78) 66%, rgba(8, 4, 16, .25) 82%, transparent 94%);
 }
 
-.contador { text-align: center; font-size: 11.5px; color: var(--paso); margin-top: 12px; }
+.contador {
+  text-align: center; font-size: 11px; color: var(--paso); margin-top: 12px;
+  letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
+}
 
 /* ---------- ficha emergente ---------- */
 /* El fondo no se desplaza: quien se desplaza es el texto de dentro. Si el
@@ -784,7 +787,8 @@ nav .num {
 }
 .tambor img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tambor .hueco {
-  padding: 24px; font-size: 13.5px; color: var(--apagado); line-height: 1.5;
+  padding: 24px; font-size: 13px; color: var(--apagado); line-height: 1.5;
+  font-family: 'Anton', sans-serif; letter-spacing: .03em; text-transform: uppercase;
 }
 .tambor.girando { border-color: var(--ambar); animation: tiritar .16s linear infinite; }
 @keyframes tiritar {
@@ -820,7 +824,9 @@ nav .num {
   border-color: var(--ambar); transform: translateY(-3px);
 }
 .aspirante span {
-  display: block; margin-top: 8px; font-size: 12.5px; font-weight: 600; line-height: 1.3;
+  display: block; margin-top: 8px; line-height: 1.2;
+  font-family: 'Anton', sans-serif; font-size: 13px; letter-spacing: .01em;
+  text-transform: uppercase; color: var(--papel);
 }
 
 @media (prefers-reduced-motion: reduce) {
