@@ -239,14 +239,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   const miVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id === yo)?.voto
   const suVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id !== yo)?.voto
   const cola = suyos.filter(t => !miVoto(t.id))
-  // quién votó que sí a una propuesta mía (puede haber más de un miembro)
-  const quienDijoSi = id => votos.find(v => v.titulo_id === id && v.usuario_id !== yo && v.voto === 'si')?.usuario_id
-
   const matches = [
-    ...mios.filter(t => suVoto(t.id) === 'si')
-      .map(t => ({ ...t, quien: `♥ ${nombres[quienDijoSi(t.id)] || 'alguien del grupo'}` })),
+    ...mios.filter(t => suVoto(t.id) === 'si'),
     ...suyos.filter(t => miVoto(t.id) === 'si')
-      .map(t => ({ ...t, quien: `♥ ${nombres[t.propuesto_por] || 'alguien del grupo'}` }))
   ]
 
   async function votar(tituloId, voto) {
@@ -1958,7 +1953,6 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
             <button className="lamina" onClick={() => setFicha(p)}
               aria-label={`Ver información de ${p.titulo}`}>
               <img src={p.cartel} alt="" loading="lazy" />
-              <span className="sello-foto si">{p.quien}</span>
             </button>
             <div className="rotulo">{p.titulo}</div>
           </div>
