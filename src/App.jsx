@@ -423,10 +423,10 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 guardados={guardados} guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
                 descartada={descartada} motivoDescarte={motivoDescarte}
                 onDescartar={descartar} onRecuperar={recuperar}
-                onComentar={comentar} codigo={pareja.codigo} />}
-            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
+                onComentar={comentar} codigo={pareja.codigo}
                 todos={titulos} votos={votos} descartes={descartes} yo={yo}
-                onRecuperar={recuperar} onVotarTitulo={votar}
+                onVotarTitulo={votar} />}
+            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
                 guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
           </>
         )}
@@ -1831,7 +1831,8 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 
 /* ======================= mis pelis ======================= */
 function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvidar,
-  descartada, motivoDescarte, onDescartar, onRecuperar, onComentar, codigo }) {
+  descartada, motivoDescarte, onDescartar, onRecuperar, onComentar, codigo,
+  todos, votos, descartes, yo, onVotarTitulo }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
   const [editando, setEditando] = useState(null)
@@ -1889,6 +1890,10 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
           onClick={() => setPestana('mias')}>
           Para mí <em>{guardados.length}</em>
         </button>
+        <button className={pestana === 'historial' ? 'activo' : ''}
+          onClick={() => setPestana('historial')}>
+          Historial
+        </button>
       </div>
 
       {pestana === 'propuestas' && (
@@ -1926,6 +1931,12 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
               </div>
             )}
         </>
+      )}
+
+      {pestana === 'historial' && (
+        <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
+          onRecuperar={onRecuperar} onVotar={onVotarTitulo}
+          guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
       )}
 
       <div className="pie">Código del grupo: <b>{codigo}</b></div>
@@ -1971,37 +1982,21 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar, onVotarTitulo,
-  guardada, onGuardar, onOlvidar }) {
+function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
-  const [historial, setHistorial] = useState(false)
 
   async function marcar(voto) {
     await onRectificar(ficha, voto)
     setFicha(null)
   }
 
-  if (historial) {
-    return (
-      <>
-        <button className="chip-juego" onClick={() => setHistorial(false)}>← Coincidencias</button>
-        <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
-          onRecuperar={onRecuperar} onVotar={onVotarTitulo}
-          guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
-      </>
-    )
-  }
-
   if (!lista.length) {
     return (
-      <>
-        <div className="vacio">
-          <b>Todavía ninguna</b>
-          En cuanto dos digáis que sí a lo mismo, aparece aquí.
-        </div>
-        <button className="chip-juego" onClick={() => setHistorial(true)}>🕘 Historial</button>
-      </>
+      <div className="vacio">
+        <b>Todavía ninguna</b>
+        En cuanto dos digáis que sí a lo mismo, aparece aquí.
+      </div>
     )
   }
 
@@ -2030,12 +2025,9 @@ function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar
       <h2>Coincidencias</h2>
       <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
 
-      <div className="accesos-match">
-        {juego === 'lista'
-          ? <button className="chip-juego" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
-          : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
-        <button className="chip-juego" onClick={() => setHistorial(true)}>🕘 Historial</button>
-      </div>
+      {juego === 'lista'
+        ? <button className="chip-juego" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
+        : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
 
       {juego !== 'lista' && (
         <div className="pestanas">
