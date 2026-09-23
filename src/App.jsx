@@ -452,6 +452,12 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 }
 
 /* ======================= añadir ======================= */
+// cuántos títulos nuevos (ni propuestos, ni coincididos, ni descartados) se
+// intentan reunir por carga, y cuántas páginas de TMDB como máximo se piden
+// para lograrlo antes de rendirse
+const OBJETIVO_NOVEDADES = 12
+const PAGINAS_MAX_POR_CARGA = 6
+
 function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('movie')
@@ -473,7 +479,12 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   const [fiesta, setFiesta] = useState(null)
   const [verTodo, setVerTodo] = useState(false)
   const [panel, setPanel] = useState(false)
+  const [agotado, setAgotado] = useState(false)
   const filaPlats = useRef(null)
+  // página real de TMDB que toca pedir a continuación: puede ir por delante
+  // de `pagina` (que solo cuenta "cargas" del usuario) porque una sola carga
+  // puede consumir varias páginas de TMDB hasta reunir resultados nuevos
+  const proximaPaginaTmdb = useRef(1)
 
   // catálogos de filtros: cambian según sean pelis o series
   useEffect(() => {
@@ -504,23 +515,47 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   // exploración con filtros
   useEffect(() => {
     if (q.trim().length >= 2) return
+    if (pagina === 1) proximaPaginaTmdb.current = 1
     let vivo = true
     setCargando(true)
     // pequeño respiro antes de pedir y redibujar: sin esto, mover el
     // desplegable de año/género con las flechas del teclado disparaba
     // una petición y un vaciado de la lista por cada tecla, y ese trabajo
     // competía con el propio desplegable nativo hasta hacerlo ir a saltos
-    const t = setTimeout(() => {
-      explorar({ tipo, modo, proveedores: provs, genero, anio, calidad, pagina })
-        .then(r => {
-          if (!vivo) return
-          setRes(ant => (pagina === 1 ? r : [...ant, ...r]))
-          setError('')
-        })
-        .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
-        .finally(() => vivo && setCargando(false))
+    const t = setTimeout(async () => {
+      try {
+        // Cada página de TMDB trae 20 títulos, pero aquí se esconde lo ya
+        // decidido (propuesto, coincidido o descartado): si se pidiera solo
+        // una página, muchas veces casi todo estaba ya visto y apenas
+        // quedaban dos o tres tarjetas. Se encadenan páginas hasta reunir
+        // un puñado de novedades de verdad, con un tope para no disparar
+        // peticiones sin fin si los filtros son muy estrechos.
+        let nuevos = []
+        let novedades = 0
+        let vueltas = 0
+        let agotadas = false
+        while (vivo && vueltas < PAGINAS_MAX_POR_CARGA && novedades < OBJETIVO_NOVEDADES) {
+          const r = await explorar({ tipo, modo, proveedores: provs, genero, anio, calidad, pagina: proximaPaginaTmdb.current })
+          vueltas++
+          proximaPaginaTmdb.current++
+          if (!r.length) { agotadas = true; break }
+          nuevos = [...nuevos, ...r]
+          novedades += verTodo ? r.length : r.filter(p => !decidido(p)).length
+        }
+        if (!vivo) return
+        setRes(ant => (pagina === 1 ? nuevos : [...ant, ...nuevos]))
+        setAgotado(agotadas)
+        setError('')
+      } catch (e) {
+        if (vivo) setError('No se ha podido consultar TMDB.')
+      } finally {
+        if (vivo) setCargando(false)
+      }
     }, 220)
     return () => { vivo = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- verTodo solo
+    // decide cuánto prefetch hace falta en esta carga, no debe disparar una
+    // nueva por sí solo: alternarlo ya revela lo escondido del `res` actual
   }, [tipo, modo, provs, genero, anio, calidad, pagina, q])
 
   const estado = p => {
@@ -783,7 +818,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
       {cargando && <div className="cargando">Cargando…</div>}
 
-      {!cargando && explorando && res.length > 0 && (
+      {!cargando && explorando && res.length > 0 && !agotado && (
         <button className="btn suave" onClick={() => setPagina(n => n + 1)}>Ver más</button>
       )}
 
@@ -1922,21 +1957,37 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
+function Matches({ lista, onRectificar, todos, votos, descartes, yo, onRecuperar, onVotarTitulo,
+  guardada, onGuardar, onOlvidar }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
+  const [historial, setHistorial] = useState(false)
 
   async function marcar(voto) {
     await onRectificar(ficha, voto)
     setFicha(null)
   }
 
+  if (historial) {
+    return (
+      <>
+        <button className="enlace" onClick={() => setHistorial(false)}>← Coincidencias</button>
+        <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
+          onRecuperar={onRecuperar} onVotar={onVotarTitulo}
+          guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
+      </>
+    )
+  }
+
   if (!lista.length) {
     return (
-      <div className="vacio">
-        <b>Todavía ninguna</b>
-        En cuanto dos digáis que sí a lo mismo, aparece aquí.
-      </div>
+      <>
+        <div className="vacio">
+          <b>Todavía ninguna</b>
+          En cuanto dos digáis que sí a lo mismo, aparece aquí.
+        </div>
+        <button className="enlace" onClick={() => setHistorial(true)}>🕘 Historial</button>
+      </>
     )
   }
 
@@ -1965,13 +2016,17 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
       <h2>Coincidencias</h2>
       <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
 
-      {juego === 'lista' ? (
-        <button className="btn suave" onClick={() => setJuego('ruleta')}>🎲 Elegir con un juego</button>
-      ) : (
+      <div className="accesos-match">
+        {juego === 'lista'
+          ? <button className="enlace" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
+          : <button className="enlace" onClick={() => setJuego('lista')}>← Lista</button>}
+        <button className="enlace" onClick={() => setHistorial(true)}>🕘 Historial</button>
+      </div>
+
+      {juego !== 'lista' && (
         <div className="pestanas">
           <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
           <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
-          <button onClick={() => setJuego('lista')}>← Lista</button>
         </div>
       )}
 

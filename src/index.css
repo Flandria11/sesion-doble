@@ -146,6 +146,8 @@ input::placeholder { color: #61539A; }
   color: var(--apagado); font-size: 13px; text-decoration: underline;
   margin-top: 18px; display: inline-block;
 }
+.accesos-match { display: flex; gap: 18px; margin-bottom: 4px; }
+.accesos-match .enlace { margin-top: 0; }
 .codigo {
   font-family: 'Anton', sans-serif; font-size: 40px; letter-spacing: .16em;
   color: var(--ambar); background: var(--sala); border: 1px dashed var(--borde);
