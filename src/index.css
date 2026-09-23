@@ -361,6 +361,9 @@ input::placeholder { color: #61539A; }
 .rotulo i { display: block; font-style: normal; font-size: 10.5px; color: var(--apagado); margin-top: 3px; }
 .rotulo.marcado i { color: var(--ambar); font-weight: 700; }
 
+.mis-pelis .rotulo { font-size: 11px; }
+.mis-pelis .rotulo i { font-size: 9.5px; }
+
 /* ---------- grupos de películas y series ---------- */
 .grupo { margin-top: 22px; }
 .grupo:first-of-type { margin-top: 6px; }

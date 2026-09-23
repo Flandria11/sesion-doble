@@ -1878,7 +1878,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
   )
 
   return (
-    <>
+    <div className="mis-pelis">
       <h2>Mis pelis</h2>
 
       <div className="pestanas fina">
@@ -1977,7 +1977,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
             </div>
           } />
       )}
-    </>
+    </div>
   )
 }
 
