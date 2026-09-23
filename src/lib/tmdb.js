@@ -169,6 +169,16 @@ const filtrarBase = (lista, esPeli) =>
     x.vote_count >= VOTOS.normal
   )
 
+/**
+ * En cines es distinto: son estrenos de los últimos días, así que casi
+ * ninguno llega a los 80 votos del suelo normal. Exigirlo dejaba la lista
+ * en nada. Aquí solo se corta lo que sí tiene datos suficientes para saber
+ * que es mala (20 votos) y aun así no llega a la nota mínima; lo recién
+ * estrenado sin apenas votos pasa igual.
+ */
+const filtrarCines = lista =>
+  lista.filter(x => x.vote_count < 20 || x.vote_average >= NOTA_MINIMA_ANADIR)
+
 export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
   const base = { page: String(pagina) }
@@ -177,7 +187,7 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
       const d = await pedir('/movie/now_playing', { ...base, region: REGION })
-      return limpiar(filtrarBase(d.results, true), 'movie')
+      return limpiar(filtrarCines(d.results), 'movie')
     }
     if (modo === 'tendencias') {
       const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)
