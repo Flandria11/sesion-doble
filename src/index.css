@@ -179,6 +179,12 @@ input::placeholder { color: #61539A; }
   font-style: normal; opacity: .6; font-size: 11px; margin-left: 2px;
 }
 
+/* variante chica, para Añadir (Películas/Series) */
+.pestanas.chica button { padding: 5px; font-size: 11px; }
+
+.mis-pelis .pestanas.fina button { padding: 5px; font-size: 11px; }
+.mis-pelis .pestanas.fina em { font-size: 9.5px; }
+
 .fila-plataformas {
   display: flex; align-items: center; gap: 4px; margin: 8px 0 0;
 }
@@ -886,9 +892,9 @@ nav .num {
 .redondo.marcado span { background: rgba(79, 209, 153, .85); color: var(--noche); border-color: transparent; }
 
 .comentar {
-  width: 100%; margin-top: 6px; padding: 6px 4px; border-radius: 7px;
+  width: 100%; margin-top: 6px; padding: 4px; border-radius: 7px;
   border: 1px solid var(--borde); color: var(--apagado);
-  font-size: 10.5px; font-weight: 700;
+  font-size: 9.5px; font-weight: 700;
 }
 .comentar:hover, .comentar:focus-visible { color: var(--ambar); border-color: var(--ambar); }
 

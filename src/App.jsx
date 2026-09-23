@@ -671,7 +671,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
       {explorando && (
         <>
-          <div className="pestanas">
+          <div className="pestanas chica">
             <button className={tipo === 'movie' ? 'activo' : ''}
               onClick={() => cambiarTipo('movie')}>Películas</button>
             <button className={tipo === 'tv' ? 'activo' : ''}
