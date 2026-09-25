@@ -961,18 +961,34 @@ const esIOS = typeof navigator !== 'undefined' &&
 /* TEMPORAL: registro en pantalla de lo que hace el reproductor, para ver
  * en el iPhone dónde se va el tiempo. Quitar cuando esté resuelto. */
 const DEPURAR = true
+// registro común (no dentro del reproductor: si este no llega a crearse,
+// también hay que verlo) y un reloj que cuenta desde el último cambio
+const registro = { lineas: [], t0: Date.now(), oyentes: new Set() }
+function apunta(txt, reiniciar) {
+  if (!DEPURAR) return
+  if (reiniciar) registro.t0 = Date.now()
+  const t = ((Date.now() - registro.t0) / 1000).toFixed(1)
+  registro.lineas = [...registro.lineas.slice(-11), `${t}s ${txt}`]
+  registro.oyentes.forEach(f => f(registro.lineas))
+}
+function Registro() {
+  const [lineas, setLineas] = useState(registro.lineas)
+  useEffect(() => {
+    registro.oyentes.add(setLineas)
+    return () => { registro.oyentes.delete(setLineas) }
+  }, [])
+  if (!DEPURAR) return null
+  return createPortal(
+    <pre className="depurar">{lineas.join('\n') || 'registro vacío'}</pre>,
+    document.body
+  )
+}
 const NOMBRE_ESTADO = { '-1': 'sin empezar', 0: 'terminado', 1: 'REPRODUCE', 2: 'pausa', 3: 'cargando', 5: 'preparado' }
 
 function Trailer({ clave, titulo, cartel }) {
   const caja = useRef(null)
   const player = useRef(null)
-  const [lineas, setLineas] = useState([])
-  const t0 = useRef(0)
-  const anota = txt => {
-    if (!DEPURAR) return
-    const t = ((Date.now() - t0.current) / 1000).toFixed(1)
-    setLineas(l => [...l.slice(-9), `${t}s ${txt}`])
-  }
+  const anota = apunta
   const [api, setApi] = useState(null)
   const [mudo, setMudo] = useState(true)
   // se guarda QUÉ vídeo está pausado o ha fallado: al cambiar de tarjeta
@@ -1032,8 +1048,10 @@ function Trailer({ clave, titulo, cartel }) {
     // creado a mano: React no controla ese nodo y no hay conflicto
     const nido = document.createElement('div')
 
+    anota('pidiendo API de YouTube')
     cargarYT()
       .then(YT => {
+        anota(`API ok${vivo ? '' : ' (ya no hace falta)'}${caja.current ? '' : ' SIN CAJA'}`)
         if (!vivo || !caja.current) return
         caja.current.appendChild(nido)
         cargada.current = querida.current
@@ -1099,9 +1117,10 @@ function Trailer({ clave, titulo, cartel }) {
           }
         })
       })
-      .catch(() => vivo && setApi(false))
+      .catch(err => { anota(`API FALLÓ: ${err && err.message}`); if (vivo) setApi(false) })
 
     return () => {
+      anota('reproductor destruido')
       vivo = false
       if (player.current && player.current.destroy) player.current.destroy()
       player.current = null
@@ -1139,8 +1158,7 @@ function Trailer({ clave, titulo, cartel }) {
   // cambio de tarjeta: mismo reproductor, otro vídeo
   useEffect(() => {
     // el reloj del registro cuenta desde que cambias de tarjeta
-    t0.current = Date.now()
-    anota(`tarjeta: ${clave || 'sin vídeo (aún)'}`)
+    anota(`tarjeta: ${clave || 'sin vídeo (aún)'}`, true)
     querida.current = clave
     cambiar(player.current)
   }, [clave])
@@ -1169,9 +1187,6 @@ function Trailer({ clave, titulo, cartel }) {
 
   return (
     <>
-      {DEPURAR && lineas.length > 0 && (
-        <pre className="depurar">{lineas.join('\n')}</pre>
-      )}
       {api === false ? (
         clave && !fallo && (
           <iframe
@@ -1237,10 +1252,15 @@ function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel }) {
     return () => obs.disconnect()
   }, [pista, activo, cuenta])
 
+  useEffect(() => {
+    apunta(`flotante: tarjeta ${activo}, sitio ${sitio ? `${sitio.top}/${sitio.height}` : 'NO'}, vídeo ${clave || 'no'}`)
+  }, [activo, sitio, clave])
+
   return (
     <div className="flotante"
       style={sitio ? { top: sitio.top, height: sitio.height } : { display: 'none' }}>
       <Trailer clave={sitio ? clave || null : null} titulo={titulo} cartel={cartel} />
+      <Registro />
     </div>
   )
 }
