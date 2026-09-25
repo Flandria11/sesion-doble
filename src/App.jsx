@@ -1839,16 +1839,15 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           <Sinopsis texto={p.sinopsis || 'Sin sinopsis disponible en español.'} abierta={abierta}
             onAlternar={() => setAbierta(a => !a)} />
 
-          {donde.length > 0 && (
-            <div className="donde">
-              <span>En</span>
-              {donde.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
-            </div>
-          )}
-
-          {/* comentario y botones van aparte: el hueco de encima es lo que
-              sube el título y la sinopsis sin mover esto de abajo */}
+          {/* plataforma, comentario y botones van aparte: el hueco de encima
+              es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
+            {donde.length > 0 && (
+              <div className="donde">
+                <span>En</span>
+                {donde.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
+              </div>
+            )}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}
