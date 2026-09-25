@@ -1058,7 +1058,14 @@ textarea::placeholder { color: #61539A; }
    desenfoque del telón le hacían saltarse el repintado. El telón de la
    ficha grande tampoco necesita desenfoque: la tarjeta lo tapa entero. */
 .diapo.suelta .cuerpo {
-  padding: 14px 16px 76px; max-height: 54%;
+  /* El texto crece hasta justo debajo del vídeo, sin taparlo. El vídeo es
+     16:9 a todo lo ancho y va centrado en el 40% del alto (el marco está
+     subido un 10%), así que acaba en 40% + ancho × 9/32. Lo que queda por
+     debajo es 60% − ancho × 9/32 (el ancho, hasta 560px, el máximo de la
+     ficha). Con un 54% fijo, en el iPhone la sinopsis ya se comía el
+     vídeo por abajo. */
+  padding: 14px 16px 76px;
+  max-height: calc(60% - min(28.125vw, 157.5px) - 6px);
   transform: translateZ(0); will-change: transform;
 }
 .diapo.suelta .tit { font-size: 22px; }
