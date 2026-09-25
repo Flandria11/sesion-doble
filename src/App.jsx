@@ -960,7 +960,7 @@ const esIOS = typeof navigator !== 'undefined' &&
 
 /* TEMPORAL: registro en pantalla de lo que hace el reproductor, para ver
  * en el iPhone dónde se va el tiempo. Quitar cuando esté resuelto. */
-const DEPURAR = true
+const DEPURAR = false
 // registro común (no dentro del reproductor: si este no llega a crearse,
 // también hay que verlo) y un reloj que cuenta desde el último cambio
 const registro = { lineas: [], t0: Date.now(), oyentes: new Set() }
