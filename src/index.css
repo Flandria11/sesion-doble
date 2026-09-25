@@ -1065,9 +1065,9 @@ textarea::placeholder { color: #61539A; }
      ficha). Con un 54% fijo, en el iPhone la sinopsis ya se comía el
      vídeo por abajo. */
   padding: 14px 16px 76px;
-  /* +28px: justo hasta el borde del vídeo quedaba demasiado bajo; así
-     roza un poco su parte de abajo (a medio camino del 54% de antes) */
-  max-height: calc(60% - min(28.125vw, 157.5px) + 28px);
+  /* +60px: justo hasta el borde del vídeo quedaba demasiado bajo; así
+     entra un poco en su parte de abajo, que es donde menos estorba */
+  max-height: calc(60% - min(28.125vw, 157.5px) + 60px);
   transform: translateZ(0); will-change: transform;
 }
 .diapo.suelta .tit { font-size: 22px; }
