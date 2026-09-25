@@ -1090,6 +1090,19 @@ textarea::placeholder { color: #61539A; }
 .diapo.suelta .btn.suave { box-shadow: none; }
 .diapo.suelta .acciones-redondas { margin-top: 8px; }
 
+/* Solo iPhone/iPad (Safari de iOS): los botones redondos (Proponer, Paso,
+   Vista, Para mí) y la píldora de la ficha, un poco más grandes. Allí se
+   veían pequeños y costaba acertarles; en Android se quedan como estaban. */
+@supports (-webkit-touch-callout: none) {
+  .torre { gap: 10px; }
+  .redondo { width: 46px; gap: 4px; }
+  .redondo span { width: 37px; height: 37px; font-size: 15px; }
+  .redondo.principal span { font-size: 17px; }
+  .redondo i { font-size: 9.5px; }
+  .acciones-redondas { gap: 22px; }
+  .diapo.suelta .btn { padding: 12px 32px; font-size: 13px; }
+}
+
 @media (min-width: 620px) {
   .telon.grande { padding: 16px; align-items: center; }
   .diapo.suelta { height: calc(100dvh - 32px); border-radius: 18px; }

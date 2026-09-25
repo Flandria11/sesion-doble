@@ -965,14 +965,16 @@ const esIOS = typeof navigator !== 'undefined' &&
  * seguidas el título "DOS BUTACAS" (ver tocarTitulo), y se recuerda en
  * este dispositivo. */
 const leerDepurar = () => {
-  try { return localStorage.getItem('sd:depurar') === '1' } catch { return false }
+  // clave nueva a propósito: la de antes ("sd:depurar") pudo quedar
+  // encendida en algún móvil con los toques de prueba
+  try { return localStorage.getItem('sd:registro') === '1' } catch { return false }
 }
 // registro común (no dentro del reproductor: si este no llega a crearse,
 // también hay que verlo) y un reloj que cuenta desde el último cambio
 const registro = { lineas: [], t0: Date.now(), oyentes: new Set(), activo: leerDepurar() }
 function alternarDepurar() {
   registro.activo = !registro.activo
-  try { localStorage.setItem('sd:depurar', registro.activo ? '1' : '0') } catch { /* privada */ }
+  try { localStorage.setItem('sd:registro', registro.activo ? '1' : '0') } catch { /* privada */ }
   registro.lineas = [registro.activo ? 'registro encendido' : '']
   registro.oyentes.forEach(f => f(registro.lineas))
 }
