@@ -981,52 +981,27 @@ function Trailer({ clave, titulo, cartel }) {
   // "querida" es el vídeo que toca ver y "cargada" el que tiene dentro
   const querida = useRef(clave)
   const cargada = useRef(null)
-  const reintento = useRef(null)
   // has tocado el botón del sonido en ESTE reproductor: en iOS, a partir de
   // ahí ya deja que suene, también en los vídeos siguientes
   const desbloqueado = useRef(false)
   // cuándo se cambió de vídeo por última vez (ver la pausa en onStateChange)
   const cambioEn = useRef(0)
+  // el vídeo que YouTube no deja reproducir: el vigilante no insiste con él
+  const fallida = useRef(null)
   // qué vídeo ha llegado a arrancar: hasta entonces la carátula lo tapa
   const [enMarchaDe, setEnMarchaDe] = useState(null)
 
   // red de seguridad: si al rato sigue sin moverse, que arranque en silencio
-  // Solo actúa si el vídeo está quieto (sin empezar, en espera o en
-  // pausa). Si está cargando (3) se le deja: en el móvil un vídeo nuevo
-  // casi siempre sigue cargando al segundo, y silenciarlo entonces era lo
-  // que hacía que el sonido se perdiera al pasar de tarjeta.
-  const vigilar = () => {
-    clearTimeout(reintento.current)
-    const quieto = pl => [-1, 2, 5].includes(pl.getPlayerState())
-    reintento.current = setTimeout(() => {
-      const pl = player.current
-      if (!pl || pausaMia.current || typeof pl.getPlayerState !== 'function') return
-      try {
-        if (!quieto(pl)) return
-        // primero se insiste con el sonido como esté...
-        pl.playVideo()
-        reintento.current = setTimeout(() => {
-          const pl2 = player.current
-          if (!pl2 || pausaMia.current || typeof pl2.getPlayerState !== 'function') return
-          try {
-            // ...y si ni así, es que el navegador no lo deja sonar: en silencio
-            if (quieto(pl2)) { pl2.mute(); setMudo(true); pl2.playVideo() }
-          } catch { /* reproductor ya destruido */ }
-        }, 1500)
-      } catch { /* reproductor ya destruido */ }
-    }, 2500)
-  }
 
   // pone en el reproductor el vídeo que toque, sin recrearlo
   const cambiar = pl => {
     const c = querida.current
     if (!pl || typeof pl.loadVideoById !== 'function' || c === cargada.current) return
-    if (!c) { pausaMia.current = true; clearTimeout(reintento.current); pl.pauseVideo(); return }
+    if (!c) { pausaMia.current = true; pl.pauseVideo(); return }
     cargada.current = c
     pausaMia.current = false
     cambioEn.current = Date.now()
     pl.loadVideoById(c)
-    vigilar()
   }
 
   // Se crea con el primer vídeo y ya no se destruye hasta salir del
@@ -1067,7 +1042,6 @@ function Trailer({ clave, titulo, cartel }) {
               // En iOS el autoplay del iframe a veces no llega a arrancar:
               // se le pide también a mano, siempre en silencio
               try { e.target.playVideo() } catch { /* sigue igual */ }
-              vigilar()
             },
             onStateChange: e => {
               if (!vivo) return
@@ -1086,6 +1060,12 @@ function Trailer({ clave, titulo, cartel }) {
                   catch { /* si el navegador lo impide, sigue mudo */ }
                 }
               }
+              // sin empezar (-1) o preparado pero quieto (5): en iOS a veces
+              // se queda ahí aunque se le haya pedido reproducir. Al play
+              // ya, sin esperar al vigilante de abajo.
+              if ((e.data === -1 || e.data === 5) && !pausaMia.current && querida.current) {
+                try { e.target.playVideo() } catch { /* sigue igual */ }
+              }
               // pausa que no has hecho tú: iOS lo ha parado por el sonido.
               // Justo después de cambiar de vídeo no cuenta: puede ser el
               // anterior deteniéndose, y silenciar ahí quitaba el sonido
@@ -1098,7 +1078,7 @@ function Trailer({ clave, titulo, cartel }) {
             // 101/150: el embed está bloqueado para este vídeo. 100: lo
             // han quitado o es privado. En cualquier caso no hay nada que
             // reproducir aquí.
-            onError: () => { if (vivo) setFalloDe(querida.current) }
+            onError: () => { if (vivo) { fallida.current = querida.current; setFalloDe(querida.current) } }
           }
         })
       })
@@ -1106,20 +1086,41 @@ function Trailer({ clave, titulo, cartel }) {
 
     return () => {
       vivo = false
-      clearTimeout(reintento.current)
       if (player.current && player.current.destroy) player.current.destroy()
       player.current = null
       cargada.current = null
       if (nido.parentNode) nido.parentNode.removeChild(nido)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hay])
+
+  // Vigilante: mientras haya vídeo y no lo hayas pausado tú, que no se
+  // quede quieto. iOS a veces no arranca un vídeo o lo para por su cuenta
+  // (por ejemplo, si el reproductor se crea mientras la pantalla aún está
+  // apareciendo con el fundido: por eso el primero no arrancaba y al
+  // bajar y volver a subir sí). Si tras varios intentos sigue quieto con
+  // sonido, es que iOS no lo deja sonar: entonces se silencia y arranca.
+  useEffect(() => {
+    if (!hay) return
+    let quietas = 0
+    const t = setInterval(() => {
+      const pl = player.current
+      if (!pl || typeof pl.getPlayerState !== 'function' ||
+          pausaMia.current || !querida.current ||
+          fallida.current === querida.current) { quietas = 0; return }
+      try {
+        if (![-1, 2, 5].includes(pl.getPlayerState())) { quietas = 0; return }
+        quietas++
+        if (quietas >= 3 && !pl.isMuted()) { pl.mute(); setMudo(true) }
+        pl.playVideo()
+      } catch { /* reproductor ya destruido */ }
+    }, 700)
+    return () => clearInterval(t)
   }, [hay])
 
   // cambio de tarjeta: mismo reproductor, otro vídeo
   useEffect(() => {
     querida.current = clave
     cambiar(player.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave])
 
   // el reproductor se consulta al pulsar, nunca una copia guardada
