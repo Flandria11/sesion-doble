@@ -959,6 +959,9 @@ function Trailer({ clave, titulo, cartel }) {
   const [api, setApi] = useState(null)
   const [mudo, setMudo] = useState(true)
   const [parado, setParado] = useState(false)
+  // true solo si lo has pausado tú con el botón: cualquier otra pausa es
+  // iOS parando el vídeo y hay que volver a arrancarlo
+  const pausaMia = useRef(false)
   // Algunos tráilers de TMDB no se pueden incrustar (el estudio lo impide):
   // YouTube entonces no reproduce nada y se queda con su propio aviso de
   // "vídeo no disponible" dentro del marco. Mejor no enseñarlo: se cae a
@@ -967,6 +970,7 @@ function Trailer({ clave, titulo, cartel }) {
 
   useEffect(() => {
     let vivo = true
+    let reintento = null
     // YouTube sustituye el elemento que recibe, así que le damos un hijo
     // creado a mano: React no controla ese nodo y no hay conflicto
     const nido = document.createElement('div')
@@ -989,18 +993,35 @@ function Trailer({ clave, titulo, cartel }) {
             onReady: e => {
               if (!vivo) return
               setApi(true)
-              // Arranca mudo siempre (iOS no admite otra cosa) y, si ya
-              // habías pedido sonido, se lo quitamos una vez está en marcha.
+              // En iOS el autoplay del iframe a veces no llega a arrancar:
+              // se le pide también a mano, siempre en silencio
+              try { e.target.playVideo() } catch { /* sigue igual */ }
+              // Si ya habías pedido sonido, se intenta quitar el silencio.
+              // iOS no deja sonar sin un toque y, en vez de seguir mudo,
+              // PARA el vídeo: por eso había que darle al play en cada
+              // tarjeta. Si pasa, onStateChange lo vuelve a arrancar mudo.
               if (leerSonido()) {
                 try { e.target.unMute(); e.target.setVolume(70); setMudo(false) }
-                catch (err) { /* si el navegador lo impide, sigue mudo */ }
+                catch { /* si el navegador lo impide, sigue mudo */ }
               }
+              // red de seguridad: si al rato sigue sin moverse, en silencio
+              reintento = setTimeout(() => {
+                const pl = player.current
+                if (!vivo || !pl || pausaMia.current) return
+                try {
+                  if (pl.getPlayerState() !== 1) { pl.mute(); setMudo(true); pl.playVideo() }
+                } catch { /* reproductor ya destruido */ }
+              }, 1500)
             },
-            // Al terminar, YouTube enseña su pantalla final con vídeos
-            // sugeridos y su logo. Rebobinamos antes de que aparezca.
             onStateChange: e => {
               if (!vivo) return
+              // Al terminar, YouTube enseña su pantalla final con vídeos
+              // sugeridos y su logo. Rebobinamos antes de que aparezca.
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
+              // pausa que no has hecho tú: iOS lo ha parado por el sonido
+              if (e.data === 2 && !pausaMia.current && !e.target.isMuted()) {
+                e.target.mute(); setMudo(true); e.target.playVideo()
+              }
             },
             // 101/150: el embed está bloqueado para este vídeo. 100: lo
             // han quitado o es privado. En cualquier caso no hay nada que
@@ -1013,6 +1034,7 @@ function Trailer({ clave, titulo, cartel }) {
 
     return () => {
       vivo = false
+      clearTimeout(reintento)
       if (player.current && player.current.destroy) player.current.destroy()
       player.current = null
       if (nido.parentNode) nido.parentNode.removeChild(nido)
@@ -1032,8 +1054,8 @@ function Trailer({ clave, titulo, cartel }) {
     try { localStorage.setItem('sd:sonido', encender ? '1' : '0') } catch (e) { /* privada */ }
   })
   const play = mando(pl => {
-    if (pl.getPlayerState() === 1) { pl.pauseVideo(); setParado(true) }
-    else { pl.playVideo(); setParado(false) }
+    if (pl.getPlayerState() === 1) { pausaMia.current = true; pl.pauseVideo(); setParado(true) }
+    else { pausaMia.current = false; pl.playVideo(); setParado(false) }
   })
 
   if (fallo) return null
