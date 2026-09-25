@@ -990,7 +990,7 @@ textarea::placeholder { color: #61539A; }
 
 /* ---------- ficha a pantalla completa ---------- */
 /* Mismo formato que Estrenos y Votar, pero de una sola tarjeta. */
-.telon.grande { padding: 0; align-items: stretch; }
+.telon.grande { padding: 0; align-items: stretch; backdrop-filter: none; }
 
 .diapo.suelta {
   position: relative; width: 100%; max-width: 560px;
@@ -1004,7 +1004,15 @@ textarea::placeholder { color: #61539A; }
 
 /* el bloque de texto sube y deja hueco para la barra inferior, que si no
    recortaba los botones */
-.diapo.suelta .cuerpo { padding: 14px 16px 76px; max-height: 40%; }
+/* translateZ(0) + will-change: capa propia para el texto. En iPhone,
+   al abrir la ficha, Safari a veces no pintaba la sinopsis (quedaba en
+   negro sobre el velo) hasta tocar en otro sitio: el tráiler y el
+   desenfoque del telón le hacían saltarse el repintado. El telón de la
+   ficha grande tampoco necesita desenfoque: la tarjeta lo tapa entero. */
+.diapo.suelta .cuerpo {
+  padding: 14px 16px 76px; max-height: 40%;
+  transform: translateZ(0); will-change: transform;
+}
 .diapo.suelta .tit { font-size: 22px; }
 /* misma especificidad que la regla de arriba: sin esto, al abrir la
    sinopsis en la ficha (que siempre lleva "suelta") ganaba esta regla
