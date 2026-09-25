@@ -982,17 +982,37 @@ function Trailer({ clave, titulo, cartel }) {
   const querida = useRef(clave)
   const cargada = useRef(null)
   const reintento = useRef(null)
+  // has tocado el botón del sonido en ESTE reproductor: en iOS, a partir de
+  // ahí ya deja que suene, también en los vídeos siguientes
+  const desbloqueado = useRef(false)
+  // qué vídeo ha llegado a arrancar: hasta entonces la carátula lo tapa
+  const [enMarchaDe, setEnMarchaDe] = useState(null)
 
   // red de seguridad: si al rato sigue sin moverse, que arranque en silencio
+  // Solo actúa si el vídeo está quieto (sin empezar, en espera o en
+  // pausa). Si está cargando (3) se le deja: en el móvil un vídeo nuevo
+  // casi siempre sigue cargando al segundo, y silenciarlo entonces era lo
+  // que hacía que el sonido se perdiera al pasar de tarjeta.
   const vigilar = () => {
     clearTimeout(reintento.current)
+    const quieto = pl => [-1, 2, 5].includes(pl.getPlayerState())
     reintento.current = setTimeout(() => {
       const pl = player.current
       if (!pl || pausaMia.current || typeof pl.getPlayerState !== 'function') return
       try {
-        if (pl.getPlayerState() !== 1) { pl.mute(); setMudo(true); pl.playVideo() }
+        if (!quieto(pl)) return
+        // primero se insiste con el sonido como esté...
+        pl.playVideo()
+        reintento.current = setTimeout(() => {
+          const pl2 = player.current
+          if (!pl2 || pausaMia.current || typeof pl2.getPlayerState !== 'function') return
+          try {
+            // ...y si ni así, es que el navegador no lo deja sonar: en silencio
+            if (quieto(pl2)) { pl2.mute(); setMudo(true); pl2.playVideo() }
+          } catch { /* reproductor ya destruido */ }
+        }, 1500)
       } catch { /* reproductor ya destruido */ }
-    }, 1000)
+    }, 2500)
   }
 
   // pone en el reproductor el vídeo que toque, sin recrearlo
@@ -1010,7 +1030,7 @@ function Trailer({ clave, titulo, cartel }) {
   useEffect(() => {
     if (!hay) return
     let vivo = true
-    let sonidoProbado = false
+    let probadoDe = null
     // YouTube sustituye el elemento que recibe, así que le damos un hijo
     // creado a mano: React no controla ese nodo y no hay conflicto
     const nido = document.createElement('div')
@@ -1045,14 +1065,14 @@ function Trailer({ clave, titulo, cartel }) {
               // Al terminar, YouTube enseña su pantalla final con vídeos
               // sugeridos y su logo. Rebobinamos antes de que aparezca.
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
-              // Ya en marcha, se quita el silencio si lo habías pedido. En
-              // iOS ni se intenta: no deja sonar sin un toque y, en vez de
-              // seguir mudo, PARA el vídeo. Allí el sonido se mantiene
-              // porque el reproductor es el mismo de tarjeta en tarjeta:
-              // basta con activarlo una vez con el botón.
-              if (e.data === 1 && !sonidoProbado) {
-                sonidoProbado = true
-                if (leerSonido() && !esIOS) {
+              // Ya en marcha (una vez por vídeo): se quita la carátula y, si
+              // habías pedido sonido, el silencio. En iOS solo si ya has
+              // tocado el botón en este reproductor: si no, no deja sonar y,
+              // en vez de seguir mudo, PARA el vídeo.
+              if (e.data === 1 && probadoDe !== cargada.current) {
+                probadoDe = cargada.current
+                setEnMarchaDe(cargada.current)
+                if (leerSonido() && e.target.isMuted() && (!esIOS || desbloqueado.current)) {
                   try { e.target.unMute(); e.target.setVolume(70); setMudo(false) }
                   catch { /* si el navegador lo impide, sigue mudo */ }
                 }
@@ -1097,7 +1117,7 @@ function Trailer({ clave, titulo, cartel }) {
   }
   const volumen = mando(pl => {
     const encender = pl.isMuted()
-    if (encender) { pl.unMute(); pl.setVolume(70); setMudo(false) }
+    if (encender) { desbloqueado.current = true; pl.unMute(); pl.setVolume(70); setMudo(false) }
     else { pl.mute(); setMudo(true) }
     try { localStorage.setItem('sd:sonido', encender ? '1' : '0') } catch { /* privada */ }
   })
@@ -1123,8 +1143,13 @@ function Trailer({ clave, titulo, cartel }) {
         <div ref={caja} className="marco" style={oculto ? { visibility: 'hidden' } : undefined} />
       )}
       {!oculto && (
-        // con key: la animación que la retira vuelve a empezar en cada vídeo
-        <div key={clave} className="cortina" style={{ backgroundImage: `url(${cartel})` }} />
+        // Tapa el vídeo hasta que de verdad arranca y se retira en ese
+        // momento, no a un tiempo fijo: antes esperaba siempre 2 s aunque
+        // ya estuviera en marcha. Sin la API no hay aviso de arranque y se
+        // queda la retirada por tiempo de siempre ("sola").
+        <div key={clave}
+          className={`cortina${api === false ? ' sola' : enMarchaDe === clave ? ' fuera' : ''}`}
+          style={{ backgroundImage: `url(${cartel})` }} />
       )}
       {api === true && !oculto && (
         <>
