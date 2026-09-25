@@ -969,7 +969,9 @@ const leerDepurar = () => {
 }
 // registro común (no dentro del reproductor: si este no llega a crearse,
 // también hay que verlo) y un reloj que cuenta desde el último cambio
-const registro = { lineas: [], t0: Date.now(), oyentes: new Set(), activo: leerDepurar() }
+// TEMPORAL: encendido para todos mientras se mide el retraso de los
+// tráileres; volver a "leerDepurar()" cuando esté visto
+const registro = { lineas: [], t0: Date.now(), oyentes: new Set(), activo: true || leerDepurar() }
 function alternarDepurar() {
   registro.activo = !registro.activo
   try { localStorage.setItem('sd:depurar', registro.activo ? '1' : '0') } catch { /* privada */ }
