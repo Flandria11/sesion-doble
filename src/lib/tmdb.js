@@ -401,29 +401,40 @@ function limitarAnimacion(resultados, notaMinima) {
  * filtrado por calidad, salgan antes los títulos que la gente realmente
  * conoce.
  */
+// dónde empieza Top esta sesión: al azar entre las primeras páginas, para
+// que no salga siempre lo mismo arriba; luego se sigue en orden desde ahí
+let inicioTop = null
+
 export async function topValoradas(pagina = 1) {
   const hace = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10)
-  const pagBase = pagina === 1 ? 1 + Math.floor(Math.random() * 3) : pagina + 2
+  if (pagina === 1 || inicioTop === null) inicioTop = Math.floor(Math.random() * 3)
+
+  // Dos páginas de películas por cada una de series: salen más pelis que
+  // series (unas 2 de cada 3) sin saltarse ninguna. Antes iban a la par.
+  const pagPelis = [1, 2].map(k => 1 + 2 * (inicioTop + pagina - 1) + (k - 1))
+  const pagSeries = 1 + inicioTop + pagina - 1
 
   const comun = {
-    page: String(pagBase),
     watch_region: REGION,
     include_adult: 'false',
     sort_by: 'popularity.desc'
   }
+  const filtroPelis = { 'vote_count.gte': '3000', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace }
+  const filtroSeries = { 'vote_count.gte': '2000', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace }
 
   const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
 
-  const [pelis, series] = await Promise.all([
-    pedir('/discover/movie', {
-      ...comun, 'vote_count.gte': '3000', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace
-    }).then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP), 'movie', mapaPelis)).catch(() => []),
-    pedir('/discover/tv', {
-      ...comun, 'vote_count.gte': '2000', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace
-    }).then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP_TV), 'tv', mapaSeries)).catch(() => [])
+  const [pelis1, pelis2, series] = await Promise.all([
+    ...pagPelis.map(pg =>
+      pedir('/discover/movie', { ...comun, ...filtroPelis, page: String(pg) })
+        .then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP), 'movie', mapaPelis))
+        .catch(() => [])),
+    pedir('/discover/tv', { ...comun, ...filtroSeries, page: String(pagSeries) })
+      .then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP_TV), 'tv', mapaSeries))
+      .catch(() => [])
   ])
 
-  return barajar([...pelis, ...series])
+  return barajar([...pelis1, ...pelis2, ...series])
 }
 
 /**

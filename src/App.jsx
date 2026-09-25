@@ -1299,13 +1299,16 @@ function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel, tmdb })
   )
 }
 
+/** Tope de tandas por lista, por si TMDB no dejara nunca de dar páginas. */
+const MAX_TANDAS = 30
+
 /* Lo que se estaba viendo en Estrenos. Vive fuera del componente para que
  * al cambiar de pestaña y volver no se pierda: si no, se recargaba todo y
  * volvías a la primera tarjeta. */
 const memoriaReel = { lista: [], pagina: 1, scroll: 0 }
 
 /* Lo mismo, pero para el apartado "Top" de esa misma pantalla. */
-const memoriaTop = { lista: [], pagina: 1, scroll: 0 }
+const memoriaTop = { lista: [], pagina: 1, scroll: 0, fin: false }
 
 /* Tarjeta que se puede deslizar a los lados, como Tinder: a la derecha
  * cuenta como "sí" y a la izquierda como "paso". El desplazamiento
@@ -1475,6 +1478,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
   vacioTexto = 'Has mirado todos los estrenos que cumplen el filtro de calidad. Vuelve en unos días.' }) {
   const [lista, setLista] = useState(memoria.lista)
   const [pagina, setPagina] = useState(memoria.pagina)
+  // TMDB ya no tiene más que dar (una tanda vino vacía) o se llegó al tope
+  const [fin, setFin] = useState(!!memoria.fin)
   const [cargando, setCargando] = useState(memoria.lista.length === 0)
   const [error, setError] = useState('')
   const [activo, setActivo] = useState(0)
@@ -1519,6 +1524,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
         if (!vivo) return
         // al pedir más, se descartan las que ya estaban: con el orden
         // barajado podrían repetirse entre tandas
+        if (!r.length || pagina >= MAX_TANDAS) setFin(true)
         setLista(ant => {
           if (pagina === 1) return r
           const claves = new Set(ant.map(x => `${x.tipo}-${x.tmdb_id}`))
@@ -1539,7 +1545,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     // eslint-disable-next-line react-hooks/immutability
     memoria.lista = lista
     memoria.pagina = pagina
-  }, [lista, pagina, memoria])
+    memoria.fin = fin
+  }, [lista, pagina, fin, memoria])
 
   useEffect(() => {
     const caja = pista.current
@@ -1582,13 +1589,16 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, visibles.length, trailers])
 
-  // al acercarse al final se pide la siguiente tanda
+  // Al acercarse al final se pide la siguiente tanda. También si no queda
+  // ninguna a la vista: si todo lo de una tanda ya lo habías visto o
+  // descartado, antes se quedaba ahí diciendo "no queda nada" (y con solo
+  // 5 tandas, en el iPhone, que ya lo había mirado todo, pasaba seguido).
   useEffect(() => {
-    if (!cargando && visibles.length && activo >= visibles.length - 3) {
-      setPagina(n => (n < 5 ? n + 1 : n))
+    if (!cargando && !error && !fin && activo >= visibles.length - 3) {
+      setPagina(n => n + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activo, visibles.length, cargando])
+  }, [activo, visibles.length, cargando, fin, error])
 
   async function proponer(p) {
     const e = estado(p)
@@ -1622,8 +1632,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     }
   }
 
-  if (cargando && !visibles.length) return <div className="cargando">{textoCargando}</div>
-  if (error) return <div className="error">{error}</div>
+  if (error && !visibles.length) return <div className="error">{error}</div>
+  // sin nada a la vista pero con más por pedir: se sigue buscando
+  if (!visibles.length && (cargando || !fin)) return <div className="cargando">{textoCargando}</div>
   if (!visibles.length) {
     return (
       <div className="vacio">
