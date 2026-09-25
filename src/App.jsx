@@ -953,6 +953,11 @@ const leerSonido = () => {
   try { return localStorage.getItem('sd:sonido') === '1' } catch (e) { return false }
 }
 
+/** iPhone/iPad (el iPad moderno se presenta como Mac, pero con toque) */
+const esIOS = typeof navigator !== 'undefined' &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+
 function Trailer({ clave, titulo, cartel }) {
   const caja = useRef(null)
   const player = useRef(null)
@@ -971,6 +976,7 @@ function Trailer({ clave, titulo, cartel }) {
   useEffect(() => {
     let vivo = true
     let reintento = null
+    let sonidoProbado = false
     // YouTube sustituye el elemento que recibe, así que le damos un hijo
     // creado a mano: React no controla ese nodo y no hay conflicto
     const nido = document.createElement('div')
@@ -996,14 +1002,9 @@ function Trailer({ clave, titulo, cartel }) {
               // En iOS el autoplay del iframe a veces no llega a arrancar:
               // se le pide también a mano, siempre en silencio
               try { e.target.playVideo() } catch { /* sigue igual */ }
-              // Si ya habías pedido sonido, se intenta quitar el silencio.
-              // iOS no deja sonar sin un toque y, en vez de seguir mudo,
-              // PARA el vídeo: por eso había que darle al play en cada
-              // tarjeta. Si pasa, onStateChange lo vuelve a arrancar mudo.
-              if (leerSonido()) {
-                try { e.target.unMute(); e.target.setVolume(70); setMudo(false) }
-                catch { /* si el navegador lo impide, sigue mudo */ }
-              }
+              // El sonido recordado se intenta en onStateChange, ya en
+              // marcha: pedirlo aquí, antes de arrancar, hacía que en iOS
+              // el vídeo no empezara hasta la red de seguridad de abajo.
               // red de seguridad: si al rato sigue sin moverse, en silencio
               reintento = setTimeout(() => {
                 const pl = player.current
@@ -1011,13 +1012,24 @@ function Trailer({ clave, titulo, cartel }) {
                 try {
                   if (pl.getPlayerState() !== 1) { pl.mute(); setMudo(true); pl.playVideo() }
                 } catch { /* reproductor ya destruido */ }
-              }, 1500)
+              }, 1000)
             },
             onStateChange: e => {
               if (!vivo) return
               // Al terminar, YouTube enseña su pantalla final con vídeos
               // sugeridos y su logo. Rebobinamos antes de que aparezca.
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
+              // Ya en marcha, se quita el silencio si lo habías pedido. En
+              // iOS ni se intenta: no deja sonar sin un toque y, en vez de
+              // seguir mudo, PARA el vídeo; así arranca al momento y el
+              // botón del volumen parpadea para pedir el toque.
+              if (e.data === 1 && !sonidoProbado) {
+                sonidoProbado = true
+                if (leerSonido() && !esIOS) {
+                  try { e.target.unMute(); e.target.setVolume(70); setMudo(false) }
+                  catch { /* si el navegador lo impide, sigue mudo */ }
+                }
+              }
               // pausa que no has hecho tú: iOS lo ha parado por el sonido
               if (e.data === 2 && !pausaMia.current && !e.target.isMuted()) {
                 e.target.mute(); setMudo(true); e.target.playVideo()
