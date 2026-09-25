@@ -403,7 +403,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     <div className="app">
       <header>
         <div className="bombillas"><i /><i /><i /><i /><i /><i /><i /></div>
-        <h1>DOS BUTACAS</h1>
+        <h1 onClick={tocarTitulo}>DOS BUTACAS</h1>
         <div className="sub">Código {pareja.codigo}</div>
         <button className="perfil" onClick={() => setAjustes(true)}
           aria-label="Tu cuenta y ajustes">
@@ -958,14 +958,31 @@ const esIOS = typeof navigator !== 'undefined' &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
-/* TEMPORAL: registro en pantalla de lo que hace el reproductor, para ver
- * en el iPhone dónde se va el tiempo. Quitar cuando esté resuelto. */
-const DEPURAR = false
+/* Registro en pantalla de lo que hace el reproductor, para ver en el móvil
+ * dónde se va el tiempo. Escondido: se enciende y se apaga tocando 5 veces
+ * seguidas el título "DOS BUTACAS" (ver tocarTitulo), y se recuerda en
+ * este dispositivo. */
+const leerDepurar = () => {
+  try { return localStorage.getItem('sd:depurar') === '1' } catch { return false }
+}
 // registro común (no dentro del reproductor: si este no llega a crearse,
 // también hay que verlo) y un reloj que cuenta desde el último cambio
-const registro = { lineas: [], t0: Date.now(), oyentes: new Set() }
+const registro = { lineas: [], t0: Date.now(), oyentes: new Set(), activo: leerDepurar() }
+function alternarDepurar() {
+  registro.activo = !registro.activo
+  try { localStorage.setItem('sd:depurar', registro.activo ? '1' : '0') } catch { /* privada */ }
+  registro.lineas = [registro.activo ? 'registro encendido' : '']
+  registro.oyentes.forEach(f => f(registro.lineas))
+}
+const toques = { n: 0, ultimo: 0 }
+function tocarTitulo() {
+  const ahora = Date.now()
+  toques.n = ahora - toques.ultimo < 700 ? toques.n + 1 : 1
+  toques.ultimo = ahora
+  if (toques.n >= 5) { toques.n = 0; alternarDepurar() }
+}
 function apunta(txt, reiniciar) {
-  if (!DEPURAR) return
+  if (!registro.activo) return
   if (reiniciar) registro.t0 = Date.now()
   const t = ((Date.now() - registro.t0) / 1000).toFixed(1)
   registro.lineas = [...registro.lineas.slice(-11), `${t}s ${txt}`]
@@ -977,7 +994,7 @@ function Registro() {
     registro.oyentes.add(setLineas)
     return () => { registro.oyentes.delete(setLineas) }
   }, [])
-  if (!DEPURAR) return null
+  if (!registro.activo) return null
   return createPortal(
     <pre className="depurar">{lineas.join('\n') || 'registro vacío'}</pre>,
     document.body

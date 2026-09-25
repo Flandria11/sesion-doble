@@ -509,6 +509,19 @@ export function buscarTrailers(tmdbId, tipo) {
         .sort((x, y) => nota(x) - nota(y))
         .forEach(x => { if (!claves.includes(x.key)) claves.push(x.key) })
     }
+    // Último recurso, solo si no hay ni tráiler ni teaser: la cabecera de
+    // la serie, un clip o un reportaje (a "Pequeñas mentirosas" solo le
+    // quedan esos). Tomas falsas y "detrás de las cámaras" no: no dan
+    // idea de qué va.
+    if (!claves.length) {
+      const orden = ['Opening Credits', 'Clip', 'Featurette']
+      for (const d of respuestas) {
+        ;(d.results || [])
+          .filter(x => x.site === 'YouTube' && orden.includes(x.type))
+          .sort((x, y) => orden.indexOf(x.type) - orden.indexOf(y.type))
+          .forEach(x => { if (!claves.includes(x.key)) claves.push(x.key) })
+      }
+    }
     return claves
   })()
   listas.set(clave, promesa)
