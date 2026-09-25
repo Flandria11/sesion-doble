@@ -985,6 +985,8 @@ function Trailer({ clave, titulo, cartel }) {
   // has tocado el botón del sonido en ESTE reproductor: en iOS, a partir de
   // ahí ya deja que suene, también en los vídeos siguientes
   const desbloqueado = useRef(false)
+  // cuándo se cambió de vídeo por última vez (ver la pausa en onStateChange)
+  const cambioEn = useRef(0)
   // qué vídeo ha llegado a arrancar: hasta entonces la carátula lo tapa
   const [enMarchaDe, setEnMarchaDe] = useState(null)
 
@@ -1022,11 +1024,18 @@ function Trailer({ clave, titulo, cartel }) {
     if (!c) { pausaMia.current = true; clearTimeout(reintento.current); pl.pauseVideo(); return }
     cargada.current = c
     pausaMia.current = false
+    cambioEn.current = Date.now()
     pl.loadVideoById(c)
     vigilar()
   }
 
-  const hay = !!clave
+  // Se crea con el primer vídeo y ya no se destruye hasta salir del
+  // carrusel, aunque alguna tarjeta no tenga tráiler (o aún no haya
+  // llegado). Antes dependía de "hay vídeo ahora": al pasar por una de
+  // esas se destruía y el siguiente era un reproductor nuevo, que tardaba
+  // en cargar y en iOS volvía a pedir que activaras el sonido.
+  const [hay, setHay] = useState(!!clave)
+  if (clave && !hay) setHay(true)
   useEffect(() => {
     if (!hay) return
     let vivo = true
@@ -1077,8 +1086,12 @@ function Trailer({ clave, titulo, cartel }) {
                   catch { /* si el navegador lo impide, sigue mudo */ }
                 }
               }
-              // pausa que no has hecho tú: iOS lo ha parado por el sonido
-              if (e.data === 2 && !pausaMia.current && !e.target.isMuted()) {
+              // pausa que no has hecho tú: iOS lo ha parado por el sonido.
+              // Justo después de cambiar de vídeo no cuenta: puede ser el
+              // anterior deteniéndose, y silenciar ahí quitaba el sonido
+              // al nuevo sin motivo.
+              if (e.data === 2 && !pausaMia.current && !e.target.isMuted() &&
+                  Date.now() - cambioEn.current > 1500) {
                 e.target.mute(); setMudo(true); e.target.playVideo()
               }
             },
