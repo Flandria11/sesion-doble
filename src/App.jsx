@@ -403,7 +403,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     <div className="app">
       <header>
         <div className="bombillas"><i /><i /><i /><i /><i /><i /><i /></div>
-        <h1 onClick={tocarTitulo}>DOS BUTACAS</h1>
+        {/* la clase es lo que hace que iOS mande el toque: Safari no avisa
+            de clics en un texto normal si no parece pulsable */}
+        <h1 className="tocable" onClick={tocarTitulo}>DOS BUTACAS</h1>
         <div className="sub">Código {pareja.codigo}</div>
         <button className="perfil" onClick={() => setAjustes(true)}
           aria-label="Tu cuenta y ajustes">

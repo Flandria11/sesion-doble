@@ -108,6 +108,12 @@ h1 {
   text-shadow: 0 0 22px rgba(245, 196, 81, .45);
 }
 .sub { font-size: 11.5px; color: var(--apagado); margin-top: 6px; }
+/* el título admite 5 toques seguidos (registro escondido): sin cursor
+   pointer iOS no manda el clic, y sin manipulation el doble toque hace zoom */
+h1.tocable {
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
 /* solo iPhone/iPad (Safari de iOS): el título, más pequeño todavía */
 @supports (-webkit-touch-callout: none) {
   h1 { font-size: 20px; }
