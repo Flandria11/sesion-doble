@@ -400,8 +400,8 @@ function limitarAnimacion(resultados, notaMinima) {
  * filtrado por calidad, salgan antes los títulos que la gente realmente
  * conoce.
  */
-// Top recorre TODAS las páginas de TMDB en un orden al azar, distinto cada
-// vez que se abre (pagina 1), y sin repetir ninguna. Antes empezaba
+// Top recorre TODAS las páginas de TMDB en un orden al azar (con ventaja
+// para las más populares), distinto cada vez que se abre, y sin repetir. Antes empezaba
 // siempre entre las 3 primeras (las más populares) y seguía en orden:
 // por eso salían tanto las mismas.
 let ordenTop = null
@@ -423,6 +423,20 @@ async function totalesTop(comun, filtroPelis, filtroSeries) {
   return t
 }
 
+/**
+ * Las páginas 1..n en un orden al azar, pero con más papeletas para las
+ * primeras (las más populares, porque se ordena por popularidad): la
+ * página p pesa 1/p. Así, de las 6 primeras páginas que salen (3 tandas),
+ * unas 3,5 son de las 10 más populares, frente a ~1 con un orden al azar
+ * normal; el resto sigue saliendo, solo que más adelante.
+ */
+function alAzarConPeso(n) {
+  return Array.from({ length: n }, (_, i) => i + 1)
+    .map(p => ({ p, k: -Math.log(Math.random() || 1e-9) * p }))
+    .sort((a, b) => a.k - b.k)
+    .map(x => x.p)
+}
+
 export async function topValoradas(pagina = 1) {
   const hace = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10)
 
@@ -436,8 +450,7 @@ export async function topValoradas(pagina = 1) {
 
   if (pagina === 1 || !ordenTop) {
     const tot = await totalesTop(comun, filtroPelis, filtroSeries)
-    const del1 = n => Array.from({ length: n }, (_, i) => i + 1)
-    ordenTop = { pelis: barajar(del1(tot.pelis)), series: barajar(del1(tot.series)) }
+    ordenTop = { pelis: alAzarConPeso(tot.pelis), series: alAzarConPeso(tot.series) }
   }
 
   // Dos páginas de películas por cada una de series: salen más pelis que
