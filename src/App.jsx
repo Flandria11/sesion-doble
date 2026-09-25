@@ -1405,6 +1405,12 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
 function Sinopsis({ texto, abierta, onAlternar }) {
   const ref = useRef(null)
   const [truncado, setTruncado] = useState(false)
+  // Cuántas líneas enteras caben en el hueco. Sin esto el texto se cortaba
+  // por donde cayera el borde, dejando media línea a la vista; ahora se
+  // corta en la última línea entera y termina en "…". Se recuerda para
+  // qué texto es, así cada tarjeta vuelve a medir la suya.
+  const [cabe, setCabe] = useState({ de: null, lineas: null })
+  const lineas = cabe.de === texto ? cabe.lineas : null
 
   useEffect(() => {
     // desplegada no hace falta medir: lo único que importa entonces es
@@ -1417,13 +1423,25 @@ function Sinopsis({ texto, abierta, onAlternar }) {
     if (!el) return
     // más de un par de píxeles: a veces el redondeo del navegador deja
     // 2-3px de diferencia aunque el texto quepa entero
-    const medir = () => setTruncado(el.scrollHeight - el.clientHeight > 8)
+    const medir = () => {
+      const cortado = el.scrollHeight - el.clientHeight > 8
+      setTruncado(cortado)
+      if (!cortado) return
+      const alto = parseFloat(getComputedStyle(el).lineHeight) || 19
+      // el +0.15 es por el redondeo: 3,98 líneas son 4 que caben
+      const n = Math.max(1, Math.floor(el.clientHeight / alto + 0.15))
+      setCabe(c => (c.de === texto && c.lineas === n ? c : { de: texto, lineas: n }))
+    }
     medir()
     // la tipografía (Anton/Karla) llega por @import y puede tardar en
     // cargar: si se mide antes, el texto cambia de alto al llegar la
     // fuente real y la medida se queda desfasada (parecía "tocable"
     // aunque ya se viera entero, o al revés)
-    document.fonts && document.fonts.ready.then(medir)
+    document.fonts && document.fonts.ready.then(() => {
+      // con la fuente buena el hueco puede ser otro: se mide desde cero
+      setCabe({ de: null, lineas: null })
+      requestAnimationFrame(medir)
+    })
     const obs = new ResizeObserver(medir)
     obs.observe(el)
     return () => obs.disconnect()
@@ -1431,10 +1449,13 @@ function Sinopsis({ texto, abierta, onAlternar }) {
 
   if (!texto) return null
   const interactivo = truncado || abierta
+  const recorte = !abierta && lineas
+    ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: lineas, overflow: 'hidden' }
+    : undefined
   if (!interactivo) return <div className="sin" ref={ref}>{texto}</div>
 
   return (
-    <div className="sin" ref={ref} role="button" tabIndex={0}
+    <div className="sin" ref={ref} role="button" tabIndex={0} style={recorte}
       onClick={onAlternar} onKeyDown={e => e.key === 'Enter' && onAlternar()}>
       {texto}
     </div>
@@ -1849,7 +1870,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               </div>
             )}
             {!ocultarBoton && conNota && !puesta && (
-              <textarea className="nota-corta" value={nota}
+              <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}
                 placeholder="Comentario (opcional)" />
             )}
