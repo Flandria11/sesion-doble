@@ -1238,9 +1238,15 @@ function Trailer({ clave, titulo, cartel }) {
  */
 function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel }) {
   const [sitio, setSitio] = useState(null)
+  const yo = useRef(null)
 
   useLayoutEffect(() => {
-    const caja = pista.current
+    // La pista se saca del propio elemento, no de la ref del padre: al
+    // montar, el efecto del hijo corre ANTES de que React rellene la ref
+    // del padre, así que pista.current aún era null y en la primera
+    // tarjeta nunca se colocaba el tráiler (no arrancaba ni salía el
+    // botón del sonido hasta bajar y volver a subir).
+    const caja = (yo.current && yo.current.parentNode) || pista.current
     if (!caja) return
     const medir = () => {
       const d = caja.querySelector(`.diapo[data-i="${activo}"]`)
@@ -1257,7 +1263,7 @@ function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel }) {
   }, [activo, sitio, clave])
 
   return (
-    <div className="flotante"
+    <div className="flotante" ref={yo}
       style={sitio ? { top: sitio.top, height: sitio.height } : { display: 'none' }}>
       <Trailer clave={sitio ? clave || null : null} titulo={titulo} cartel={cartel} />
       <Registro />
