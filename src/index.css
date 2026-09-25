@@ -1035,10 +1035,13 @@ textarea::placeholder { color: #61539A; }
    desenfoque del telón le hacían saltarse el repintado. El telón de la
    ficha grande tampoco necesita desenfoque: la tarjeta lo tapa entero. */
 .diapo.suelta .cuerpo {
-  padding: 14px 16px 76px; max-height: 40%;
+  padding: 14px 16px 76px; max-height: 48%;
   transform: translateZ(0); will-change: transform;
 }
 .diapo.suelta .tit { font-size: 22px; }
+/* el hueco sube título y sinopsis; los botones no encogen (la que cede
+   sitio, si falta, es la sinopsis) */
+.diapo.suelta .pie-ficha { margin-top: 22px; flex-shrink: 0; }
 /* misma especificidad que la regla de arriba: sin esto, al abrir la
    sinopsis en la ficha (que siempre lleva "suelta") ganaba esta regla
    por ir después en el archivo y el texto no llegaba a desplegarse */

@@ -1846,18 +1846,22 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
             </div>
           )}
 
-          {!ocultarBoton && conNota && !puesta && (
-            <textarea className="nota-corta" value={nota}
-              onChange={e => setNota(e.target.value)} maxLength={200}
-              placeholder="Comentario (opcional)" />
-          )}
-          {!ocultarBoton && (
-            <button className={`btn${puesta ? ' suave' : ''}`}
-              onClick={() => onProponer(nota.trim())} disabled={puesta}>
-              {puesta ? (etiquetaPuesta || 'Ya está en tu lista') : (etiquetaBoton || 'Proponer')}
-            </button>
-          )}
-          {acciones}
+          {/* comentario y botones van aparte: el hueco de encima es lo que
+              sube el título y la sinopsis sin mover esto de abajo */}
+          <div className="pie-ficha">
+            {!ocultarBoton && conNota && !puesta && (
+              <textarea className="nota-corta" value={nota}
+                onChange={e => setNota(e.target.value)} maxLength={200}
+                placeholder="Comentario (opcional)" />
+            )}
+            {!ocultarBoton && (
+              <button className={`btn${puesta ? ' suave' : ''}`}
+                onClick={() => onProponer(nota.trim())} disabled={puesta}>
+                {puesta ? (etiquetaPuesta || 'Ya está en tu lista') : (etiquetaBoton || 'Proponer')}
+              </button>
+            )}
+            {acciones}
+          </div>
         </div>
       </section>
     </div>
