@@ -430,20 +430,50 @@ export async function topValoradas(pagina = 1) {
  * Busca el tráiler en YouTube. Prioriza España; si no lo hay,
  * cae al original en vez de dejarlo vacío.
  */
-export async function buscarTrailer(tmdbId, tipo) {
+// Los tráileres de otro país (el "UK Trailer", el australiano...) a menudo
+// están bloqueados en España y YouTube no deja reproducirlos: pasa, por
+// ejemplo, con "Una noche al año". Se dejan para el final.
+const DE_OTRO_PAIS = /\b(uk|u\.k\.|australia|australian|canada|canadian|india|irish|nz|new zealand|south africa)\b/i
+
+const listas = new Map()
+
+/**
+ * Todos los tráileres de YouTube de un título, del mejor al peor: primero
+ * en español, luego en inglés; tráileres antes que teasers, y los de otro
+ * país al final. Si el primero no se puede reproducir, el reproductor
+ * prueba el siguiente.
+ */
+export function buscarTrailers(tmdbId, tipo) {
+  const clave = `${tipo}-${tmdbId}`
+  if (listas.has(clave)) return listas.get(clave)
   const ruta = `/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/videos`
-  for (const idioma of ['es-ES', 'en-US']) {
-    try {
-      const d = await pedir(ruta, { language: idioma })
-      const videos = (d.results || []).filter(x => x.site === 'YouTube')
-      // un "Trailer" de verdad antes que un simple teaser, si hay de los dos
-      const v = videos.find(x => x.type === 'Trailer') || videos.find(x => x.type === 'Teaser')
-      if (v) return v.key
-    } catch (e) {
-      /* probamos el siguiente idioma */
+  const promesa = (async () => {
+    const claves = []
+    for (const idioma of ['es-ES', 'en-US']) {
+      try {
+        const d = await pedir(ruta, { language: idioma })
+        const videos = (d.results || []).filter(x => x.site === 'YouTube')
+        const nota = x => (x.type === 'Trailer' ? 0 : 2) + (DE_OTRO_PAIS.test(x.name || '') ? 1 : 0)
+        videos
+          .filter(x => x.type === 'Trailer' || x.type === 'Teaser')
+          .sort((x, y) => nota(x) - nota(y))
+          .forEach(x => { if (!claves.includes(x.key)) claves.push(x.key) })
+      } catch {
+        /* probamos el siguiente idioma */
+      }
     }
-  }
-  return ''
+    return claves
+  })()
+  listas.set(clave, promesa)
+  // si falla del todo, que se pueda volver a pedir
+  promesa.then(l => { if (!l.length) listas.delete(clave) })
+  return promesa
+}
+
+/** El mejor tráiler de un título (clave de YouTube), o '' si no hay. */
+export async function buscarTrailer(tmdbId, tipo) {
+  const l = await buscarTrailers(tmdbId, tipo)
+  return l[0] || ''
 }
 
 /** Géneros legibles de un título, para la ficha. */

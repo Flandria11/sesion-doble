@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, generos, dondeVerla, barajar } from './lib/tmdb'
+import { buscar, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -985,10 +985,17 @@ function Registro() {
 }
 const NOMBRE_ESTADO = { '-1': 'sin empezar', 0: 'terminado', 1: 'REPRODUCE', 2: 'pausa', 3: 'cargando', 5: 'preparado' }
 
-function Trailer({ clave, titulo, cartel }) {
+function Trailer({ clave: pedida, titulo, cartel, tmdb }) {
   const caja = useRef(null)
   const player = useRef(null)
   const anota = apunta
+  // Si el vídeo pedido no se puede reproducir (bloqueado en España, quitado
+  // por el estudio...), se prueba el siguiente tráiler del título.
+  // "sustituto" recuerda para qué vídeo pedido es, así al cambiar de
+  // tarjeta se vuelve solo al de la nueva.
+  const [sustituto, setSustituto] = useState({ de: null, clave: null })
+  const clave = pedida && sustituto.de === pedida ? sustituto.clave : pedida
+  const probadas = useRef({ de: null, lista: [] })
   const [api, setApi] = useState(null)
   const [mudo, setMudo] = useState(true)
   // se guarda QUÉ vídeo está pausado o ha fallado: al cambiar de tarjeta
@@ -1014,6 +1021,10 @@ function Trailer({ clave, titulo, cartel }) {
   const desbloqueado = useRef(false)
   // cuándo se cambió de vídeo por última vez (ver la pausa en onStateChange)
   const cambioEn = useRef(0)
+  // lo último pedido, para los avisos de YouTube (que llegan más tarde)
+  const pedidaRef = useRef(pedida)
+  const tmdbRef = useRef(tmdb)
+  useEffect(() => { pedidaRef.current = pedida; tmdbRef.current = tmdb })
   // el vídeo que YouTube no deja reproducir: el vigilante no insiste con él
   const fallida = useRef(null)
   // qué vídeo ha llegado a arrancar: hasta entonces la carátula lo tapa
@@ -1113,7 +1124,24 @@ function Trailer({ clave, titulo, cartel }) {
             // 101/150: el embed está bloqueado para este vídeo. 100: lo
             // han quitado o es privado. En cualquier caso no hay nada que
             // reproducir aquí.
-            onError: ev => { anota(`ERROR ${ev && ev.data}`); if (vivo) { fallida.current = querida.current; setFalloDe(querida.current) } }
+            onError: ev => {
+              anota(`ERROR ${ev && ev.data}`)
+              if (!vivo) return
+              const mala = querida.current
+              const deQue = pedidaRef.current
+              if (probadas.current.de !== deQue) probadas.current = { de: deQue, lista: [] }
+              probadas.current.lista.push(mala)
+              const rendirse = () => { fallida.current = mala; setFalloDe(mala) }
+              if (!tmdbRef.current) return rendirse()
+              buscarTrailers(tmdbRef.current.id, tmdbRef.current.tipo).then(lista => {
+                // ya estás en otra tarjeta: nada que hacer
+                if (!vivo || pedidaRef.current !== deQue) return
+                const otra = lista.find(k => !probadas.current.lista.includes(k))
+                if (!otra) return rendirse()
+                anota(`probando otro: ${otra}`)
+                setSustituto({ de: deQue, clave: otra })
+              }).catch(rendirse)
+            }
           }
         })
       })
@@ -1236,7 +1264,7 @@ function Trailer({ clave, titulo, cartel }) {
  * hay uno solo, colocado encima de la tarjeta que estás viendo (dentro
  * de la pista, así se desplaza con ella), que cambia de vídeo al pasar.
  */
-function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel }) {
+function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel, tmdb }) {
   const [sitio, setSitio] = useState(null)
   const yo = useRef(null)
 
@@ -1265,7 +1293,7 @@ function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel }) {
   return (
     <div className="flotante" ref={yo}
       style={sitio ? { top: sitio.top, height: sitio.height } : { display: 'none' }}>
-      <Trailer clave={sitio ? clave || null : null} titulo={titulo} cartel={cartel} />
+      <Trailer clave={sitio ? clave || null : null} titulo={titulo} cartel={cartel} tmdb={tmdb} />
       <Registro />
     </div>
   )
@@ -1637,7 +1665,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
           <TrailerFlotante pista={pista} activo={activo} cuenta={visibles.length}
             clave={trailers[`${visibles[activo].tipo}-${visibles[activo].tmdb_id}`]}
             titulo={visibles[activo].titulo}
-            cartel={visibles[activo].fondo || visibles[activo].cartel} />
+            cartel={visibles[activo].fondo || visibles[activo].cartel}
+            tmdb={{ id: visibles[activo].tmdb_id, tipo: visibles[activo].tipo }} />
         )}
       </div>
       {recien && !comentando && (
@@ -1793,7 +1822,8 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
         onClick={e => e.stopPropagation()}>
         <div className="lienzo">
           {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-          {trailer && <Trailer clave={trailer} titulo={p.titulo} cartel={p.fondo || p.cartel} />}
+          {trailer && <Trailer clave={trailer} titulo={p.titulo} cartel={p.fondo || p.cartel}
+            tmdb={{ id: p.tmdb_id, tipo: p.tipo }} />}
         </div>
         <div className="velo" />
 
@@ -1939,7 +1969,8 @@ function Votar({ cola, nombres, onVotar }) {
       {actual && (
         <TrailerFlotante pista={pista} activo={activo} cuenta={cola.length}
           clave={claveVideo} titulo={actual.titulo}
-          cartel={actual.fondo || actual.cartel} />
+          cartel={actual.fondo || actual.cartel}
+          tmdb={actual.tmdb_id ? { id: actual.tmdb_id, tipo: actual.tipo } : null} />
       )}
     </div>
   )
