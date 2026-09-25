@@ -317,12 +317,12 @@ export async function estrenos(pagina = 1) {
     { desde: dia(548), hasta: dia(401), votos: '600', votosTv: '420' }
   ]
 
-  // Se pide una página al azar dentro de las primeras y luego se baraja:
-  // así no salen siempre los mismos títulos ni en el mismo orden.
-  const pagBase = pagina === 1 ? 1 + Math.floor(Math.random() * 3) : pagina + 2
-
+  // Las páginas van en orden (1, 2, 3...) y la variedad viene de barajar
+  // cada ventana por dentro (ver abajo). Antes la primera tanda era una
+  // página al azar entre la 1 y la 3 y la segunda ya la 4: si tocaba la 3,
+  // la 1 y la 2 (los estrenos más recientes) no salían en toda la sesión.
   const comun = {
-    page: String(pagBase),
+    page: String(pagina),
     watch_region: REGION,
     with_watch_monetization_types: 'flatrate',
     include_adult: 'false'
@@ -386,10 +386,9 @@ function limitarAnimacion(resultados, notaMinima) {
 /**
  * Lo mejor valorado de hace más de año y medio: el complemento de
  * Estrenos, que ya cubre hasta ahí, así que aquí no hace falta elegir
- * año ni repetir lo que se ve del otro lado. Igual que en Estrenos, se
- * pide una página al azar entre las primeras y se baraja: si no, al
- * ordenar siempre por nota saldrían las mismas en el mismo orden cada
- * vez que se abre.
+ * año ni repetir lo que se ve del otro lado. Las páginas se recorren en
+ * un orden al azar (ver ordenTop) y cada tanda se baraja: si no, saldrían
+ * siempre las mismas en el mismo orden cada vez que se abre.
  *
  * El mínimo de votos es alto (3000 en pelis) a propósito: con 300 se
  * colaban títulos de nicho (un drama coreano, una serie infantil...) con
@@ -401,18 +400,31 @@ function limitarAnimacion(resultados, notaMinima) {
  * filtrado por calidad, salgan antes los títulos que la gente realmente
  * conoce.
  */
-// dónde empieza Top esta sesión: al azar entre las primeras páginas, para
-// que no salga siempre lo mismo arriba; luego se sigue en orden desde ahí
-let inicioTop = null
+// Top recorre TODAS las páginas de TMDB en un orden al azar, distinto cada
+// vez que se abre (pagina 1), y sin repetir ninguna. Antes empezaba
+// siempre entre las 3 primeras (las más populares) y seguía en orden:
+// por eso salían tanto las mismas.
+let ordenTop = null
+// cuántas páginas hay de cada tipo: cambia poco, se guarda un día
+const TOTALES_TOP = 'sd:top-totales'
+
+async function totalesTop(comun, filtroPelis, filtroSeries) {
+  try {
+    const g = JSON.parse(localStorage.getItem(TOTALES_TOP) || 'null')
+    if (g && Date.now() - g.t < 864e5) return g
+  } catch { /* sin almacenamiento: se pregunta */ }
+  const [a, b] = await Promise.all([
+    pedir('/discover/movie', { ...comun, ...filtroPelis, page: '1' }),
+    pedir('/discover/tv', { ...comun, ...filtroSeries, page: '1' })
+  ])
+  // TMDB no deja pasar de la página 500
+  const t = { t: Date.now(), pelis: Math.min(a.total_pages || 1, 500), series: Math.min(b.total_pages || 1, 500) }
+  try { localStorage.setItem(TOTALES_TOP, JSON.stringify(t)) } catch { /* privada */ }
+  return t
+}
 
 export async function topValoradas(pagina = 1) {
   const hace = new Date(Date.now() - 548 * 864e5).toISOString().slice(0, 10)
-  if (pagina === 1 || inicioTop === null) inicioTop = Math.floor(Math.random() * 3)
-
-  // Dos páginas de películas por cada una de series: salen más pelis que
-  // series (unas 2 de cada 3) sin saltarse ninguna. Antes iban a la par.
-  const pagPelis = [1, 2].map(k => 1 + 2 * (inicioTop + pagina - 1) + (k - 1))
-  const pagSeries = 1 + inicioTop + pagina - 1
 
   const comun = {
     watch_region: REGION,
@@ -422,16 +434,29 @@ export async function topValoradas(pagina = 1) {
   const filtroPelis = { 'vote_count.gte': '3000', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace }
   const filtroSeries = { 'vote_count.gte': '2000', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace }
 
+  if (pagina === 1 || !ordenTop) {
+    const tot = await totalesTop(comun, filtroPelis, filtroSeries)
+    const del1 = n => Array.from({ length: n }, (_, i) => i + 1)
+    ordenTop = { pelis: barajar(del1(tot.pelis)), series: barajar(del1(tot.series)) }
+  }
+
+  // Dos páginas de películas por cada una de series: salen más pelis que
+  // series (unas 2 de cada 3). Si ya no quedan páginas de un tipo, esa
+  // parte viene vacía; cuando se acaban las dos, la tanda sale vacía y la
+  // lista sabe que ha llegado al final.
+  const pagPelis = [ordenTop.pelis[2 * (pagina - 1)], ordenTop.pelis[2 * (pagina - 1) + 1]]
+  const pagSeries = ordenTop.series[pagina - 1]
+  const pide = (ruta, filtro, pg, tipo, mapa, notaAnim) => (pg
+    ? pedir(ruta, { ...comun, ...filtro, page: String(pg) })
+        .then(d => limpiar(limitarAnimacion(d.results, notaAnim), tipo, mapa))
+        .catch(() => [])
+    : Promise.resolve([]))
+
   const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
 
   const [pelis1, pelis2, series] = await Promise.all([
-    ...pagPelis.map(pg =>
-      pedir('/discover/movie', { ...comun, ...filtroPelis, page: String(pg) })
-        .then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP), 'movie', mapaPelis))
-        .catch(() => [])),
-    pedir('/discover/tv', { ...comun, ...filtroSeries, page: String(pagSeries) })
-      .then(d => limpiar(limitarAnimacion(d.results, NOTA_MINIMA_ANIMACION_TOP_TV), 'tv', mapaSeries))
-      .catch(() => [])
+    ...pagPelis.map(pg => pide('/discover/movie', filtroPelis, pg, 'movie', mapaPelis, NOTA_MINIMA_ANIMACION_TOP)),
+    pide('/discover/tv', filtroSeries, pagSeries, 'tv', mapaSeries, NOTA_MINIMA_ANIMACION_TOP_TV)
   ])
 
   return barajar([...pelis1, ...pelis2, ...series])
@@ -459,19 +484,17 @@ export function buscarTrailers(tmdbId, tipo) {
   if (listas.has(clave)) return listas.get(clave)
   const ruta = `/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/videos`
   const promesa = (async () => {
+    // los dos idiomas a la vez: uno detrás de otro se notaba al arrancar
+    const respuestas = await Promise.all(['es-ES', 'en-US'].map(idioma =>
+      pedir(ruta, { language: idioma }).catch(() => ({ results: [] }))))
     const claves = []
-    for (const idioma of ['es-ES', 'en-US']) {
-      try {
-        const d = await pedir(ruta, { language: idioma })
-        const videos = (d.results || []).filter(x => x.site === 'YouTube')
-        const nota = x => (x.type === 'Trailer' ? 0 : 2) + (DE_OTRO_PAIS.test(x.name || '') ? 1 : 0)
-        videos
-          .filter(x => x.type === 'Trailer' || x.type === 'Teaser')
-          .sort((x, y) => nota(x) - nota(y))
-          .forEach(x => { if (!claves.includes(x.key)) claves.push(x.key) })
-      } catch {
-        /* probamos el siguiente idioma */
-      }
+    const nota = x => (x.type === 'Trailer' ? 0 : 2) + (DE_OTRO_PAIS.test(x.name || '') ? 1 : 0)
+    // el español primero, luego el inglés: el orden del array lo mantiene
+    for (const d of respuestas) {
+      ;(d.results || [])
+        .filter(x => x.site === 'YouTube' && (x.type === 'Trailer' || x.type === 'Teaser'))
+        .sort((x, y) => nota(x) - nota(y))
+        .forEach(x => { if (!claves.includes(x.key)) claves.push(x.key) })
     }
     return claves
   })()
