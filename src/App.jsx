@@ -958,9 +958,21 @@ const esIOS = typeof navigator !== 'undefined' &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
+/* TEMPORAL: registro en pantalla de lo que hace el reproductor, para ver
+ * en el iPhone dónde se va el tiempo. Quitar cuando esté resuelto. */
+const DEPURAR = true
+const NOMBRE_ESTADO = { '-1': 'sin empezar', 0: 'terminado', 1: 'REPRODUCE', 2: 'pausa', 3: 'cargando', 5: 'preparado' }
+
 function Trailer({ clave, titulo, cartel }) {
   const caja = useRef(null)
   const player = useRef(null)
+  const [lineas, setLineas] = useState([])
+  const t0 = useRef(0)
+  const anota = txt => {
+    if (!DEPURAR) return
+    const t = ((Date.now() - t0.current) / 1000).toFixed(1)
+    setLineas(l => [...l.slice(-9), `${t}s ${txt}`])
+  }
   const [api, setApi] = useState(null)
   const [mudo, setMudo] = useState(true)
   // se guarda QUÉ vídeo está pausado o ha fallado: al cambiar de tarjeta
@@ -1001,6 +1013,7 @@ function Trailer({ clave, titulo, cartel }) {
     cargada.current = c
     pausaMia.current = false
     cambioEn.current = Date.now()
+    anota(`cargar ${c}`)
     pl.loadVideoById(c)
   }
 
@@ -1024,6 +1037,7 @@ function Trailer({ clave, titulo, cartel }) {
         if (!vivo || !caja.current) return
         caja.current.appendChild(nido)
         cargada.current = querida.current
+        anota(`crear ${querida.current}`)
         player.current = new YT.Player(nido, {
           videoId: querida.current,
           playerVars: {
@@ -1036,6 +1050,7 @@ function Trailer({ clave, titulo, cartel }) {
           events: {
             onReady: e => {
               if (!vivo) return
+              anota('listo')
               setApi(true)
               // si mientras cargaba ya has pasado a otra tarjeta
               if (querida.current !== cargada.current) { cambiar(e.target); return }
@@ -1045,6 +1060,7 @@ function Trailer({ clave, titulo, cartel }) {
             },
             onStateChange: e => {
               if (!vivo) return
+              anota(`${NOMBRE_ESTADO[e.data] ?? e.data}${e.target.isMuted() ? ' (mudo)' : ' (sonido)'}`)
               // Al terminar, YouTube enseña su pantalla final con vídeos
               // sugeridos y su logo. Rebobinamos antes de que aparezca.
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
@@ -1072,13 +1088,14 @@ function Trailer({ clave, titulo, cartel }) {
               // al nuevo sin motivo.
               if (e.data === 2 && !pausaMia.current && !e.target.isMuted() &&
                   Date.now() - cambioEn.current > 1500) {
+                anota('pausa de iOS: silencio')
                 e.target.mute(); setMudo(true); e.target.playVideo()
               }
             },
             // 101/150: el embed está bloqueado para este vídeo. 100: lo
             // han quitado o es privado. En cualquier caso no hay nada que
             // reproducir aquí.
-            onError: () => { if (vivo) { fallida.current = querida.current; setFalloDe(querida.current) } }
+            onError: ev => { anota(`ERROR ${ev && ev.data}`); if (vivo) { fallida.current = querida.current; setFalloDe(querida.current) } }
           }
         })
       })
@@ -1091,6 +1108,7 @@ function Trailer({ clave, titulo, cartel }) {
       cargada.current = null
       if (nido.parentNode) nido.parentNode.removeChild(nido)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hay])
 
   // Vigilante: mientras haya vídeo y no lo hayas pausado tú, que no se
@@ -1110,7 +1128,8 @@ function Trailer({ clave, titulo, cartel }) {
       try {
         if (![-1, 2, 5].includes(pl.getPlayerState())) { quietas = 0; return }
         quietas++
-        if (quietas >= 3 && !pl.isMuted()) { pl.mute(); setMudo(true) }
+        anota(`vigilante: quieto x${quietas}`)
+        if (quietas >= 3 && !pl.isMuted()) { anota('vigilante: silencio'); pl.mute(); setMudo(true) }
         pl.playVideo()
       } catch { /* reproductor ya destruido */ }
     }, 700)
@@ -1119,6 +1138,9 @@ function Trailer({ clave, titulo, cartel }) {
 
   // cambio de tarjeta: mismo reproductor, otro vídeo
   useEffect(() => {
+    // el reloj del registro cuenta desde que cambias de tarjeta
+    t0.current = Date.now()
+    anota(`tarjeta: ${clave || 'sin vídeo (aún)'}`)
     querida.current = clave
     cambiar(player.current)
   }, [clave])
@@ -1131,6 +1153,7 @@ function Trailer({ clave, titulo, cartel }) {
   }
   const volumen = mando(pl => {
     const encender = pl.isMuted()
+    anota(encender ? 'botón: sonido' : 'botón: silencio')
     if (encender) { desbloqueado.current = true; pl.unMute(); pl.setVolume(70); setMudo(false) }
     else { pl.mute(); setMudo(true) }
     try { localStorage.setItem('sd:sonido', encender ? '1' : '0') } catch { /* privada */ }
@@ -1146,6 +1169,9 @@ function Trailer({ clave, titulo, cartel }) {
 
   return (
     <>
+      {DEPURAR && lineas.length > 0 && (
+        <pre className="depurar">{lineas.join('\n')}</pre>
+      )}
       {api === false ? (
         clave && !fallo && (
           <iframe
