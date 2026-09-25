@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
@@ -963,19 +963,53 @@ function Trailer({ clave, titulo, cartel }) {
   const player = useRef(null)
   const [api, setApi] = useState(null)
   const [mudo, setMudo] = useState(true)
-  const [parado, setParado] = useState(false)
-  // true solo si lo has pausado tú con el botón: cualquier otra pausa es
-  // iOS parando el vídeo y hay que volver a arrancarlo
+  // se guarda QUÉ vídeo está pausado o ha fallado: al cambiar de tarjeta
+  // el nuevo empieza limpio sin tener que reiniciar nada a mano
+  const [paradoDe, setParadoDe] = useState(null)
+  // true solo si lo has pausado tú con el botón (o no hay nada que ver):
+  // cualquier otra pausa es iOS parando el vídeo y hay que volver a
+  // arrancarlo
   const pausaMia = useRef(false)
   // Algunos tráilers de TMDB no se pueden incrustar (el estudio lo impide):
   // YouTube entonces no reproduce nada y se queda con su propio aviso de
   // "vídeo no disponible" dentro del marco. Mejor no enseñarlo: se cae a
   // la carátula, como si no hubiera tráiler.
-  const [fallo, setFallo] = useState(false)
+  const [falloDe, setFalloDe] = useState(null)
+  const fallo = !!clave && falloDe === clave
+  const parado = !!clave && paradoDe === clave
+  // El reproductor es UNO y va cambiando de vídeo (ver TrailerFlotante):
+  // "querida" es el vídeo que toca ver y "cargada" el que tiene dentro
+  const querida = useRef(clave)
+  const cargada = useRef(null)
+  const reintento = useRef(null)
 
+  // red de seguridad: si al rato sigue sin moverse, que arranque en silencio
+  const vigilar = () => {
+    clearTimeout(reintento.current)
+    reintento.current = setTimeout(() => {
+      const pl = player.current
+      if (!pl || pausaMia.current || typeof pl.getPlayerState !== 'function') return
+      try {
+        if (pl.getPlayerState() !== 1) { pl.mute(); setMudo(true); pl.playVideo() }
+      } catch { /* reproductor ya destruido */ }
+    }, 1000)
+  }
+
+  // pone en el reproductor el vídeo que toque, sin recrearlo
+  const cambiar = pl => {
+    const c = querida.current
+    if (!pl || typeof pl.loadVideoById !== 'function' || c === cargada.current) return
+    if (!c) { pausaMia.current = true; clearTimeout(reintento.current); pl.pauseVideo(); return }
+    cargada.current = c
+    pausaMia.current = false
+    pl.loadVideoById(c)
+    vigilar()
+  }
+
+  const hay = !!clave
   useEffect(() => {
+    if (!hay) return
     let vivo = true
-    let reintento = null
     let sonidoProbado = false
     // YouTube sustituye el elemento que recibe, así que le damos un hijo
     // creado a mano: React no controla ese nodo y no hay conflicto
@@ -985,12 +1019,12 @@ function Trailer({ clave, titulo, cartel }) {
       .then(YT => {
         if (!vivo || !caja.current) return
         caja.current.appendChild(nido)
+        cargada.current = querida.current
         player.current = new YT.Player(nido, {
-          videoId: clave,
+          videoId: querida.current,
           playerVars: {
             autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1,
             playsinline: 1, disablekb: 1, iv_load_policy: 3,
-            loop: 1, playlist: clave,
             // sin 'origin': la API de YouTube avisa de un desajuste de
             // origen y no aporta nada aquí
             enablejsapi: 1
@@ -999,20 +1033,12 @@ function Trailer({ clave, titulo, cartel }) {
             onReady: e => {
               if (!vivo) return
               setApi(true)
+              // si mientras cargaba ya has pasado a otra tarjeta
+              if (querida.current !== cargada.current) { cambiar(e.target); return }
               // En iOS el autoplay del iframe a veces no llega a arrancar:
               // se le pide también a mano, siempre en silencio
               try { e.target.playVideo() } catch { /* sigue igual */ }
-              // El sonido recordado se intenta en onStateChange, ya en
-              // marcha: pedirlo aquí, antes de arrancar, hacía que en iOS
-              // el vídeo no empezara hasta la red de seguridad de abajo.
-              // red de seguridad: si al rato sigue sin moverse, en silencio
-              reintento = setTimeout(() => {
-                const pl = player.current
-                if (!vivo || !pl || pausaMia.current) return
-                try {
-                  if (pl.getPlayerState() !== 1) { pl.mute(); setMudo(true); pl.playVideo() }
-                } catch { /* reproductor ya destruido */ }
-              }, 1000)
+              vigilar()
             },
             onStateChange: e => {
               if (!vivo) return
@@ -1021,8 +1047,9 @@ function Trailer({ clave, titulo, cartel }) {
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
               // Ya en marcha, se quita el silencio si lo habías pedido. En
               // iOS ni se intenta: no deja sonar sin un toque y, en vez de
-              // seguir mudo, PARA el vídeo; así arranca al momento y el
-              // botón del volumen parpadea para pedir el toque.
+              // seguir mudo, PARA el vídeo. Allí el sonido se mantiene
+              // porque el reproductor es el mismo de tarjeta en tarjeta:
+              // basta con activarlo una vez con el botón.
               if (e.data === 1 && !sonidoProbado) {
                 sonidoProbado = true
                 if (leerSonido() && !esIOS) {
@@ -1038,7 +1065,7 @@ function Trailer({ clave, titulo, cartel }) {
             // 101/150: el embed está bloqueado para este vídeo. 100: lo
             // han quitado o es privado. En cualquier caso no hay nada que
             // reproducir aquí.
-            onError: () => { if (vivo) setFallo(true) }
+            onError: () => { if (vivo) setFalloDe(querida.current) }
           }
         })
       })
@@ -1046,11 +1073,20 @@ function Trailer({ clave, titulo, cartel }) {
 
     return () => {
       vivo = false
-      clearTimeout(reintento)
+      clearTimeout(reintento.current)
       if (player.current && player.current.destroy) player.current.destroy()
       player.current = null
+      cargada.current = null
       if (nido.parentNode) nido.parentNode.removeChild(nido)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hay])
+
+  // cambio de tarjeta: mismo reproductor, otro vídeo
+  useEffect(() => {
+    querida.current = clave
+    cambiar(player.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave])
 
   // el reproductor se consulta al pulsar, nunca una copia guardada
@@ -1063,27 +1099,34 @@ function Trailer({ clave, titulo, cartel }) {
     const encender = pl.isMuted()
     if (encender) { pl.unMute(); pl.setVolume(70); setMudo(false) }
     else { pl.mute(); setMudo(true) }
-    try { localStorage.setItem('sd:sonido', encender ? '1' : '0') } catch (e) { /* privada */ }
+    try { localStorage.setItem('sd:sonido', encender ? '1' : '0') } catch { /* privada */ }
   })
   const play = mando(pl => {
-    if (pl.getPlayerState() === 1) { pausaMia.current = true; pl.pauseVideo(); setParado(true) }
-    else { pausaMia.current = false; pl.playVideo(); setParado(false) }
+    if (pl.getPlayerState() === 1) { pausaMia.current = true; pl.pauseVideo(); setParadoDe(clave) }
+    else { pausaMia.current = false; pl.playVideo(); setParadoDe(null) }
   })
 
-  if (fallo) return null
+  // oculto en vez de quitarlo: el marco guarda el reproductor, y sacarlo
+  // del DOM obligaría a crearlo de nuevo en la siguiente tarjeta
+  const oculto = fallo || !clave
 
   return (
     <>
       {api === false ? (
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${clave}?autoplay=1&mute=1` +
-               `&controls=0&loop=1&playlist=${clave}&playsinline=1&rel=0&modestbranding=1`}
-          title={titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+        clave && !fallo && (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${clave}?autoplay=1&mute=1` +
+                 `&controls=0&loop=1&playlist=${clave}&playsinline=1&rel=0&modestbranding=1`}
+            title={titulo} allow="autoplay; encrypted-media" tabIndex={-1} />
+        )
       ) : (
-        <div ref={caja} className="marco" />
+        <div ref={caja} className="marco" style={oculto ? { visibility: 'hidden' } : undefined} />
       )}
-      <div className="cortina" style={{ backgroundImage: `url(${cartel})` }} />
-      {api === true && (
+      {!oculto && (
+        // con key: la animación que la retira vuelve a empezar en cada vídeo
+        <div key={clave} className="cortina" style={{ backgroundImage: `url(${cartel})` }} />
+      )}
+      {api === true && !oculto && (
         <>
           {/* en el centro, justo encima del botón de YouTube, que no
               responde porque el vídeo no recibe el toque */}
@@ -1092,10 +1135,9 @@ function Trailer({ clave, titulo, cartel }) {
             {parado ? '▶' : '❚❚'}
           </button>
           <div className="mandos-video">
-            {/* en iOS el intento automático de sonido (onReady) casi
-                siempre falla y el vídeo se queda mudo aunque ya lo
-                hubieras activado antes: el botón lo avisa pulsando,
-                para que se note que hace falta un toque más */}
+            {/* en iOS el vídeo arranca mudo aunque ya hubieras activado el
+                sonido: el botón lo avisa pulsando, para que se note que
+                hace falta un toque (solo una vez: luego se mantiene) */}
             <button className={mudo && leerSonido() ? 'pedir' : ''}
               onClick={volumen} aria-label={mudo ? 'Activar el sonido' : 'Silenciar'}>
               {mudo ? '🔇' : '🔊'}
@@ -1104,6 +1146,37 @@ function Trailer({ clave, titulo, cartel }) {
         </>
       )}
     </>
+  )
+}
+
+/* ---- un solo tráiler para todo el carrusel ----
+ * Antes cada tarjeta montaba su propio reproductor: al bajar había que
+ * cargar YouTube de cero (tardaba) y en iOS el sonido se perdía en cada
+ * tarjeta, porque solo deja sonar al reproductor que has tocado. Ahora
+ * hay uno solo, colocado encima de la tarjeta que estás viendo (dentro
+ * de la pista, así se desplaza con ella), que cambia de vídeo al pasar.
+ */
+function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel }) {
+  const [sitio, setSitio] = useState(null)
+
+  useLayoutEffect(() => {
+    const caja = pista.current
+    if (!caja) return
+    const medir = () => {
+      const d = caja.querySelector(`.diapo[data-i="${activo}"]`)
+      setSitio(d ? { top: d.offsetTop, height: d.offsetHeight } : null)
+    }
+    medir()
+    const obs = new ResizeObserver(medir)
+    obs.observe(caja)
+    return () => obs.disconnect()
+  }, [pista, activo, cuenta])
+
+  return (
+    <div className="flotante"
+      style={sitio ? { top: sitio.top, height: sitio.height } : { display: 'none' }}>
+      <Trailer clave={sitio ? clave || null : null} titulo={titulo} cartel={cartel} />
+    </div>
   )
 }
 
@@ -1434,9 +1507,6 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
               onSi={() => proponer(p)} onNo={() => onDescartar(p, 'no_interesa')}>
               <div className="lienzo">
                 {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-                {i === activo && tr && (
-                  <Trailer clave={tr} titulo={p.titulo} cartel={p.fondo || p.cartel} />
-                )}
               </div>
               <div className="velo" />
 
@@ -1472,6 +1542,12 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
             </Deslizable>
           )
         })}
+        {visibles[activo] && (
+          <TrailerFlotante pista={pista} activo={activo} cuenta={visibles.length}
+            clave={trailers[`${visibles[activo].tipo}-${visibles[activo].tmdb_id}`]}
+            titulo={visibles[activo].titulo}
+            cartel={visibles[activo].fondo || visibles[activo].cartel} />
+        )}
       </div>
       {recien && !comentando && (
         <div className="propuesta-hecha">
@@ -1671,18 +1747,25 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
 
 /* Las propuestas guardadas antes del arreglo no tienen la clave del
  * tráiler. En vez de dejarlas sin vídeo, se busca en el momento. */
-function TrailerDeTitulo({ p }) {
-  const [clave, setClave] = useState(p.trailer || null)
+function useTrailerDe(p) {
+  const guardado = p ? p.trailer : null
+  const tmdb = p ? p.tmdb_id : null
+  const tipo = p ? p.tipo : null
+  const de = `${tipo}-${tmdb}`
+  // se recuerda de qué título es lo buscado: al pasar de tarjeta no se
+  // cuela el vídeo de la anterior mientras llega el nuevo
+  const [buscado, setBuscado] = useState({ de: null, clave: null })
 
   useEffect(() => {
-    if (p.trailer) { setClave(p.trailer); return }
+    if (!tmdb || guardado) return
     let vivo = true
-    buscarTrailer(p.tmdb_id, p.tipo).then(t => vivo && setClave(t || ''))
+    buscarTrailer(tmdb, tipo).then(t => vivo && setBuscado({ de, clave: t || null }))
     return () => { vivo = false }
-  }, [p.id, p.trailer, p.tmdb_id, p.tipo])
+  }, [tmdb, tipo, guardado, de])
 
-  if (!clave) return null
-  return <Trailer clave={clave} titulo={p.titulo} cartel={p.fondo || p.cartel} />
+  if (!p) return null
+  if (guardado) return guardado
+  return buscado.de === de ? buscado.clave : null
 }
 
 /* ======================= votar ======================= */
@@ -1693,6 +1776,8 @@ function Votar({ cola, nombres, onVotar }) {
   const [activo, setActivo] = useState(0)
   const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
+  const actual = cola[activo]
+  const claveVideo = useTrailerDe(actual)
 
   useEffect(() => {
     const caja = pista.current
@@ -1726,9 +1811,6 @@ function Votar({ cola, nombres, onVotar }) {
             onSi={() => onVotar(p.id, 'si')} onNo={() => onVotar(p.id, 'no')}>
             <div className="lienzo">
               {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
-              {i === activo && (
-                <TrailerDeTitulo p={p} />
-              )}
             </div>
             <div className="velo" />
 
@@ -1763,6 +1845,11 @@ function Votar({ cola, nombres, onVotar }) {
           </Deslizable>
         )
       })}
+      {actual && (
+        <TrailerFlotante pista={pista} activo={activo} cuenta={cola.length}
+          clave={claveVideo} titulo={actual.titulo}
+          cartel={actual.fondo || actual.cartel} />
+      )}
     </div>
   )
 }

@@ -401,6 +401,9 @@ input::placeholder { color: #61539A; }
    barra inferior (unos 62px) y el aire de main. Así la tarjeta entra
    entera y no queda media cortada bajo la navegación. */
 .pista {
+  /* relative: el tráiler flotante se coloca respecto a la pista, y así
+     se desplaza con la tarjeta al hacer scroll */
+  position: relative;
   height: calc(100vh - 196px);
   height: calc(100dvh - 196px);
   min-height: 380px;
@@ -465,12 +468,24 @@ input::placeholder { color: #61539A; }
    estilo del iframe que crea, y sin esto a veces se reactivaba el toque
    ahí dentro mientras el vídeo estaba en marcha, dejando sin respuesta
    los botones de encima (Proponer, Paso, Vista...) hasta pausarlo. */
-.diapo .marco, .diapo > .lienzo > iframe {
+/* el tráiler único del carrusel (TrailerFlotante): ocupa justo la tarjeta
+   que estás viendo. Sin z-index a propósito: así el vídeo queda por
+   encima de la carátula de la tarjeta pero por debajo de su velo, texto
+   y botones, igual que cuando iba dentro de ella. */
+.flotante {
+  position: absolute; left: 0; right: 0;
+  overflow: hidden; pointer-events: none;
+}
+/* al arrastrar una tarjeta a un lado, la tarjeta se mueve pero el vídeo
+   no: mientras dura el gesto se esconde y se ve la carátula */
+.pista:has(> .diapo[style*="transform"]) .flotante { visibility: hidden; }
+.diapo .marco, .diapo > .lienzo > iframe,
+.flotante .marco, .flotante > iframe {
   position: absolute; left: 0; top: -10%;
   width: 100%; height: 100%;
   border: 0; pointer-events: none !important;
 }
-.diapo .marco iframe {
+.diapo .marco iframe, .flotante .marco iframe {
   position: absolute; inset: 0; width: 100%; height: 100%;
   border: 0; pointer-events: none !important;
 }
