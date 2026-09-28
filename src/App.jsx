@@ -885,11 +885,11 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
         const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
         return (
           <Ficha p={ficha} puesta={!!visible} conNota
-            etiquetaPuesta={visible === 'coincide' ? '¡Ya coincidís en esta!' : 'Ya la propusiste tú'}
+            etiquetaPuesta={visible === 'coincide' ? 'Coincidís' : 'Propuesta'}
             onCerrar={() => setFicha(null)}
             onProponer={async nota => { setFicha(null); await actuar(ficha, nota) }}
             acciones={
-              <div className="acciones-redondas">
+              <>
                 <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
                   onClick={() => { (guardada(ficha) ? onOlvidar : onGuardar)(ficha); setFicha(null) }}>
                   <span>🔖</span><i>{guardada(ficha) ? 'Guardada' : 'Para mí'}</i>
@@ -910,7 +910,7 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
                         <span>👁</span><i>Vista</i>
                       </button>
                     </>}
-              </div>
+              </>
             } />
         )
       })()}
@@ -1910,13 +1910,19 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
                 onChange={e => setNota(e.target.value)} maxLength={200}
                 placeholder="Comentario (opcional)" />
             )}
-            {!ocultarBoton && (
-              <button className={`btn${puesta ? ' suave' : ''}`}
-                onClick={() => onProponer(nota.trim())} disabled={puesta}>
-                {puesta ? (etiquetaPuesta || 'Ya está en tu lista') : (etiquetaBoton || 'Proponer')}
-              </button>
+            {/* Proponer va en la misma fila que el resto de botones: la
+                píldora aparte ocupaba una línea más y empujaba la sinopsis
+                hacia el tráiler */}
+            {ocultarBoton ? acciones : (
+              <div className="acciones-redondas">
+                <button className={`redondo principal${puesta ? ' hecho' : ''}`}
+                  onClick={() => onProponer(nota.trim())} disabled={puesta}>
+                  <span>{puesta ? '✓' : '+'}</span>
+                  <i>{puesta ? (etiquetaPuesta || 'En tu lista') : (etiquetaBoton || 'Proponer')}</i>
+                </button>
+                {acciones}
+              </div>
             )}
-            {acciones}
           </div>
         </div>
       </section>
