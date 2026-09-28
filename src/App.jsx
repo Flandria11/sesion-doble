@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, barajar } from './lib/tmdb'
+import { buscar, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, sinopsisDe, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -276,16 +276,17 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     // La búsqueda de TMDB no trae ni el tráiler ni los géneros: hay que
     // pedirlos aparte. Sin esto, las propuestas se guardaban sin vídeo y
     // en Votar solo se veía la carátula.
-    const [trailer, genero] = await Promise.all([
+    const [trailer, genero, sinopsis] = await Promise.all([
       p.trailer ? Promise.resolve(p.trailer) : buscarTrailer(p.tmdb_id, p.tipo),
-      p.genero ? Promise.resolve(p.genero) : generos(p.tmdb_id, p.tipo)
+      p.genero ? Promise.resolve(p.genero) : generos(p.tmdb_id, p.tipo),
+      p.sinopsis ? Promise.resolve(p.sinopsis) : sinopsisDe(p.tmdb_id, p.tipo)
     ])
 
     const { data, error } = await supabase.from('titulos').insert({
       pareja_id: pareja.id, propuesto_por: yo,
       tmdb_id: p.tmdb_id, tipo: p.tipo, titulo: p.titulo,
       anio: p.anio, cartel: p.cartel, fondo: p.fondo,
-      sinopsis: p.sinopsis, trailer: trailer || null, genero: genero || null,
+      sinopsis: sinopsis || '', trailer: trailer || null, genero: genero || null,
       nota: nota || null
     }).select().single()
     if (error) { console.error('titulos:', error); setAviso('No se ha podido proponer: ' + detalle(error)); return null }
@@ -1845,6 +1846,7 @@ function useCerrarConAtras(onCerrar) {
 function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
+  const [reserva, setReserva] = useState({ de: null, texto: '' })
   const [donde, setDonde] = useState([])
   const [abierta, setAbierta] = useState(false)
   const [nota, setNota] = useState('')
@@ -1854,8 +1856,10 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
     buscarTrailer(p.tmdb_id, p.tipo).then(t => vivo && setTrailer(t || ''))
     generos(p.tmdb_id, p.tipo).then(g => vivo && setGen(g))
     dondeVerla(p.tmdb_id, p.tipo).then(d => vivo && setDonde(d))
+    // TMDB no siempre la tiene en español: se busca en otro idioma
+    if (!p.sinopsis) sinopsisDe(p.tmdb_id, p.tipo).then(texto => vivo && setReserva({ de: `${p.tipo}-${p.tmdb_id}`, texto }))
     return () => { vivo = false }
-  }, [p.tmdb_id, p.tipo])
+  }, [p.tmdb_id, p.tipo, p.sinopsis])
 
   useEffect(() => {
     const esc = e => e.key === 'Escape' && onCerrar()
@@ -1889,7 +1893,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           </div>
           <div className="tit">{p.titulo}</div>
 
-          <Sinopsis texto={p.sinopsis || 'Sin sinopsis disponible en español.'} abierta={abierta}
+          <Sinopsis texto={p.sinopsis || (reserva.de === `${p.tipo}-${p.tmdb_id}` && reserva.texto) || 'Sin sinopsis disponible.'} abierta={abierta}
             onAlternar={() => setAbierta(a => !a)} />
 
           {/* plataforma, comentario y botones van aparte: el hueco de encima

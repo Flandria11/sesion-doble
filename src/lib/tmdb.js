@@ -561,3 +561,23 @@ export async function dondeVerla(tmdbId, tipo) {
     return []
   }
 }
+
+/**
+ * Sinopsis de reserva cuando TMDB no la tiene en español de España (pasa
+ * mucho con el cine francés o coreano recién estrenado, p. ej. "La
+ * bataille de Gaulle"). Se prueba otro español, luego el inglés y, si
+ * tampoco, el idioma original: mejor eso que dejar la ficha vacía.
+ */
+export async function sinopsisDe(tmdbId, tipo) {
+  try {
+    const d = await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
+      append_to_response: 'translations'
+    })
+    if (d.overview) return d.overview
+    const lista = (d.translations?.translations || []).filter(t => t.data?.overview)
+    const de = idioma => lista.find(t => t.iso_639_1 === idioma)?.data.overview
+    return de('es') || de('en') || de(d.original_language) || ''
+  } catch (e) {
+    return ''
+  }
+}
