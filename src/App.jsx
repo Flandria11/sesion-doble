@@ -205,17 +205,19 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   const [nombres, setNombres] = useState({})
   const [descartes, setDescartes] = useState([])
   const [guardados, setGuardados] = useState([])
+  const [puntuaciones, setPuntuaciones] = useState([])
   const [aviso, setAviso] = useState('')
   const [ajustes, setAjustes] = useState(false)
   const [cargando, setCargando] = useState(true)
 
   const recargar = useCallback(async () => {
-    const [t, v, p, d, g] = await Promise.all([
+    const [t, v, p, d, g, n] = await Promise.all([
       supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado', { ascending: false }),
       supabase.from('votos').select('*'),
       supabase.from('perfiles').select('id, nombre'),
       supabase.from('descartes').select('*'),
-      supabase.from('guardados').select('*').order('creado', { ascending: false })
+      supabase.from('guardados').select('*').order('creado', { ascending: false }),
+      supabase.from('puntuaciones').select('*').order('creado', { ascending: false })
     ])
     // si una consulta falla, se deja lo que ya había en vez de vaciarlo:
     // mejor una lista algo vieja que una lista vacía que no es verdad
@@ -224,6 +226,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     if (!p.error) setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Alguien'])))
     if (!d.error) setDescartes(d.data || [])
     if (!g.error) setGuardados(g.data || [])
+    // las notas de lo visto juntos no avisan si fallan: mientras no exista
+    // la tabla, el resto de la app sigue igual
+    if (!n.error) setPuntuaciones(n.data || [])
     setCargando(false)
     // si alguna consulta falla, se avisa en vez de dejar la pantalla a medias
     const fallo = [t, v, p, d, g].find(r => r && r.error)
@@ -238,6 +243,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       .channel('sesion-doble')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'titulos' }, recargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, recargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'puntuaciones' }, recargar)
       .subscribe()
     return () => { supabase.removeChannel(canal) }
   }, [recargar])
@@ -247,10 +253,40 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   const miVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id === yo)?.voto
   const suVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id !== yo)?.voto
   const cola = suyos.filter(t => !miVoto(t.id))
+  // Lo visto juntos sale de coincidencias en cuanto alguien le pone nota,
+  // y pasa a su propio apartado, donde cada uno pone la suya
+  const vistaJuntos = id => puntuaciones.some(x => x.titulo_id === id)
   const matches = [
     ...mios.filter(t => suVoto(t.id) === 'si'),
     ...suyos.filter(t => miVoto(t.id) === 'si')
-  ]
+  ].filter(t => !vistaJuntos(t.id))
+  const ultimaNota = id => puntuaciones.find(x => x.titulo_id === id)?.creado || ''
+  const vistas = titulos.filter(t => vistaJuntos(t.id))
+    .sort((a, b) => ultimaNota(b.id).localeCompare(ultimaNota(a.id)))
+  const sinMiNota = vistas.filter(t => !puntuaciones.some(x => x.titulo_id === t.id && x.usuario_id === yo))
+
+  async function puntuar(tituloId, nota) {
+    const anteriores = puntuaciones
+    const fila = { titulo_id: tituloId, usuario_id: yo, nota, creado: new Date().toISOString() }
+    setPuntuaciones(l => [fila, ...l.filter(x => !(x.titulo_id === tituloId && x.usuario_id === yo))])
+    const { error } = await supabase.from('puntuaciones')
+      .upsert({ titulo_id: tituloId, usuario_id: yo, nota }, { onConflict: 'titulo_id,usuario_id' })
+    if (error) {
+      setAviso('No se ha podido guardar la nota: ' + detalle(error))
+      setPuntuaciones(anteriores)
+    }
+  }
+
+  async function quitarNota(tituloId) {
+    const anteriores = puntuaciones
+    setPuntuaciones(l => l.filter(x => !(x.titulo_id === tituloId && x.usuario_id === yo)))
+    const { error } = await supabase.from('puntuaciones').delete()
+      .eq('titulo_id', tituloId).eq('usuario_id', yo)
+    if (error) {
+      setAviso('No se ha podido quitar la nota: ' + detalle(error))
+      setPuntuaciones(anteriores)
+    }
+  }
 
   async function votar(tituloId, voto) {
     const anterior = votos.find(v => v.titulo_id === tituloId && v.usuario_id === yo)
@@ -396,7 +432,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     ['buscar', 'Añadir', 0],
     ['reel', 'Ver', 0],
     ['votar', 'Votar', cola.length],
-    ['match', 'Coinciden', matches.length],
+    ['match', 'Coinciden', matches.length + sinMiNota.length],
     ['mias', 'Mis pelis', 0]
   ]
 
@@ -438,7 +474,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 todos={titulos} votos={votos} descartes={descartes} yo={yo}
                 onVotarTitulo={votar} />}
             {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
-                guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
+                guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
+                vistas={vistas} puntuaciones={puntuaciones} yo={yo} nombres={nombres}
+                onPuntuar={puntuar} onQuitarNota={quitarNota} />}
           </>
         )}
       </main>
@@ -2350,28 +2388,38 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
+function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
+  vistas, puntuaciones, yo, nombres, onPuntuar, onQuitarNota }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
+  const [apartado, setApartado] = useState('porver')
+  // título al que se le está poniendo nota (se abre encima de la ficha)
+  const [puntuando, setPuntuando] = useState(null)
 
   async function marcar(voto) {
     await onRectificar(ficha, voto)
     setFicha(null)
   }
 
-  if (!lista.length) {
-    return (
-      <div className="vacio">
-        <b>Todavía ninguna</b>
-        En cuanto dos digáis que sí a lo mismo, aparece aquí.
-      </div>
-    )
+  const notasDe = id => puntuaciones.filter(x => x.titulo_id === id)
+  const miNota = id => notasDe(id).find(x => x.usuario_id === yo)?.nota
+  const quien = u => (u === yo ? 'Tú' : nombres[u] || 'Alguien')
+  const resumen = id => (miNota(id) === undefined
+    ? 'Falta tu nota'
+    : notasDe(id).map(x => `${quien(x.usuario_id)} ${x.nota}`).join(' · '))
+  const media = id => {
+    const n = notasDe(id)
+    return n.length ? String(Math.round(n.reduce((a, x) => a + x.nota, 0) / n.length * 10) / 10) : ''
   }
 
-  const pelis = lista.filter(p => p.tipo !== 'tv')
-  const series = lista.filter(p => p.tipo === 'tv')
+  async function guardarNota(nota) {
+    const p = puntuando
+    setPuntuando(null)
+    setFicha(null)
+    await onPuntuar(p.id, nota)
+  }
 
-  const bloque = (titulo, grupo) => grupo.length > 0 && (
+  const bloque = (titulo, grupo, conNotas) => grupo.length > 0 && (
     <section className="grupo">
       <h3>{titulo} <span>{grupo.length}</span></h3>
       <div className="catalogo">
@@ -2380,47 +2428,104 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
             <button className="lamina" onClick={() => setFicha(p)}
               aria-label={`Ver información de ${p.titulo}`}>
               <img src={p.cartel} alt="" loading="lazy" />
+              {conNotas && media(p.id) && <span className="nota">★ {media(p.id)}</span>}
             </button>
-            <div className="rotulo">{p.titulo}</div>
+            <div className={`rotulo${conNotas && miNota(p.id) === undefined ? ' marcado' : ''}`}>
+              {p.titulo}
+              {conNotas && <i>{resumen(p.id)}</i>}
+            </div>
           </div>
         ))}
       </div>
     </section>
   )
 
+  const hayVistas = vistas.length > 0
+  const enVistas = hayVistas && apartado === 'vistas'
+  const esVista = ficha && vistas.some(v => v.id === ficha.id)
+
   return (
     <>
       <h2>Coincidencias</h2>
-      <div className="ayuda">Os apetecen a los dos. De aquí sale el plan.</div>
+      <div className="ayuda">
+        {enVistas
+          ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
+          : 'Os apetecen a los dos. De aquí sale el plan.'}
+      </div>
 
-      {juego === 'lista'
-        ? <button className="chip-juego" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
-        : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
-
-      {juego !== 'lista' && (
+      {hayVistas && (
         <div className="pestanas">
-          <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
-          <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
+          <button className={!enVistas ? 'activo' : ''} onClick={() => setApartado('porver')}>
+            Por ver ({lista.length})
+          </button>
+          <button className={enVistas ? 'activo' : ''} onClick={() => setApartado('vistas')}>
+            Vistas juntos ({vistas.length})
+          </button>
         </div>
       )}
 
-      {juego === 'lista' && (
+      {enVistas ? (
         <>
-          {bloque('Películas', pelis)}
-          {bloque('Series', series)}
+          {bloque('Películas', vistas.filter(p => p.tipo !== 'tv'), true)}
+          {bloque('Series', vistas.filter(p => p.tipo === 'tv'), true)}
+        </>
+      ) : !lista.length ? (
+        <div className="vacio">
+          <b>Todavía ninguna</b>
+          En cuanto dos digáis que sí a lo mismo, aparece aquí.
+        </div>
+      ) : (
+        <>
+          {juego === 'lista'
+            ? <button className="chip-juego" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
+            : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
+
+          {juego !== 'lista' && (
+            <div className="pestanas">
+              <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
+              <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
+            </div>
+          )}
+
+          {juego === 'lista' && (
+            <>
+              {bloque('Películas', lista.filter(p => p.tipo !== 'tv'))}
+              {bloque('Series', lista.filter(p => p.tipo === 'tv'))}
+            </>
+          )}
+          {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
+          {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
         </>
       )}
-      {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
-      {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
 
       {ficha && (
         <Ficha p={ficha} puesta ocultarBoton
           onCerrar={() => setFicha(null)}
           onProponer={() => setFicha(null)}
-          acciones={
+          acciones={esVista ? (
+            <>
+              <div className="notas-juntos">
+                {notasDe(ficha.id).map(x => (
+                  <span key={x.usuario_id}>{quien(x.usuario_id)} <b>{x.nota}</b></span>
+                ))}
+                {miNota(ficha.id) === undefined && <span className="falta">Falta tu nota</span>}
+              </div>
+              <div className="acciones-redondas">
+                <button className="redondo principal" onClick={() => setPuntuando(ficha)}>
+                  <span>★</span><i>{miNota(ficha.id) === undefined ? 'Puntuar' : 'Cambiar'}</i>
+                </button>
+                {miNota(ficha.id) !== undefined && (
+                  <button className="redondo"
+                    onClick={async () => { const id = ficha.id; setFicha(null); await onQuitarNota(id) }}>
+                    <span>↺</span><i>Quitar nota</i>
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
             <div className="acciones-redondas">
-              <button className="redondo" onClick={() => marcar('vista')}>
-                <span>👁</span><i>Vista</i>
+              <button className="redondo principal" onClick={() => setPuntuando(ficha)}>
+                <span>🍿</span><i>Vista juntos</i>
               </button>
               <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
                 onClick={() => (guardada(ficha) ? onOlvidar : onGuardar)(ficha)}>
@@ -2430,9 +2535,44 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar }) {
                 <span>✕</span><i>Paso</i>
               </button>
             </div>
-          } />
+          )} />
+      )}
+
+      {puntuando && (
+        <Puntuar titulo={puntuando.titulo} inicial={miNota(puntuando.id)}
+          primera={notasDe(puntuando.id).length === 0}
+          onGuardar={guardarNota} onCerrar={() => setPuntuando(null)} />
       )}
     </>
+  )
+}
+
+/* Nota del 0 al 10 al marcar algo como visto juntos. Cada uno pone la
+ * suya y todos ven las de todos. */
+function Puntuar({ titulo, inicial, primera, onGuardar, onCerrar }) {
+  const [nota, setNota] = useState(inicial ?? null)
+  return createPortal(
+    <div className="telon encima" onClick={onCerrar}>
+      <div className="panel chico" onClick={e => e.stopPropagation()}>
+        <div className="detalle">
+          <h3>¿Qué nota le pones?</h3>
+          <div className="ayuda" style={{ marginBottom: 12 }}>
+            {titulo}. {primera
+              ? 'Pasará a Vistas juntos y la otra persona podrá poner la suya.'
+              : 'Los dos veréis la nota de cada uno.'}
+          </div>
+          <div className="notas-0-10">
+            {Array.from({ length: 11 }, (_, i) => (
+              <button key={i} className={nota === i ? 'activo' : ''} onClick={() => setNota(i)}>{i}</button>
+            ))}
+          </div>
+          <button className="btn" disabled={nota === null} onClick={() => onGuardar(nota)}>Guardar</button>
+          <button className="btn suave" onClick={onCerrar}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+    ,
+    document.body
   )
 }
 

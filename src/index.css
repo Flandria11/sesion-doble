@@ -679,6 +679,28 @@ input::placeholder { color: #61539A; }
 
 /* ---------- celebración de coincidencia ---------- */
 .telon.fiesta { align-items: center; }
+/* la nota se pone con la ficha abierta detrás */
+.telon.encima { z-index: 60; }
+
+/* ---------- vistas juntos: nota del 0 al 10 ---------- */
+.notas-0-10 {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-bottom: 14px;
+}
+.notas-0-10 button {
+  aspect-ratio: 1; border-radius: 50%;
+  border: 1px solid var(--borde); background: var(--terciopelo);
+  font-size: 15px; font-weight: 800; color: var(--papel);
+}
+.notas-0-10 button.activo { background: var(--ambar); color: var(--noche); border-color: transparent; }
+.notas-juntos {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px;
+}
+.notas-juntos span {
+  background: rgba(8, 4, 16, .55); border: 1px solid rgba(247, 242, 233, .18);
+  border-radius: 999px; padding: 4px 11px; font-size: 12px; color: var(--papel);
+}
+.notas-juntos b { color: var(--ambar); font-weight: 800; margin-left: 2px; }
+.notas-juntos .falta { color: var(--ambar); border-color: var(--ambar); font-weight: 700; }
 
 .confeti {
   position: relative; text-align: center; width: 100%; max-width: 330px;
