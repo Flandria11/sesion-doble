@@ -700,7 +700,26 @@ input::placeholder { color: #61539A; }
   border-radius: 999px; padding: 4px 11px; font-size: 12px; color: var(--papel);
 }
 .notas-juntos b { color: var(--ambar); font-weight: 800; margin-left: 2px; }
-.notas-juntos .falta { color: var(--ambar); border-color: var(--ambar); font-weight: 700; }
+.notas-juntos .falta { color: var(--no); border-color: var(--no); font-weight: 700; }
+
+/* ya la habéis visto pero te falta poner tu nota: borde y aviso en rojo */
+.lamina.falta { box-shadow: 0 0 0 2px var(--no), 0 0 14px rgba(240, 96, 126, .45); }
+.lamina .aviso-falta {
+  position: absolute; top: 6px; left: 6px; right: 6px; text-align: center;
+  background: var(--no); color: var(--noche);
+  font-size: 9px; font-weight: 800; letter-spacing: .02em;
+  padding: 3px 4px; border-radius: 5px;
+}
+.rotulo.falta i { color: var(--no); font-weight: 700; }
+.num-falta {
+  display: inline-block; background: var(--no); color: var(--noche);
+  border-radius: 9px; padding: 0 5px; font-size: 10px; font-weight: 800; margin-left: 5px;
+}
+.falta-votar {
+  margin-top: 12px; padding: 8px 12px; border-radius: 9px;
+  border: 1px solid var(--no); background: rgba(240, 96, 126, .12);
+  color: var(--no); font-size: 12.5px; font-weight: 700; text-align: center;
+}
 
 .confeti {
   position: relative; text-align: center; width: 100%; max-width: 330px;

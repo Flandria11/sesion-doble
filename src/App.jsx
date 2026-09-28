@@ -2392,7 +2392,9 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   vistas, puntuaciones, yo, nombres, onPuntuar, onQuitarNota }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
-  const [apartado, setApartado] = useState('porver')
+  // si a alguien le falta poner su nota, se abre directamente en Vistas juntos
+  const [apartado, setApartado] = useState(() =>
+    vistas.some(v => !puntuaciones.some(x => x.titulo_id === v.id && x.usuario_id === yo)) ? 'vistas' : 'porver')
   // título al que se le está poniendo nota (se abre encima de la ficha)
   const [puntuando, setPuntuando] = useState(null)
 
@@ -2405,7 +2407,7 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   const miNota = id => notasDe(id).find(x => x.usuario_id === yo)?.nota
   const quien = u => (u === yo ? 'Tú' : nombres[u] || 'Alguien')
   const resumen = id => (miNota(id) === undefined
-    ? 'Falta tu nota'
+    ? 'Te falta votar'
     : notasDe(id).map(x => `${quien(x.usuario_id)} ${x.nota}`).join(' · '))
   const media = id => {
     const n = notasDe(id)
@@ -2425,12 +2427,14 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
       <div className="catalogo">
         {grupo.map(p => (
           <div className="tarjeta" key={p.id}>
-            <button className="lamina" onClick={() => setFicha(p)}
+            <button className={`lamina${conNotas && miNota(p.id) === undefined ? ' falta' : ''}`}
+              onClick={() => setFicha(p)}
               aria-label={`Ver información de ${p.titulo}`}>
               <img src={p.cartel} alt="" loading="lazy" />
               {conNotas && media(p.id) && <span className="nota">★ {media(p.id)}</span>}
+              {conNotas && miNota(p.id) === undefined && <span className="aviso-falta">Te falta votar</span>}
             </button>
-            <div className={`rotulo${conNotas && miNota(p.id) === undefined ? ' marcado' : ''}`}>
+            <div className={`rotulo${conNotas && miNota(p.id) === undefined ? ' falta' : ''}`}>
               {p.titulo}
               {conNotas && <i>{resumen(p.id)}</i>}
             </div>
@@ -2441,6 +2445,9 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   )
 
   const hayVistas = vistas.length > 0
+  const pendientes = vistas.filter(v => miNota(v.id) === undefined)
+  // lo que te falta por votar, primero
+  const ordenadas = [...pendientes, ...vistas.filter(v => miNota(v.id) !== undefined)]
   const enVistas = hayVistas && apartado === 'vistas'
   const esVista = ficha && vistas.some(v => v.id === ficha.id)
 
@@ -2460,14 +2467,20 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
           </button>
           <button className={enVistas ? 'activo' : ''} onClick={() => setApartado('vistas')}>
             Vistas juntos ({vistas.length})
+            {pendientes.length > 0 && <span className="num-falta">{pendientes.length}</span>}
           </button>
         </div>
       )}
 
       {enVistas ? (
         <>
-          {bloque('Películas', vistas.filter(p => p.tipo !== 'tv'), true)}
-          {bloque('Series', vistas.filter(p => p.tipo === 'tv'), true)}
+          {pendientes.length > 0 && (
+            <div className="falta-votar">
+              Te falta votar {pendientes.length === 1 ? '1 que ya habéis visto' : `${pendientes.length} que ya habéis visto`}
+            </div>
+          )}
+          {bloque('Películas', ordenadas.filter(p => p.tipo !== 'tv'), true)}
+          {bloque('Series', ordenadas.filter(p => p.tipo === 'tv'), true)}
         </>
       ) : !lista.length ? (
         <div className="vacio">
@@ -2508,7 +2521,7 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
                 {notasDe(ficha.id).map(x => (
                   <span key={x.usuario_id}>{quien(x.usuario_id)} <b>{x.nota}</b></span>
                 ))}
-                {miNota(ficha.id) === undefined && <span className="falta">Falta tu nota</span>}
+                {miNota(ficha.id) === undefined && <span className="falta">Te falta votar</span>}
               </div>
               <div className="acciones-redondas">
                 <button className="redondo principal" onClick={() => setPuntuando(ficha)}>
