@@ -1097,7 +1097,14 @@ textarea::placeholder { color: #61539A; }
   border-radius: 999px; box-shadow: 0 8px 18px rgba(245, 196, 81, .3);
 }
 .diapo.suelta .btn.suave { box-shadow: none; }
-.diapo.suelta .acciones-redondas { margin-top: 8px; }
+.diapo.suelta .acciones-redondas { margin-top: 8px; gap: 22px; }
+/* En la ficha los redondos (Proponer, Para mí, Paso, Vista...) van algo
+   más grandes que en la torre de las tarjetas: aquí hay sitio y son lo
+   único que se toca */
+.diapo.suelta .acciones-redondas .redondo { width: 50px; gap: 4px; }
+.diapo.suelta .acciones-redondas .redondo span { width: 42px; height: 42px; font-size: 17px; }
+.diapo.suelta .acciones-redondas .redondo.principal span { font-size: 19px; }
+.diapo.suelta .acciones-redondas .redondo i { font-size: 10px; }
 
 /* Solo iPhone/iPad (Safari de iOS): los botones redondos (Proponer, Paso,
    Vista, Para mí) y la píldora de la ficha, un poco más grandes. Allí se
@@ -1110,6 +1117,11 @@ textarea::placeholder { color: #61539A; }
   .redondo i { font-size: 9.5px; }
   .acciones-redondas { gap: 22px; }
   .diapo.suelta .btn { padding: 12px 32px; font-size: 13px; }
+  .diapo.suelta .acciones-redondas { gap: 24px; }
+  .diapo.suelta .acciones-redondas .redondo { width: 56px; }
+  .diapo.suelta .acciones-redondas .redondo span { width: 47px; height: 47px; font-size: 19px; }
+  .diapo.suelta .acciones-redondas .redondo.principal span { font-size: 21px; }
+  .diapo.suelta .acciones-redondas .redondo i { font-size: 11px; }
 }
 
 @media (min-width: 620px) {
