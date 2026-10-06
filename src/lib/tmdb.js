@@ -394,22 +394,33 @@ export async function estrenos(pagina = 1) {
     ])
   )
 
-  // Cada ventana se baraja por dentro, pero las más recientes siguen
-  // saliendo antes: así hay variedad sin perder el sentido de "estrenos".
-  // Pelis y series se barajan por separado y luego se reparten a lo largo
-  // de la ventana: barajadas juntas, a veces salían cinco series seguidas.
-  const salida = []
+  // Antes cada ventana se barajaba por dentro y salían en orden: primero
+  // toda la de los últimos tres meses. Como de esa quedan pocas sin
+  // decidir, siempre arrancaba con las mismas cinco o seis. Ahora todas
+  // las ventanas entran en el mismo sorteo, con más papeletas cuanto más
+  // reciente: lo nuevo sigue saliendo antes en general, pero no siempre.
+  // Pelis y series se sortean por separado y luego se reparten, para que
+  // no salgan cinco series seguidas.
+  const PESOS = [4, 2.5, 1.6, 1]
+  const peso = new Map()
+  const sortear = lista => lista
+    .map(x => ({ x, k: Math.random() ** (1 / peso.get(x)) }))
+    .sort((a, b) => b.k - a.k)
+    .map(o => o.x)
+  const bomboPelis = [], bomboSeries = []
   const vistos = new Set()
   for (let v = 0; v < ventanas.length; v++) {
-    const mezcla = repartir(barajar(tandas[v * 2]), barajar(tandas[v * 2 + 1]))
-    for (const x of mezcla) {
-      const clave = `${x.tipo}-${x.tmdb_id}`
-      if (vistos.has(clave)) continue
-      vistos.add(clave)
-      salida.push(x)
+    for (const [lista, destino] of [[tandas[v * 2], bomboPelis], [tandas[v * 2 + 1], bomboSeries]]) {
+      for (const x of lista) {
+        const clave = `${x.tipo}-${x.tmdb_id}`
+        if (vistos.has(clave)) continue
+        vistos.add(clave)
+        peso.set(x, PESOS[v])
+        destino.push(x)
+      }
     }
   }
-  return salida
+  return repartir(sortear(bomboPelis), sortear(bomboSeries))
 }
 
 /** Junta dos listas espaciando la más corta a lo largo de la más larga. */
