@@ -846,7 +846,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // hay en los cines, y lo ya decidido lleva su marca en la carátula
   const todoALaVista = !explorando || modo === 'cines'
   const visibles = todoALaVista ? res : res.filter(p => !decidido(p))
-  const escondidas = res.length - visibles.length
   const modosVisibles = MODOS.filter(m =>
     (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
   )
@@ -962,22 +961,31 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                   Solo lo incluido en la suscripción de {provs.length === 1 ? 'esa plataforma' : 'esas plataformas'} en España.
                 </div>
               )}
-              <div className="barra-filtros">
-                <select value={genero} onChange={e => cambiarGenero(e.target.value)}
-                  aria-label="Filtrar por género">
-                  <option value="">Todos los géneros</option>
-                  {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-                </select>
-                <select value={anio} onChange={e => cambiarAnio(e.target.value)}
-                  aria-label="Filtrar por año">
-                  {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
-                </select>
-              </div>
-              {escondidas > 0 && (
-                <div className="ayuda" style={{ margin: 0 }}>
-                  {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya decidida{escondidas === 1 ? '' : 's'}. Búscala por nombre para verla.
+              {/* chips en vez de <select>: el desplegable nativo abría una
+                  lista blanca que no pegaba nada con la app */}
+              <div className="grupo-filtro">
+                <b>Género</b>
+                <div className="filtros">
+                  <button className={!genero ? 'activo' : ''} onClick={() => cambiarGenero('')}>Todos</button>
+                  {gens.map(g => (
+                    <button key={g.id} className={genero === String(g.id) ? 'activo' : ''}
+                      onClick={() => cambiarGenero(genero === String(g.id) ? '' : String(g.id))}>
+                      {g.nombre}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
+              <div className="grupo-filtro">
+                <b>Año</b>
+                <div className="filtros">
+                  {ANOS.map(a => (
+                    <button key={a.id || 'todos'} className={anio === a.id ? 'activo' : ''}
+                      onClick={() => cambiarAnio(anio === a.id ? '' : a.id)}>
+                      {a.nombre}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {hayFiltros && (
                 <button className="limpiar" onClick={() => {
                   setProvs([]); setGenero(''); setAnio('')

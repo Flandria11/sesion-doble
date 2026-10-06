@@ -165,22 +165,21 @@ export async function generosLista(tipo = 'movie') {
  * las listas rápidas de TMDB, que traen mejores resultados.
  */
 /**
- * Opciones del filtro de año. Los últimos sueltos, y hacia atrás por
- * décadas: nadie quiere buscar "1997" exacto.
+ * Opciones del filtro de año: siempre "de tal año hasta hoy". Nadie busca
+ * "1997" exacto; se busca "algo de los 90 para acá" o "lo de estos años".
  */
+const ESTE_ANO = new Date().getFullYear()
+const desde = (anio, nombre) => ({ id: String(anio), nombre, desde: `${anio}-01-01` })
 export const ANOS = [
-  { id: '', nombre: 'Cualquier año' },
-  { id: '2026', nombre: '2026' },
-  { id: '2025', nombre: '2025' },
-  { id: '2024', nombre: '2024' },
-  { id: '2023', nombre: '2023' },
-  { id: '2022', nombre: '2022' },
-  { id: 'd2020', nombre: 'Años 2020', desde: '2020-01-01', hasta: '2029-12-31' },
-  { id: 'd2010', nombre: 'Años 2010', desde: '2010-01-01', hasta: '2019-12-31' },
-  { id: 'd2000', nombre: 'Años 2000', desde: '2000-01-01', hasta: '2009-12-31' },
-  { id: 'd1990', nombre: 'Años 90', desde: '1990-01-01', hasta: '1999-12-31' },
-  { id: 'd1980', nombre: 'Años 80', desde: '1980-01-01', hasta: '1989-12-31' },
-  { id: 'ant', nombre: 'Antes de 1980', hasta: '1979-12-31' }
+  { id: '', nombre: 'Todos' },
+  desde(ESTE_ANO, 'Este año'),
+  desde(ESTE_ANO - 1, `Desde ${ESTE_ANO - 1}`),
+  desde(2020, 'Desde 2020'),
+  desde(2015, 'Desde 2015'),
+  desde(2010, 'Desde 2010'),
+  desde(2000, 'Desde 2000'),
+  desde(1990, 'Desde los 90'),
+  desde(1980, 'Desde los 80')
 ]
 
 /**

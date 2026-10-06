@@ -200,6 +200,12 @@ input::placeholder { color: #61539A; }
 .fila-tipo .plegable { flex: none; }
 .panel-filtros .fila-plataformas { margin: 0; }
 .panel-filtros .limpiar { align-self: flex-start; }
+.grupo-filtro b {
+  display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--apagado);
+}
+/* dentro del panel las filas de chips no salen hasta el borde de la pantalla */
+.grupo-filtro .filtros { margin: 6px -12px 0; padding: 0 12px 3px; }
 
 .mis-pelis .pestanas.fina button { padding: 5px; font-size: 11px; }
 .mis-pelis .pestanas.fina em { font-size: 9.5px; }
