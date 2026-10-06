@@ -1182,6 +1182,13 @@ textarea::placeholder { color: #61539A; }
 /* ---------- añadir: buscar por título o por actor ---------- */
 .busca-fila { display: flex; gap: 6px; align-items: center; }
 .busca-fila .busca { flex: 1; min-width: 0; }
+/* la ✕ va dentro de la caja, al final, y la caja deja sitio para ella */
+.busca-caja { position: relative; flex: 1; min-width: 0; display: flex; }
+.busca-caja .busca { padding-right: 30px; }
+.borrar-busca {
+  position: absolute; right: 0; top: 0; height: 30px; width: 30px; padding: 0;
+  background: none; border: 0; color: var(--papel); opacity: .7; font-size: 14px;
+}
 .pestanas.busca-modo { margin-top: 0; flex-shrink: 0; padding: 2px; }
 .pestanas.busca-modo button { padding: 4px 8px; flex: none; }
 

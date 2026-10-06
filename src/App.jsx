@@ -526,8 +526,9 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // el buscador busca títulos o, con el otro botón, actores: de estos se
   // enseña su filmografía
   const [porActor, setPorActor] = useState(false)
-  // lo que se busca de verdad: se fija al dar a Enter, no a cada tecla, y
-  // cambiar entre Título y Actor no toca lo que ya hay en pantalla
+  // lo que se busca de verdad: sigue a la caja con un respiro (o al
+  // momento con Enter), y cambiar entre Título y Actor sin nada escrito no
+  // toca lo que ya hay en pantalla
   const [buscado, setBuscado] = useState({ texto: '', actor: false })
   const [personas, setPersonas] = useState([])
   const [persona, setPersona] = useState(null)
@@ -565,6 +566,15 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     generosLista(tipo).then(g => vivo && setGens(g)).catch(() => {})
     return () => { vivo = false }
   }, [tipo])
+
+  // se va filtrando mientras escribes, o al cambiar Título/Actor
+  useEffect(() => {
+    const texto = q.trim()
+    if (texto.length < 2) return
+    if (texto === buscado.texto && porActor === buscado.actor) return
+    const t = setTimeout(() => setBuscado({ texto, actor: porActor }), 450)
+    return () => clearTimeout(t)
+  }, [q, porActor, buscado])
 
   // búsqueda por texto
   useEffect(() => {
@@ -799,10 +809,10 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     if (q.trim().length < 2) return
     setBuscado({ texto: q.trim(), actor: porActor })
   }
-  // al vaciar la caja se vuelve a explorar
+  // al vaciar la caja (a mano o con la ✕) se vuelve a explorar
   function escribir(v) {
     setQ(v)
-    if (!v.trim() && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
+    if (v.trim().length < 2 && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
   }
   const hayFiltros = provs.length > 0 || genero || anio || calidad
 
@@ -833,9 +843,15 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
       <form className="busca-fila" onSubmit={lanzarBusqueda}>
-        <input className="busca" type="text" enterKeyHint="search"
-          placeholder={porActor ? 'Actor o actriz y Enter…' : 'Peli o serie y Enter…'}
-          value={q} onChange={e => escribir(e.target.value)} autoComplete="off" />
+        <span className="busca-caja">
+          <input className="busca" type="text" enterKeyHint="search"
+            placeholder={porActor ? 'Buscar un actor o actriz…' : 'Buscar una peli o serie…'}
+            value={q} onChange={e => escribir(e.target.value)} autoComplete="off" />
+          {q && (
+            <button type="button" className="borrar-busca" aria-label="Borrar la búsqueda"
+              onClick={() => escribir('')}>✕</button>
+          )}
+        </span>
         <div className="pestanas chica busca-modo">
           <button type="button" className={!porActor ? 'activo' : ''}
             onClick={() => setPorActor(false)}>Título</button>
