@@ -1169,3 +1169,32 @@ textarea::placeholder { color: #61539A; }
   .telon.grande { padding: 16px; align-items: center; }
   .diapo.suelta { height: calc(100dvh - 32px); border-radius: 18px; }
 }
+
+/* ---------- añadir: buscar por título o por actor ---------- */
+.busca-fila { display: flex; gap: 6px; align-items: center; }
+.busca-fila .busca { flex: 1; min-width: 0; }
+.pestanas.busca-modo { margin-top: 0; flex-shrink: 0; padding: 2px; }
+.pestanas.busca-modo button { padding: 4px 8px; flex: none; }
+
+.filtros.personas button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px 3px 3px;
+}
+.filtros.personas img, .filtros.personas .sin-foto {
+  width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--sala); font-size: 12px;
+}
+
+/* la otra persona la propuso y aún no has dicho nada */
+.lamina.suya { box-shadow: 0 0 0 2px var(--si), 0 6px 18px rgba(0, 0, 0, .45); }
+
+/* estado del título en la ficha de Añadir (propuesta por, vista juntos...) */
+.aviso-ficha {
+  display: table; margin: 0 auto 8px;
+  background: rgba(8, 4, 16, .55); border: 1px solid rgba(245, 196, 81, .5);
+  border-radius: 999px; padding: 4px 12px;
+  font-size: 12px; font-weight: 700; color: var(--ambar); text-align: center;
+}
+
+/* con cinco botones en la ficha no caben con el hueco de siempre */
+.diapo.suelta .acciones-redondas:has(> :nth-child(5)) { gap: 10px; }

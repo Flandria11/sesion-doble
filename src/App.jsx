@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, sinopsisDe, barajar } from './lib/tmdb'
+import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, sinopsisDe, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -252,10 +252,11 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   const suyos = titulos.filter(t => t.propuesto_por !== yo)
   const miVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id === yo)?.voto
   const suVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id !== yo)?.voto
-  const cola = suyos.filter(t => !miVoto(t.id))
   // Lo visto juntos sale de coincidencias en cuanto alguien le pone nota,
-  // y pasa a su propio apartado, donde cada uno pone la suya
+  // y pasa a su propio apartado, donde cada uno pone la suya. Tampoco se
+  // pide votar: si ya la habéis visto, no hay nada que decidir
   const vistaJuntos = id => puntuaciones.some(x => x.titulo_id === id)
+  const cola = suyos.filter(t => !miVoto(t.id) && !vistaJuntos(t.id))
   const matches = [
     ...mios.filter(t => suVoto(t.id) === 'si'),
     ...suyos.filter(t => miVoto(t.id) === 'si')
@@ -275,6 +276,17 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       setAviso('No se ha podido guardar la nota: ' + detalle(error))
       setPuntuaciones(anteriores)
     }
+  }
+
+  /**
+   * Vista juntos desde Añadir, sin pasar antes por proponer y coincidir.
+   * La nota va colgada del título del grupo: si nadie lo había propuesto
+   * todavía, se crea (no llega a Votar, porque ya tiene nota).
+   */
+  async function vistaJuntosDesde(p, nota) {
+    let t = titulos.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+    if (!t) t = await anadir(p)
+    if (t) await puntuar(t.id, nota)
   }
 
   async function quitarNota(tituloId) {
@@ -457,7 +469,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
-                miVoto={miVoto} onAdd={anadir} onVotar={votar}
+                miVoto={miVoto} suVoto={suVoto} onAdd={anadir} onVotar={votar}
+                puntuaciones={puntuaciones} onVistaJuntos={vistaJuntosDesde}
                 descartada={descartada} motivoDescarte={motivoDescarte}
                 onDescartar={descartar} onRecuperar={recuperar}
                 guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
@@ -466,7 +479,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 descartada={descartada} onDescartar={descartar}
                 guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
-            {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} onQuitar={quitar}
+            {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} vistaJuntos={vistaJuntos} onQuitar={quitar}
                 guardados={guardados} guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
                 descartada={descartada} motivoDescarte={motivoDescarte}
                 onDescartar={descartar} onRecuperar={recuperar}
@@ -507,8 +520,14 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 const OBJETIVO_NOVEDADES = 12
 const PAGINAS_MAX_POR_CARGA = 6
 
-function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
+function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaciones, onVistaJuntos, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
   const [q, setQ] = useState('')
+  // el buscador busca títulos o, con el otro botón, actores: de estos se
+  // enseña su filmografía
+  const [porActor, setPorActor] = useState(false)
+  const [personas, setPersonas] = useState([])
+  const [persona, setPersona] = useState(null)
+  const [puntuando, setPuntuando] = useState(null)
   const [tipo, setTipo] = useState('movie')
   const [modo, setModo] = useState('tendencias')
   const [provs, setProvs] = useState([])
@@ -550,8 +569,18 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     setCargando(true)
     const t = setTimeout(async () => {
       try {
-        const r = await buscar(q.trim())
-        if (vivo) { setRes(r); setError('') }
+        if (porActor) {
+          // se elige al más conocido; los demás quedan para tocarlos
+          const gente = await buscarPersonas(q.trim())
+          if (!vivo) return
+          setPersonas(gente)
+          setPersona(gente[0] || null)
+          if (!gente.length) setRes([])
+        } else {
+          const r = await buscar(q.trim())
+          if (vivo) setRes(r)
+        }
+        if (vivo) setError('')
       } catch (e) {
         if (vivo) setError('No se ha podido consultar TMDB.')
       } finally {
@@ -559,7 +588,19 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
       }
     }, 400)
     return () => { vivo = false; clearTimeout(t) }
-  }, [q])
+  }, [q, porActor])
+
+  // filmografía del actor elegido
+  useEffect(() => {
+    if (!porActor || !persona) return
+    let vivo = true
+    setCargando(true)
+    filmografia(persona.id)
+      .then(r => { if (vivo) { setRes(r); setError('') } })
+      .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
+      .finally(() => vivo && setCargando(false))
+    return () => { vivo = false }
+  }, [porActor, persona])
 
   // exploración con filtros
   useEffect(() => {
@@ -639,15 +680,46 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
     if (!x) return null
-    if (x.propuesto_por === yo) return { tipo: 'mio', t: x }
+    if (puntuaciones.some(n => n.titulo_id === x.id)) return { tipo: 'juntos', t: x }
+    if (x.propuesto_por === yo) return { tipo: suVoto(x.id) === 'si' ? 'coincide' : 'mio', t: x }
     const v = miVoto(x.id)
     if (v === 'si') return { tipo: 'coincide', t: x }
     return { tipo: 'suyo', t: x }
   }
+  const miNotaDe = e => puntuaciones.find(n => n.titulo_id === e.t.id && n.usuario_id === yo)?.nota
+
+  /**
+   * Qué hay ya decidido de un título, para ponerlo bajo la carátula: sobre
+   * todo al buscarlo, que es cuando más se quiere saber si ya estaba.
+   */
+  const marcaDe = p => {
+    const e = estado(p)
+    if (e && e.tipo === 'juntos') {
+      const n = miNotaDe(e)
+      return n === undefined ? 'En Vistas juntos · te falta tu nota' : `En Vistas juntos · tu nota ${n}`
+    }
+    if (e && e.tipo === 'coincide') return 'En Coinciden · os apetece a los dos'
+    if (e && e.tipo === 'mio') {
+      const v = suVoto(e.t.id)
+      return v === 'no' ? 'En Mis pelis · no le apetece'
+        : v === 'vista' ? 'En Mis pelis · ya la vio'
+        : 'En Mis pelis · esperando su voto'
+    }
+    if (e && e.tipo === 'suyo') {
+      const de = `La propuso ${nombres[e.t.propuesto_por] || 'alguien'}`
+      const v = miVoto(e.t.id)
+      return v === 'no' ? `${de} · dijiste que no`
+        : v === 'vista' ? `${de} · la marcaste vista`
+        : `${de} · en Votar`
+    }
+    if (descartada(p)) return motivoDescarte(p) === 'vista' ? 'La marcaste vista' : 'No te interesa'
+    if (guardada(p)) return 'Guardada para ti'
+    return null
+  }
 
   async function actuar(p, nota = '') {
     const e = estado(p)
-    if (anadiendo || (e && (e.tipo === 'mio' || e.tipo === 'coincide'))) return
+    if (anadiendo || (e && ['mio', 'coincide', 'juntos'].includes(e.tipo))) return
     setAnadiendo(p.tmdb_id)
     // el finally es el que importa: si onVotar/onAdd fallara sin avisar,
     // anadiendo se quedaba puesto para siempre y ya no dejaba tocar nada
@@ -724,11 +796,14 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
    */
   const decidido = p => {
     const e = estado(p)
-    if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return true
+    if (e && ['mio', 'coincide', 'juntos'].includes(e.tipo)) return true
     if (e && ['no', 'vista'].includes(miVoto(e.t.id))) return true
     return descartada(p) || guardada(p)
   }
-  const visibles = verTodo ? res : res.filter(p => !decidido(p))
+  // Al buscar algo concreto sale siempre, aunque ya esté decidido: se busca
+  // justo para saber qué pasó con él. Esconderlo solo tiene sentido al
+  // explorar, para no repasar lo mismo.
+  const visibles = verTodo || !explorando ? res : res.filter(p => !decidido(p))
   const escondidas = res.length - visibles.length
   const modosVisibles = MODOS.filter(m =>
     (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
@@ -740,8 +815,29 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
     <>
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
-      <input className="busca" type="text" placeholder="Buscar una peli o serie…"
-        value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
+      <div className="busca-fila">
+        <input className="busca" type="text"
+          placeholder={porActor ? 'Buscar un actor o actriz…' : 'Buscar una peli o serie…'}
+          value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
+        <div className="pestanas chica busca-modo">
+          <button className={!porActor ? 'activo' : ''}
+            onClick={() => { setPorActor(false); setPersonas([]); setPersona(null); setRes([]) }}>Título</button>
+          <button className={porActor ? 'activo' : ''}
+            onClick={() => { setPorActor(true); setRes([]) }}>Actor</button>
+        </div>
+      </div>
+
+      {porActor && !explorando && personas.length > 0 && (
+        <div className="filtros personas">
+          {personas.map(x => (
+            <button key={x.id} className={persona && persona.id === x.id ? 'activo' : ''}
+              onClick={() => setPersona(x)}>
+              {x.foto ? <img src={x.foto} alt="" loading="lazy" /> : <span className="sin-foto">👤</span>}
+              {x.nombre}
+            </button>
+          ))}
+        </div>
+      )}
 
       {explorando && (
         <>
@@ -869,33 +965,37 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
       <div className="catalogo">
         {visibles.map(p => {
           const e = estado(p)
-          const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
+          const visible = e && ['mio', 'coincide', 'juntos'].includes(e.tipo) ? e.tipo : null
           const fuera = !visible && descartada && descartada(p)
-          const nota = visible === 'mio' ? 'La propusiste tú'
-            : visible === 'coincide' ? '¡Coincidís!'
-            : fuera ? 'No te interesa'
-            : [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
+          // la otra persona la propuso y aún no has dicho nada: el botón vota que sí
+          const suya = e && e.tipo === 'suyo' && !miVoto(e.t.id)
+          const yaVotada = e && e.tipo === 'suyo' && !suya
+          const marca = marcaDe(p)
+          const nota = marca || [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
           return (
             <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
-              <button className={`lamina${visible || fuera ? ' puesta' : ''}`}
+              <button className={`lamina${visible || fuera || yaVotada ? ' puesta' : ''}${suya ? ' suya' : ''}`}
                 onClick={() => setFicha(p)}
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
                 <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
                 {p.voto && !visible && <span className="nota">★ {p.voto}</span>}
-                {visible && <span className="check">{visible === 'coincide' ? '★' : '✓'}</span>}
+                {visible && <span className="check">{visible === 'juntos' ? '🍿' : visible === 'coincide' ? '★' : '✓'}</span>}
+                {suya && <span className="sello-foto si">♥ {nombres[e.t.propuesto_por] || 'Alguien'}</span>}
               </button>
               <button className={`mas${visible ? ' ya' : ''}${fuera ? ' volver' : ''}`}
                 onClick={() => (fuera ? onRecuperar(p) : actuar(p))}
                 disabled={!!visible || anadiendo === p.tmdb_id}
-                aria-label={fuera ? `Recuperar ${p.titulo}` : visible ? nota : `Proponer ${p.titulo}`}>
+                aria-label={fuera ? `Recuperar ${p.titulo}` : visible ? nota : suya ? `Me apetece ${p.titulo}` : `Proponer ${p.titulo}`}>
                 {anadiendo === p.tmdb_id ? '·'
+                  : visible === 'juntos' ? '🍿'
                   : visible === 'coincide' ? '★'
                   : visible ? '✓'
                   : fuera ? '↺'
+                  : suya ? '♥'
                   : '+'}
               </button>
-              <div className={`rotulo${visible || fuera ? ' marcado' : ''}`}>
+              <div className={`rotulo${marca ? ' marcado' : ''}`}>
                 {p.titulo}
                 <i>{nota}</i>
               </div>
@@ -920,14 +1020,24 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
 
       {ficha && (() => {
         const e = estado(ficha)
-        const visible = e && (e.tipo === 'mio' || e.tipo === 'coincide') ? e.tipo : null
+        const visible = e && ['mio', 'coincide', 'juntos'].includes(e.tipo) ? e.tipo : null
+        const juntos = visible === 'juntos'
+        const miNota = juntos ? miNotaDe(e) : undefined
+        const marca = marcaDe(ficha)
         return (
-          <Ficha p={ficha} puesta={!!visible} conNota
-            etiquetaPuesta={visible === 'coincide' ? 'Coincidís' : 'Propuesta'}
+          <Ficha p={ficha} puesta={!!visible} conNota={!e}
+            etiquetaPuesta={juntos ? 'Vista juntos' : visible === 'coincide' ? 'Coincidís' : 'Propuesta'}
+            etiquetaBoton={e && e.tipo === 'suyo' ? 'Me apetece' : undefined}
+            aviso={marca}
             onCerrar={() => setFicha(null)}
             onProponer={async nota => { setFicha(null); await actuar(ficha, nota) }}
             acciones={
               <>
+                <button className={`redondo${juntos ? ' marcado' : ''}`}
+                  onClick={() => setPuntuando(ficha)}>
+                  <span>🍿</span>
+                  <i>{!juntos ? 'Vista juntos' : miNota === undefined ? 'Tu nota' : `Nota ${miNota}`}</i>
+                </button>
                 <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
                   onClick={() => { (guardada(ficha) ? onOlvidar : onGuardar)(ficha); setFicha(null) }}>
                   <span>🔖</span><i>{guardada(ficha) ? 'Guardada' : 'Para mí'}</i>
@@ -950,6 +1060,23 @@ function Anadir({ titulos, yo, nombres, miVoto, onAdd, onVotar, descartada, moti
                     </>}
               </>
             } />
+        )
+      })()}
+
+      {puntuando && (() => {
+        const e = estado(puntuando)
+        return (
+          <Puntuar titulo={puntuando.titulo}
+            inicial={e && e.tipo === 'juntos' ? miNotaDe(e) : undefined}
+            primera={!(e && e.tipo === 'juntos')}
+            onCerrar={() => setPuntuando(null)}
+            onGuardar={async nota => {
+              const p = puntuando
+              setPuntuando(null); setFicha(null)
+              await onVistaJuntos(p, nota)
+              setFlash(`${p.titulo} está en Vistas juntos`)
+              setTimeout(() => setFlash(''), 2600)
+            }} />
         )
       })()}
 
@@ -1881,7 +2008,7 @@ function useCerrarConAtras(onCerrar) {
  * pantalla completa con el tráiler de fondo. La diferencia es que aquí no
  * se desliza: es una sola y se cierra con la X o tocando fuera.
  */
-function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, onCerrar, onProponer }) {
+function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [reserva, setReserva] = useState({ de: null, texto: '' })
@@ -1937,6 +2064,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
           {/* plataforma, comentario y botones van aparte: el hueco de encima
               es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
+            {aviso && <div className="aviso-ficha">{aviso}</div>}
             {donde.length > 0 && (
               <div className="donde">
                 <span>En</span>
@@ -2226,7 +2354,7 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 }
 
 /* ======================= mis pelis ======================= */
-function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvidar,
+function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGuardar, onOlvidar,
   descartada, motivoDescarte, onDescartar, onRecuperar, onComentar, codigo,
   todos, votos, descartes, yo, onVotarTitulo }) {
   const [ficha, setFicha] = useState(null)
@@ -2253,6 +2381,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
       <div className="catalogo">
         {grupo.map(p => {
           const v = suVoto(p.id)
+          const juntos = vistaJuntos(p.id)
           return (
             <div className="tarjeta" key={p.id}>
               <button className={`lamina${v === 'no' ? ' puesta' : ''}`}
@@ -2260,7 +2389,7 @@ function Mias({ lista, suVoto, onQuitar, guardados, guardada, onGuardar, onOlvid
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
                 {p.nota && <span className="tag">💬</span>}
-                <span className={`sello-foto ${v || ''}`}>{texto_voto(v)}</span>
+                <span className={`sello-foto ${juntos ? 'si' : v || ''}`}>{juntos ? '🍿 Vista juntos' : texto_voto(v)}</span>
               </button>
               <div className="rotulo">{p.titulo}</div>
               <button className="comentar" onClick={() => abrirComentario(p)}>
@@ -2596,6 +2725,7 @@ function Puntuar({ titulo, inicial, primera, onGuardar, onCerrar }) {
 function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada, onGuardar, onOlvidar }) {
   const [estado, setEstado] = useState('no')
   const [ficha, setFicha] = useState(null)
+  const [q, setQ] = useState('')
 
   const miVoto = id => {
     const v = votos.find(x => x.titulo_id === id && x.usuario_id === yo)
@@ -2631,7 +2761,13 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
 
   const fichas = [...deDescartes, ...deVotos]
   const cuenta = e => fichas.filter(f => f.estado === e).length
-  const visibles = fichas.filter(f => f.estado === estado)
+  // Al buscar por nombre se mira en los dos apartados a la vez: quien
+  // busca no tiene por qué acordarse de dónde la dejó
+  const sinAcentos = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const buscando = sinAcentos(q.trim())
+  const visibles = buscando
+    ? fichas.filter(f => sinAcentos(f.titulo).includes(buscando))
+    : fichas.filter(f => f.estado === estado)
 
   async function deshacer(f) {
     if (f.origen === 'descarte') await onRecuperar(f.dato)
@@ -2647,17 +2783,24 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
         Tus decisiones. La otra persona no ve esta pantalla.
       </div>
 
-      <div className="filtros">
-        {[['no', 'No me interesan'], ['vista', 'Ya vistas']].map(([id, nombre]) => (
-          <button key={id} className={estado === id ? 'activo' : ''}
-            onClick={() => setEstado(id)}>
-            {nombre} · {cuenta(id)}
-          </button>
-        ))}
-      </div>
+      <input className="busca" type="text" placeholder="Buscar por nombre…"
+        value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
+
+      {!buscando && (
+        <div className="filtros">
+          {[['no', 'No me interesan'], ['vista', 'Ya vistas']].map(([id, nombre]) => (
+            <button key={id} className={estado === id ? 'activo' : ''}
+              onClick={() => setEstado(id)}>
+              {nombre} · {cuenta(id)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {visibles.length === 0
-        ? <div className="vacio"><b>Nada aquí</b>Todavía no has apartado nada en este apartado.</div>
+        ? (buscando
+            ? <div className="vacio"><b>Sin resultados</b>No hay nada con ese nombre en tu historial.</div>
+            : <div className="vacio"><b>Nada aquí</b>Todavía no has apartado nada en este apartado.</div>)
         : (
           <div className="catalogo">
             {visibles.map(f => (
@@ -2665,6 +2808,11 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
                 <button className="lamina puesta" onClick={() => setFicha(f)}
                   aria-label={`Ver información de ${f.titulo}`}>
                   {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
+                  {buscando && (
+                    <span className={`sello-foto ${f.estado}`}>
+                      {f.estado === 'vista' ? '👁 Vista' : '✕ No interesa'}
+                    </span>
+                  )}
                 </button>
                 <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
               </div>

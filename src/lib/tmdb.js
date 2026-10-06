@@ -52,10 +52,55 @@ async function mapaGeneros(tipo) {
   return mapa
 }
 
-/** Busca películas y series a la vez. */
+/**
+ * Busca películas y series a la vez. Si el texto lleva un año
+ * ("prisioneros del 2013"), TMDB no encuentra nada: el año se separa y
+ * se usa para filtrar. Si con ese año no queda ninguna, salen todas.
+ */
 export async function buscar(texto) {
-  const d = await pedir('/search/multi', { query: texto, include_adult: 'false' })
-  return limpiar(d.results)
+  const conAnio = texto.match(/^(.*?)\s*(?:\(|\bde(?:l)?\s+|\bdel\s+año\s+)?\b((?:19|20)\d{2})\)?\s*$/i)
+  const query = conAnio && conAnio[1].trim().length >= 2 ? conAnio[1].trim() : texto
+  const anio = query !== texto ? conAnio[2] : ''
+  const d = await pedir('/search/multi', { query, include_adult: 'false' })
+  const lista = limpiar(d.results)
+  if (!anio) return lista
+  const delAnio = lista.filter(x => x.anio === anio)
+  return delAnio.length ? delAnio : lista
+}
+
+const foto = p => (p ? `https://image.tmdb.org/t/p/w185${p}` : '')
+
+/** Actores (y directores) por nombre, los más conocidos primero. */
+export async function buscarPersonas(texto) {
+  const d = await pedir('/search/person', { query: texto, include_adult: 'false' })
+  return (d.results || [])
+    .filter(x => x.profile_path || (x.known_for || []).length)
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+    .slice(0, 8)
+    .map(x => ({ id: x.id, nombre: x.name, foto: foto(x.profile_path), oficio: x.known_for_department }))
+}
+
+// En series, los programas de entrevistas, noticias y galas cuentan como
+// "reparto" de cualquiera que haya pasado por ellos: se quitan
+const GENEROS_TELE = [10763, 10767, 10764]
+const DE_SI_MISMO = /^(self|himself|herself|themselves|él mismo|ella misma)\b/i
+
+/** Todo lo que ha hecho una persona, de lo más conocido a lo menos. */
+export async function filmografia(personaId) {
+  const d = await pedir(`/person/${personaId}/combined_credits`)
+  const vistos = new Set()
+  const lista = [...(d.cast || []), ...(d.crew || []).filter(x => x.job === 'Director')]
+    .filter(x => !(x.genre_ids || []).some(g => GENEROS_TELE.includes(g)))
+    .filter(x => !DE_SI_MISMO.test(x.character || ''))
+    .filter(x => (x.vote_count || 0) >= 20)
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+    .filter(x => {
+      const clave = `${x.media_type}-${x.id}`
+      if (vistos.has(clave)) return false
+      vistos.add(clave)
+      return true
+    })
+  return limpiar(lista)
 }
 
 /* ------------------------------------------------------------------ *
