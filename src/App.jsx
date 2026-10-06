@@ -2697,16 +2697,22 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   const enVistas = hayVistas && apartado === 'vistas'
   const esVista = ficha && vistas.some(v => v.id === ficha.id)
 
+  const jugando = !enVistas && lista.length > 0 && juego !== 'lista'
+
   return (
     <>
       <h2>Coincidencias</h2>
-      <div className="ayuda">
-        {enVistas
-          ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
-          : 'Os apetecen a los dos. De aquí sale el plan.'}
-      </div>
+      {/* jugando, solo el juego: las pestañas de Por ver / Vistas juntos
+          distraían y se volvía a la lista con "← Lista" */}
+      {!jugando && (
+        <div className="ayuda">
+          {enVistas
+            ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
+            : 'Os apetecen a los dos. De aquí sale el plan.'}
+        </div>
+      )}
 
-      {hayVistas && (
+      {hayVistas && !jugando && (
         <div className="pestanas">
           <button className={!enVistas ? 'activo' : ''} onClick={() => setApartado('porver')}>
             Por ver ({lista.length})
