@@ -1008,7 +1008,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
           const suya = e && e.tipo === 'suyo' && !miVoto(e.t.id)
           const yaVotada = e && e.tipo === 'suyo' && !suya
           const marca = marcaDe(p)
-          const nota = marca || [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
+          const nota = [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
           return (
             <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
               <button className={`lamina${visible || fuera || yaVotada ? ' puesta' : ''}${suya ? ' suya' : ''}`}
@@ -1016,14 +1016,16 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={p.cartel} alt="" loading="lazy" />
                 <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
-                {p.voto && !visible && <span className="nota">★ {p.voto}</span>}
+                {p.voto && !visible && !marca && <span className="nota">★ {p.voto}</span>}
                 {visible && <span className="check">{visible === 'juntos' ? '🍿' : visible === 'coincide' ? '★' : '✓'}</span>}
-                {suya && <span className="sello-foto si">♥ {nombres[e.t.propuesto_por] || 'Alguien'}</span>}
+                {/* qué hay decidido, sobre la carátula: debajo, con un título
+                    largo, se cortaba y no se llegaba a ver */}
+                {marca && <span className={`marca-foto${suya ? ' si' : ''}`}>{suya ? '♥ ' : ''}{marca}</span>}
               </button>
               <button className={`mas${visible ? ' ya' : ''}${fuera ? ' volver' : ''}`}
                 onClick={() => (fuera ? onRecuperar(p) : actuar(p))}
                 disabled={!!visible || anadiendo === p.tmdb_id}
-                aria-label={fuera ? `Recuperar ${p.titulo}` : visible ? nota : suya ? `Me apetece ${p.titulo}` : `Proponer ${p.titulo}`}>
+                aria-label={fuera ? `Recuperar ${p.titulo}` : visible ? marca : suya ? `Me apetece ${p.titulo}` : `Proponer ${p.titulo}`}>
                 {anadiendo === p.tmdb_id ? '·'
                   : visible === 'juntos' ? '🍿'
                   : visible === 'coincide' ? '★'
@@ -1032,7 +1034,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                   : suya ? '♥'
                   : '+'}
               </button>
-              <div className={`rotulo${marca ? ' marcado' : ''}`}>
+              <div className="rotulo">
                 {p.titulo}
                 <i>{nota}</i>
               </div>

@@ -356,6 +356,18 @@ input::placeholder { color: #61539A; }
 .sello-foto.no { color: var(--no); }
 .sello-foto.vista { color: var(--apagado); }
 
+/* estado en Añadir (En Coinciden, La propuso…): franja al pie de la
+   carátula, en hasta dos líneas para que se lea entero */
+.marca-foto {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 14px 6px 6px;
+  background: linear-gradient(to top, rgba(8, 4, 16, .95) 55%, rgba(8, 4, 16, 0));
+  color: var(--ambar); font-size: 9.5px; font-weight: 800; line-height: 1.25;
+  text-align: left;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.marca-foto.si { color: var(--si); }
+
 .lamina .check {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
