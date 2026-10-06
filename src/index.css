@@ -558,6 +558,15 @@ input::placeholder { color: #61539A; }
   50% { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(247, 242, 233, 0); }
 }
 
+/* sin vídeo en TMDB: aviso donde irían los mandos, con salida a YouTube */
+.sin-trailer {
+  position: absolute; top: 14px; left: 14px; z-index: 5;
+  pointer-events: auto;
+  padding: 9px 13px; border-radius: 999px;
+  background: rgba(8, 4, 16, .55); backdrop-filter: blur(4px);
+  color: var(--papel); font-size: 13px; font-weight: 700; text-decoration: none;
+}
+
 /* cortina de arranque: tapa el instante en que YouTube dibuja sus iconos */
 .cortina {
   position: absolute; inset: 0; z-index: 1; pointer-events: none;

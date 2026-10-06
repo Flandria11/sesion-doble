@@ -1498,6 +1498,15 @@ function TrailerFlotante({ pista, activo, cuenta, clave, titulo, cartel, tmdb })
     <div className="flotante" ref={yo}
       style={sitio ? { top: sitio.top, height: sitio.height } : { display: 'none' }}>
       <Trailer clave={sitio ? clave || null : null} titulo={titulo} cartel={cartel} tmdb={tmdb} />
+      {/* '' es que TMDB no tiene ningún vídeo (undefined, que aún se está
+          buscando): pasa con series recién estrenadas, como "GIGN: Unidad
+          de élite". Sin esto la tarjeta se quedaba quieta sin explicar nada. */}
+      {clave === '' && (
+        <a className="sin-trailer" target="_blank" rel="noreferrer"
+          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${titulo} tráiler`)}`}>
+          Sin tráiler · Buscar en YouTube ↗
+        </a>
+      )}
       <Registro />
     </div>
   )
