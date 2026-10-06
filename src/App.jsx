@@ -2638,6 +2638,7 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   vistas, puntuaciones, yo, nombres, onPuntuar, onQuitarNota }) {
   const [ficha, setFicha] = useState(null)
   const [juego, setJuego] = useState('lista')
+  const [eligiendo, setEligiendo] = useState(false)
   // si a alguien le falta poner su nota, se abre directamente en Vistas juntos
   const [apartado, setApartado] = useState(() =>
     vistas.some(v => !puntuaciones.some(x => x.titulo_id === v.id && x.usuario_id === yo)) ? 'vistas' : 'porver')
@@ -2742,7 +2743,7 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
       ) : (
         <>
           {juego === 'lista'
-            ? <button className="chip-juego" onClick={() => setJuego('ruleta')}>🎲 Juego</button>
+            ? <button className="chip-juego" onClick={() => setEligiendo(true)}>🎲 Juego</button>
             : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
 
           {juego !== 'lista' && (
@@ -2761,6 +2762,11 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
           {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
           {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
         </>
+      )}
+
+      {eligiendo && (
+        <ElegirJuego lista={lista} onCerrar={() => setEligiendo(false)}
+          onElegir={j => { setJuego(j); setEligiendo(false) }} />
       )}
 
       {ficha && (
@@ -3045,6 +3051,40 @@ function Ruleta({ lista, onFicha }) {
       </button>
       <div className="contador">{grupo.length} en juego</div>
     </div>
+  )
+}
+
+/* ---- elegir juego: dos tarjetas flotando sobre la pantalla difuminada ----
+ * Antes "Juego" entraba directo en la ruleta y el torneo quedaba en una
+ * pestaña que casi no se veía.
+ */
+function ElegirJuego({ lista, onElegir, onCerrar }) {
+  // dos carátulas de vuestras coincidencias para el cara a cara del torneo
+  const [cara] = useState(() => barajar(lista.filter(p => p.cartel)).slice(0, 2))
+  return createPortal(
+    <div className="telon elegir-juego" onClick={onCerrar}>
+      <div className="juegos" onClick={e => e.stopPropagation()}>
+        <h3>¿A qué jugamos?</h3>
+        <button className="tarjeta-juego ruleta" onClick={() => onElegir('ruleta')}>
+          <span className="icono-juego girando">🎡</span>
+          <b>Ruleta</b>
+          <i>Que decida la suerte</i>
+        </button>
+        <button className="tarjeta-juego torneo-j" onClick={() => onElegir('torneo')}>
+          {cara.length === 2 ? (
+            <span className="cara-a-cara">
+              <img src={cara[0].cartel} alt="" />
+              <em>VS</em>
+              <img src={cara[1].cartel} alt="" />
+            </span>
+          ) : <span className="icono-juego">🏆</span>}
+          <b>Torneo</b>
+          <i>Duelos hasta que quede una</i>
+        </button>
+        <button className="cerrar-juegos" onClick={onCerrar}>Cancelar</button>
+      </div>
+    </div>,
+    document.body
   )
 }
 

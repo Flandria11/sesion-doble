@@ -1257,3 +1257,72 @@ textarea::placeholder { color: #61539A; }
 
 /* con cinco botones en la ficha no caben con el hueco de siempre */
 .diapo.suelta .acciones-redondas:has(> :nth-child(5)) { gap: 10px; }
+
+/* ---------- elegir juego: tarjetas flotantes ---------- */
+.telon.elegir-juego {
+  background: rgba(6, 3, 12, .55);
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  animation: juego-aparecer .25s ease both;
+}
+.juegos {
+  width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 18px;
+}
+.juegos h3 {
+  font-family: 'Anton', sans-serif; font-weight: 400; font-size: 26px;
+  letter-spacing: .02em; text-transform: uppercase; text-align: center;
+  color: var(--papel); animation: juego-subir .4s ease both;
+}
+.tarjeta-juego {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 22px 18px 20px; border-radius: 22px;
+  border: 1px solid rgba(245, 196, 81, .35);
+  background: linear-gradient(150deg, rgba(46, 27, 79, .95), rgba(29, 16, 51, .92));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06);
+  color: var(--papel);
+  /* entra subiendo y luego flota; cada una a su ritmo */
+  animation: juego-subir .45s cubic-bezier(.2, .9, .3, 1.2) both, juego-flotar 4.2s ease-in-out .45s infinite;
+}
+.tarjeta-juego.torneo-j { animation-delay: .08s, .55s; animation-duration: .45s, 4.8s; }
+.tarjeta-juego::before {
+  /* juego-brillo que cruza la tarjeta de vez en cuando */
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, .09) 50%, transparent 65%);
+  transform: translateX(-100%); animation: juego-brillo 5s ease-in-out 1s infinite;
+}
+.tarjeta-juego:active { transform: scale(.97); }
+.tarjeta-juego b {
+  font-family: 'Anton', sans-serif; font-weight: 400; font-size: 24px;
+  letter-spacing: .03em; text-transform: uppercase; color: var(--ambar);
+}
+.tarjeta-juego i { font-style: normal; font-size: 13px; color: #D6CCF2; }
+.icono-juego { font-size: 52px; line-height: 1.1; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .5)); }
+.icono-juego.girando { animation: juego-girar 7s linear infinite; }
+.cara-a-cara { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.cara-a-cara img {
+  width: 58px; aspect-ratio: 2/3; object-fit: cover; border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .55);
+}
+.cara-a-cara img:first-child { transform: rotate(-7deg); }
+.cara-a-cara img:last-child { transform: rotate(7deg); }
+.cara-a-cara em {
+  font-style: normal; font-family: 'Anton', sans-serif; font-size: 20px; color: var(--no);
+  text-shadow: 0 2px 10px rgba(240, 96, 126, .6);
+}
+.cerrar-juegos {
+  align-self: center; padding: 8px 18px; border-radius: 999px;
+  color: var(--apagado); font-size: 13px; font-weight: 700;
+  animation: juego-subir .4s ease .15s both;
+}
+
+@keyframes juego-aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes juego-subir { from { opacity: 0; transform: translateY(26px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes juego-flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes juego-brillo { 0%, 70% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+@keyframes juego-girar { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .telon.elegir-juego, .juegos h3, .tarjeta-juego, .tarjeta-juego::before,
+  .icono-juego.girando, .cerrar-juegos { animation: none; }
+}
