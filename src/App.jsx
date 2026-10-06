@@ -1872,7 +1872,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
               dataI={i} key={clave}
               onSi={() => proponer(p)} onNo={() => onDescartar(p, 'no_interesa')}>
               <div className="lienzo">
-                {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
+                {/* sin tráiler, la carátula: es vertical como la tarjeta y
+                    dice más que el fotograma de fondo, que queda recortado */}
+                {(p.fondo || p.cartel) && <img src={tr === '' ? p.cartel || p.fondo : p.fondo || p.cartel} alt="" />}
               </div>
               <div className="velo" />
 
