@@ -367,7 +367,6 @@ export async function estrenos(pagina = 1) {
   // página al azar entre la 1 y la 3 y la segunda ya la 4: si tocaba la 3,
   // la 1 y la 2 (los estrenos más recientes) no salían en toda la sesión.
   const comun = {
-    page: String(pagina),
     watch_region: REGION,
     with_watch_monetization_types: 'flatrate',
     include_adult: 'false'
@@ -375,18 +374,28 @@ export async function estrenos(pagina = 1) {
 
   const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
 
+  /**
+   * De pelis se piden dos páginas por tanda y de series una. TMDB tiene
+   * bastantes más pelis que series en cada ventana, pero las pelis son lo
+   * que más se propone y se descarta, y lo ya decidido no se enseña: con
+   * una página de cada, al quitar eso quedaban sobre todo series.
+   */
+  const pelis = v => pg => pedir('/discover/movie', {
+    ...comun,
+    page: String(pg),
+    'vote_count.gte': v.votos,
+    'vote_average.gte': String(NOTA_MINIMA_ESTRENOS),
+    sort_by: 'primary_release_date.desc',
+    'primary_release_date.gte': v.desde,
+    'primary_release_date.lte': v.hasta
+  }).then(d => limpiar(d.results, 'movie', mapaPelis)).catch(() => [])
+
   const tandas = await Promise.all(
     ventanas.flatMap(v => [
-      pedir('/discover/movie', {
-        ...comun,
-        'vote_count.gte': v.votos,
-        'vote_average.gte': String(NOTA_MINIMA_ESTRENOS),
-        sort_by: 'primary_release_date.desc',
-        'primary_release_date.gte': v.desde,
-        'primary_release_date.lte': v.hasta
-      }).then(d => limpiar(d.results, 'movie', mapaPelis)).catch(() => []),
+      Promise.all([pelis(v)(pagina * 2 - 1), pelis(v)(pagina * 2)]).then(([a, b]) => [...a, ...b]),
       pedir('/discover/tv', {
         ...comun,
+        page: String(pagina),
         'vote_count.gte': v.votosTv,
         'vote_average.gte': String(NOTA_MINIMA_ESTRENOS_TV),
         sort_by: 'first_air_date.desc',
@@ -398,10 +407,12 @@ export async function estrenos(pagina = 1) {
 
   // Cada ventana se baraja por dentro, pero las más recientes siguen
   // saliendo antes: así hay variedad sin perder el sentido de "estrenos".
+  // Pelis y series se barajan por separado y luego se reparten a lo largo
+  // de la ventana: barajadas juntas, a veces salían cinco series seguidas.
   const salida = []
   const vistos = new Set()
   for (let v = 0; v < ventanas.length; v++) {
-    const mezcla = barajar([...tandas[v * 2], ...tandas[v * 2 + 1]])
+    const mezcla = repartir(barajar(tandas[v * 2]), barajar(tandas[v * 2 + 1]))
     for (const x of mezcla) {
       const clave = `${x.tipo}-${x.tmdb_id}`
       if (vistos.has(clave)) continue
@@ -410,6 +421,19 @@ export async function estrenos(pagina = 1) {
     }
   }
   return salida
+}
+
+/** Junta dos listas espaciando la más corta a lo largo de la más larga. */
+function repartir(a, b) {
+  const [larga, corta] = a.length >= b.length ? [a, b] : [b, a]
+  const salida = []
+  let j = 0
+  larga.forEach((x, i) => {
+    salida.push(x)
+    // tras cada elemento de la larga, los de la corta que ya "tocan"
+    while (j < corta.length && (j + 1) * larga.length <= (i + 1) * corta.length) salida.push(corta[j++])
+  })
+  return [...salida, ...corta.slice(j)]
 }
 
 const GENERO_ANIMACION = 16

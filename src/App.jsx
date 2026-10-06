@@ -476,6 +476,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
             {vista === 'reel' && <Ver titulos={titulos} yo={yo}
                 miVoto={miVoto} onAdd={anadir} onVotar={votar}
+                puntuaciones={puntuaciones} onVistaJuntos={vistaJuntosDesde}
                 descartada={descartada} onDescartar={descartar}
                 guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
             {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
@@ -525,6 +526,9 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // el buscador busca títulos o, con el otro botón, actores: de estos se
   // enseña su filmografía
   const [porActor, setPorActor] = useState(false)
+  // lo que se busca de verdad: se fija al dar a Enter, no a cada tecla, y
+  // cambiar entre Título y Actor no toca lo que ya hay en pantalla
+  const [buscado, setBuscado] = useState({ texto: '', actor: false })
   const [personas, setPersonas] = useState([])
   const [persona, setPersona] = useState(null)
   const [puntuando, setPuntuando] = useState(null)
@@ -564,21 +568,23 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
 
   // búsqueda por texto
   useEffect(() => {
-    if (q.trim().length < 2) return
+    if (buscado.texto.length < 2) return
     let vivo = true
     setCargando(true)
     const t = setTimeout(async () => {
       try {
-        if (porActor) {
+        if (buscado.actor) {
           // se elige al más conocido; los demás quedan para tocarlos
-          const gente = await buscarPersonas(q.trim())
+          const gente = await buscarPersonas(buscado.texto)
           if (!vivo) return
           setPersonas(gente)
           setPersona(gente[0] || null)
           if (!gente.length) setRes([])
         } else {
-          const r = await buscar(q.trim())
-          if (vivo) setRes(r)
+          const r = await buscar(buscado.texto)
+          if (!vivo) return
+          setPersonas([]); setPersona(null)
+          setRes(r)
         }
         if (vivo) setError('')
       } catch (e) {
@@ -586,13 +592,13 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
       } finally {
         if (vivo) setCargando(false)
       }
-    }, 400)
+    }, 0)
     return () => { vivo = false; clearTimeout(t) }
-  }, [q, porActor])
+  }, [buscado])
 
   // filmografía del actor elegido
   useEffect(() => {
-    if (!porActor || !persona) return
+    if (!buscado.actor || !persona) return
     let vivo = true
     setCargando(true)
     filmografia(persona.id)
@@ -600,11 +606,11 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
       .catch(() => vivo && setError('No se ha podido consultar TMDB.'))
       .finally(() => vivo && setCargando(false))
     return () => { vivo = false }
-  }, [porActor, persona])
+  }, [buscado.actor, persona])
 
   // exploración con filtros
   useEffect(() => {
-    if (q.trim().length >= 2) return
+    if (buscado.texto.length >= 2) return
     if (pagina === 1) {
       // Sin esto, la tarjeta más popular (la última superproducción, por
       // ejemplo) salía siempre en la primera pantalla, solo cambiando de
@@ -675,7 +681,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     // eslint-disable-next-line react-hooks/exhaustive-deps -- verTodo solo
     // decide cuánto prefetch hace falta en esta carga, no debe disparar una
     // nueva por sí solo: alternarlo ya revela lo escondido del `res` actual
-  }, [tipo, modo, provs, genero, anio, calidad, pagina, q])
+  }, [tipo, modo, provs, genero, anio, calidad, pagina, buscado])
 
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
@@ -786,7 +792,18 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     saltarSiHaceFalta()
   })
 
-  const explorando = q.trim().length < 2
+  const explorando = buscado.texto.length < 2
+
+  function lanzarBusqueda(e) {
+    e.preventDefault()
+    if (q.trim().length < 2) return
+    setBuscado({ texto: q.trim(), actor: porActor })
+  }
+  // al vaciar la caja se vuelve a explorar
+  function escribir(v) {
+    setQ(v)
+    if (!v.trim() && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
+  }
   const hayFiltros = provs.length > 0 || genero || anio || calidad
 
   /**
@@ -815,19 +832,19 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     <>
       {flash && <div className="ok">{flash}</div>}
       <h2>Añadir</h2>
-      <div className="busca-fila">
-        <input className="busca" type="text"
-          placeholder={porActor ? 'Buscar un actor o actriz…' : 'Buscar una peli o serie…'}
-          value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
+      <form className="busca-fila" onSubmit={lanzarBusqueda}>
+        <input className="busca" type="text" enterKeyHint="search"
+          placeholder={porActor ? 'Actor o actriz y Enter…' : 'Peli o serie y Enter…'}
+          value={q} onChange={e => escribir(e.target.value)} autoComplete="off" />
         <div className="pestanas chica busca-modo">
-          <button className={!porActor ? 'activo' : ''}
-            onClick={() => { setPorActor(false); setPersonas([]); setPersona(null); setRes([]) }}>Título</button>
-          <button className={porActor ? 'activo' : ''}
-            onClick={() => { setPorActor(true); setRes([]) }}>Actor</button>
+          <button type="button" className={!porActor ? 'activo' : ''}
+            onClick={() => setPorActor(false)}>Título</button>
+          <button type="button" className={porActor ? 'activo' : ''}
+            onClick={() => setPorActor(true)}>Actor</button>
         </div>
-      </div>
+      </form>
 
-      {porActor && !explorando && personas.length > 0 && (
+      {buscado.actor && !explorando && personas.length > 0 && (
         <div className="filtros personas">
           {personas.map(x => (
             <button key={x.id} className={persona && persona.id === x.id ? 'activo' : ''}
@@ -1657,7 +1674,7 @@ function Sinopsis({ texto, abierta, onAlternar }) {
  * pero pidiendo los títulos con otra función y guardando el progreso en
  * otra memoria, para no mezclar las dos listas.
  */
-function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, guardada, onGuardar, onComentar,
+function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos, descartada, onDescartar, guardada, onGuardar, onComentar,
   cargar = estrenos, memoria = memoriaReel,
   textoCargando = 'Buscando estrenos…',
   textoError = 'No se han podido cargar los estrenos.',
@@ -1677,6 +1694,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
   const [recien, setRecien] = useState(null)   // recién propuesta, por si quieres comentarla
   const [comentando, setComentando] = useState(null)
   const [avisoVoto, setAvisoVoto] = useState('')
+  const [puntuando, setPuntuando] = useState(null)
   const pista = useRef(null)
 
   const estado = p => {
@@ -1698,6 +1716,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
     const e = estado(p)
     if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return false
     if (e && ['no', 'vista'].includes(miVoto(e.t.id))) return false
+    if (e && puntuaciones.some(n => n.titulo_id === e.t.id)) return false
     return true
   })
 
@@ -1855,6 +1874,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
                   <span>{puesto ? '✓' : '+'}</span>
                   <i>{puesto ? 'Puesta' : 'Proponer'}</i>
                 </button>
+                <button className="redondo" onClick={() => setPuntuando(p)}>
+                  <span>🍿</span><i>Vista juntos</i>
+                </button>
                 <button className="redondo" onClick={() => onDescartar(p, 'no_interesa')}>
                   <span>✕</span><i>Paso</i>
                 </button>
@@ -1904,6 +1926,18 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, descartada, onDescartar, gu
           onGuardar={async nota => {
             await onComentar(comentando.id, nota)
             setComentando(null); setRecien(null)
+          }} />
+      )}
+
+      {puntuando && (
+        <Puntuar titulo={puntuando.titulo} primera
+          onCerrar={() => setPuntuando(null)}
+          onGuardar={async nota => {
+            const p = puntuando
+            setPuntuando(null)
+            await onVistaJuntos(p, nota)
+            setAvisoVoto(`${p.titulo} está en Vistas juntos`)
+            setTimeout(() => setAvisoVoto(''), 3200)
           }} />
       )}
 
