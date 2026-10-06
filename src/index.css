@@ -200,12 +200,25 @@ input::placeholder { color: #61539A; }
 .fila-tipo .plegable { flex: none; }
 .panel-filtros .fila-plataformas { margin: 0; }
 .panel-filtros .limpiar { align-self: flex-start; }
-.grupo-filtro b {
-  display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--apagado);
+/* desplegable propio (Género, Desde, Hasta) */
+.desplegable { position: relative; flex: 1; min-width: 0; }
+.desplegable > .plegable { width: 100%; padding: 9px 11px; font-size: 12.5px; color: var(--papel); }
+.desplegable > .plegable.puesto { border-color: var(--ambar); color: var(--ambar); }
+.desplegable .etiqueta { color: var(--apagado); font-weight: 600; }
+.desplegable .opciones {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  max-height: 260px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--sala); border: 1px solid var(--terciopelo); border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .55);
+  padding: 4px;
 }
-/* dentro del panel las filas de chips no salen hasta el borde de la pantalla */
-.grupo-filtro .filtros { margin: 6px -12px 0; padding: 0 12px 3px; }
+.desplegable .opciones button {
+  display: block; width: 100%; text-align: left;
+  padding: 9px 10px; border-radius: 7px;
+  font-size: 13px; color: #D6CCF2;
+}
+.desplegable .opciones button:hover { background: var(--terciopelo); }
+.desplegable .opciones button.activo { background: var(--ambar); color: var(--noche); font-weight: 800; }
 
 .mis-pelis .pestanas.fina button { padding: 5px; font-size: 11px; }
 .mis-pelis .pestanas.fina em { font-size: 9.5px; }

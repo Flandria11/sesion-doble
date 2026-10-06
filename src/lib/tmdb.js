@@ -165,22 +165,12 @@ export async function generosLista(tipo = 'movie') {
  * las listas rápidas de TMDB, que traen mejores resultados.
  */
 /**
- * Opciones del filtro de año: siempre "de tal año hasta hoy". Nadie busca
- * "1997" exacto; se busca "algo de los 90 para acá" o "lo de estos años".
+ * Años para el filtro "desde / hasta", como en FilmAffinity: uno a uno
+ * desde este año hasta 1900.
  */
-const ESTE_ANO = new Date().getFullYear()
-const desde = (anio, nombre) => ({ id: String(anio), nombre, desde: `${anio}-01-01` })
-export const ANOS = [
-  { id: '', nombre: 'Todos' },
-  desde(ESTE_ANO, 'Este año'),
-  desde(ESTE_ANO - 1, `Desde ${ESTE_ANO - 1}`),
-  desde(2020, 'Desde 2020'),
-  desde(2015, 'Desde 2015'),
-  desde(2010, 'Desde 2010'),
-  desde(2000, 'Desde 2000'),
-  desde(1990, 'Desde los 90'),
-  desde(1980, 'Desde los 80')
-]
+const ANO_MAS_ANTIGUO = 1900
+export const ANOS = Array.from({ length: new Date().getFullYear() - ANO_MAS_ANTIGUO + 1 },
+  (_, i) => String(new Date().getFullYear() - i))
 
 /**
  * Mínimos de votos. Un 9 con cuatro votos no significa nada, así que
@@ -236,10 +226,10 @@ async function cartelera() {
   return limpiar(todas, 'movie')
 }
 
-export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', pagina = 1 } = {}) {
+export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', desde = '', hasta = '', pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
   const base = { page: String(pagina) }
-  const filtrando = proveedores.length > 0 || genero || anio
+  const filtrando = proveedores.length > 0 || genero || desde || hasta
 
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
@@ -271,19 +261,10 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     'vote_average.gte': String(esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV)
   }
 
-  // filtro de año: los sueltos por año exacto, las décadas por rango
-  if (anio) {
-    const campo = esPeli ? 'primary_release_date' : 'first_air_date'
-    const op = ANOS.find(a => a.id === anio)
-    if (op && (op.desde || op.hasta)) {
-      if (op.desde) p[`${campo}.gte`] = op.desde
-      if (op.hasta) p[`${campo}.lte`] = op.hasta
-    } else if (esPeli) {
-      p.primary_release_year = anio
-    } else {
-      p.first_air_date_year = anio
-    }
-  }
+  // filtro de año: desde el 1 de enero de uno hasta el 31 de diciembre del otro
+  const campo = esPeli ? 'primary_release_date' : 'first_air_date'
+  if (desde) p[`${campo}.gte`] = `${desde}-01-01`
+  if (hasta) p[`${campo}.lte`] = `${hasta}-12-31`
   if (proveedores.length) {
     p.with_watch_providers = proveedores.join('|')
     p.with_watch_monetization_types = 'flatrate'
@@ -294,8 +275,8 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
   else if (modo === 'novedades') {
     p.sort_by = esPeli ? 'primary_release_date.desc' : 'first_air_date.desc'
     const hoy = new Date().toISOString().slice(0, 10)
-    if (esPeli) p['primary_release_date.lte'] = hoy
-    else p['first_air_date.lte'] = hoy
+    // si "hasta" ya pone un tope anterior, se respeta
+    if (!hasta || `${hasta}-12-31` > hoy) p[`${campo}.lte`] = hoy
   } else if (modo === 'cines' && esPeli) {
     const hace = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)
     const hoy = new Date().toISOString().slice(0, 10)

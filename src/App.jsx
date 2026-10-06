@@ -537,7 +537,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   const [modo, setModo] = useState('tendencias')
   const [provs, setProvs] = useState([])
   const [genero, setGenero] = useState('')
-  const [anio, setAnio] = useState('')
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
   const [pagina, setPagina] = useState(1)
 
   const [plats, setPlats] = useState([])
@@ -654,7 +655,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
         let vueltas = 0
         let agotadas = false
         while (vivo && vueltas < PAGINAS_MAX_POR_CARGA && novedades < OBJETIVO_NOVEDADES) {
-          const r = await explorar({ tipo, modo, proveedores: provs, genero, anio, pagina: proximaPaginaTmdb.current })
+          const r = await explorar({ tipo, modo, proveedores: provs, genero, desde, hasta, pagina: proximaPaginaTmdb.current })
           vueltas++
           proximaPaginaTmdb.current++
           if (!r.length) { agotadas = true; break }
@@ -690,7 +691,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     }, 220)
     return () => { vivo = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipo, modo, provs, genero, anio, pagina, buscado])
+  }, [tipo, modo, provs, genero, desde, hasta, pagina, buscado])
 
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
@@ -788,7 +789,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // vista un instante y la petición (ya con su respiro) la sustituye sola.
   const cambiarSuave = fn => (...a) => { fn(...a); setPagina(1) }
   const cambiarTipo = cambiar(t => {
-    setTipo(t); setProvs([]); setGenero(''); setAnio('')
+    setTipo(t); setProvs([]); setGenero(''); setDesde(''); setHasta('')
     if (t === 'tv' && modo === 'cines') setModo('tendencias')
   })
 
@@ -797,7 +798,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   const cambiarModo = cambiar(m => {
     setModo(m)
     // en cartelera no aplicamos nada de esto: es lo que hay en las salas
-    if (m === 'cines') { setProvs([]); setGenero(''); setAnio('') }
+    if (m === 'cines') { setProvs([]); setGenero(''); setDesde(''); setHasta('') }
   })
 
   // Y al revés: si marcas una plataforma estando en un modo que no admite
@@ -807,7 +808,18 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     if (m && !m.filtrable) setModo('populares')
   }
   const cambiarGenero = cambiarSuave(g => { setGenero(g); if (g) saltarSiHaceFalta() })
-  const cambiarAnio = cambiarSuave(a => { setAnio(a); if (a) saltarSiHaceFalta() })
+  // si "desde" queda por detrás de "hasta" (o al revés), se ajusta el otro
+  // para que el rango siga teniendo sentido
+  const cambiarDesde = cambiarSuave(a => {
+    setDesde(a)
+    if (a && hasta && hasta < a) setHasta('')
+    if (a) saltarSiHaceFalta()
+  })
+  const cambiarHasta = cambiarSuave(a => {
+    setHasta(a)
+    if (a && desde && desde > a) setDesde('')
+    if (a) saltarSiHaceFalta()
+  })
   const alternarPlat = cambiar(id => {
     setProvs(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]))
     saltarSiHaceFalta()
@@ -825,8 +837,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     setQ(v)
     if (v.trim().length < 2 && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
   }
-  const hayFiltros = provs.length > 0 || genero || anio
-  const nFiltros = provs.length + [genero, anio].filter(Boolean).length
+  const hayFiltros = provs.length > 0 || genero || desde || hasta
+  const nFiltros = provs.length + [genero, desde || hasta].filter(Boolean).length
 
   /**
    * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
@@ -961,34 +973,19 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                   Solo lo incluido en la suscripción de {provs.length === 1 ? 'esa plataforma' : 'esas plataformas'} en España.
                 </div>
               )}
-              {/* chips en vez de <select>: el desplegable nativo abría una
+              {/* desplegables propios en vez de <select>: el nativo abría una
                   lista blanca que no pegaba nada con la app */}
-              <div className="grupo-filtro">
-                <b>Género</b>
-                <div className="filtros">
-                  <button className={!genero ? 'activo' : ''} onClick={() => cambiarGenero('')}>Todos</button>
-                  {gens.map(g => (
-                    <button key={g.id} className={genero === String(g.id) ? 'activo' : ''}
-                      onClick={() => cambiarGenero(genero === String(g.id) ? '' : String(g.id))}>
-                      {g.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grupo-filtro">
-                <b>Año</b>
-                <div className="filtros">
-                  {ANOS.map(a => (
-                    <button key={a.id || 'todos'} className={anio === a.id ? 'activo' : ''}
-                      onClick={() => cambiarAnio(anio === a.id ? '' : a.id)}>
-                      {a.nombre}
-                    </button>
-                  ))}
-                </div>
+              <Desplegable etiqueta="Género" valor={genero} onCambio={cambiarGenero}
+                opciones={[{ id: '', nombre: 'Todos' }, ...gens.map(g => ({ id: String(g.id), nombre: g.nombre }))]} />
+              <div className="barra-filtros">
+                <Desplegable etiqueta="Desde" valor={desde} onCambio={cambiarDesde}
+                  opciones={[{ id: '', nombre: 'Cualquiera' }, ...ANOS.map(a => ({ id: a, nombre: a }))]} />
+                <Desplegable etiqueta="Hasta" valor={hasta} onCambio={cambiarHasta}
+                  opciones={[{ id: '', nombre: 'Hoy' }, ...ANOS.map(a => ({ id: a, nombre: a }))]} />
               </div>
               {hayFiltros && (
                 <button className="limpiar" onClick={() => {
-                  setProvs([]); setGenero(''); setAnio('')
+                  setProvs([]); setGenero(''); setDesde(''); setHasta('')
                   setPagina(1); setRes([])
                 }}>Limpiar filtros</button>
               )}
@@ -1122,6 +1119,48 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
 
       {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
     </>
+  )
+}
+
+/* ---- desplegable con el estilo de la app ----
+ * El <select> nativo abre en el móvil una lista blanca del sistema. Este
+ * abre la suya debajo del botón, con la opción elegida a la vista.
+ */
+function Desplegable({ etiqueta, valor, opciones, onCambio }) {
+  const [abierto, setAbierto] = useState(false)
+  const caja = useRef(null)
+  const lista = useRef(null)
+  const elegida = opciones.find(o => o.id === valor) || opciones[0]
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = e => { if (caja.current && !caja.current.contains(e.target)) setAbierto(false) }
+    document.addEventListener('pointerdown', fuera)
+    // con muchos años, que se vea la elegida sin tener que bajar
+    lista.current?.querySelector('.activo')?.scrollIntoView({ block: 'nearest' })
+    return () => document.removeEventListener('pointerdown', fuera)
+  }, [abierto])
+
+  return (
+    <div className="desplegable" ref={caja}>
+      <button type="button" className={`plegable${abierto ? ' abierto' : ''}${valor ? ' puesto' : ''}`}
+        onClick={() => setAbierto(v => !v)} aria-expanded={abierto}>
+        <span className="etiqueta">{etiqueta}</span>
+        {elegida.nombre}
+        <span className="flecha">{abierto ? '▴' : '▾'}</span>
+      </button>
+      {abierto && (
+        <div className="opciones" ref={lista} role="listbox">
+          {opciones.map(o => (
+            <button type="button" key={o.id || 'nada'} role="option" aria-selected={o.id === valor}
+              className={o.id === valor ? 'activo' : ''}
+              onClick={() => { onCambio(o.id); setAbierto(false) }}>
+              {o.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
