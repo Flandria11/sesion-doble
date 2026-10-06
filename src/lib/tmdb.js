@@ -189,20 +189,18 @@ export const ANOS = [
  * No lo subo más porque el cine español recibe muchos menos votos que el
  * americano, y un listón alto se lo lleva por delante.
  */
-const VOTOS = { valoradas: 1000, calidad: 350, normal: 80 }
-const NOTA_MINIMA = 6
-const NOTA_MINIMA_TV = 6.5
-const NOTA_MINIMA_ANADIR = 5
-const NOTA_MINIMA_ANADIR_TV = 5.5
+const VOTOS = { valoradas: 1000, normal: 80 }
+const NOTA_MINIMA_ANADIR = 5.2
+const NOTA_MINIMA_ANADIR_TV = 5.8
 const NOTA_MINIMA_TOP = 7
 const NOTA_MINIMA_TOP_TV = 7.7
-const NOTA_MINIMA_ESTRENOS = 6.2
+const NOTA_MINIMA_ESTRENOS = 6.1
 const NOTA_MINIMA_ESTRENOS_TV = 6.7
 const NOTA_MINIMA_ANIMACION_TOP = 7.5
 const NOTA_MINIMA_ANIMACION_TOP_TV = 8.1
 
 /**
- * Suelo de calidad en Añadir aunque no se active el interruptor: sin
+ * Suelo de calidad en Añadir: sin
  * esto colaban pelis de serie Z con nota de 2 con tal de tener algo de
  * votos. Tendencias/Populares/Cines/Valoradas siguen ordenados como
  * los da TMDB (por eso salen antes las más populares); esto solo
@@ -239,10 +237,10 @@ async function cartelera() {
   return limpiar(todas, 'movie')
 }
 
-export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
+export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
   const base = { page: String(pagina) }
-  const filtrando = proveedores.length > 0 || genero || anio || calidad
+  const filtrando = proveedores.length > 0 || genero || anio
 
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
@@ -269,13 +267,9 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     watch_region: REGION,
     include_adult: 'false',
     'vote_count.gte': String(
-      modo === 'valoradas' ? VOTOS.valoradas : calidad ? VOTOS.calidad : VOTOS.normal
+      modo === 'valoradas' ? VOTOS.valoradas : VOTOS.normal
     ),
-    'vote_average.gte': String(
-      calidad
-        ? (esPeli ? NOTA_MINIMA : NOTA_MINIMA_TV)
-        : (esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV)
-    )
+    'vote_average.gte': String(esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV)
   }
 
   // filtro de año: los sueltos por año exacto, las décadas por rango

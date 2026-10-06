@@ -538,7 +538,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   const [provs, setProvs] = useState([])
   const [genero, setGenero] = useState('')
   const [anio, setAnio] = useState('')
-  const [calidad, setCalidad] = useState(false)
   const [pagina, setPagina] = useState(1)
 
   const [plats, setPlats] = useState([])
@@ -550,7 +549,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   const [anadiendo, setAnadiendo] = useState(null)
   const [ficha, setFicha] = useState(null)
   const [fiesta, setFiesta] = useState(null)
-  const [verTodo, setVerTodo] = useState(false)
   const [panel, setPanel] = useState(false)
   const [agotado, setAgotado] = useState(false)
   const filaPlats = useRef(null)
@@ -656,7 +654,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
         let vueltas = 0
         let agotadas = false
         while (vivo && vueltas < PAGINAS_MAX_POR_CARGA && novedades < OBJETIVO_NOVEDADES) {
-          const r = await explorar({ tipo, modo, proveedores: provs, genero, anio, calidad, pagina: proximaPaginaTmdb.current })
+          const r = await explorar({ tipo, modo, proveedores: provs, genero, anio, pagina: proximaPaginaTmdb.current })
           vueltas++
           proximaPaginaTmdb.current++
           if (!r.length) { agotadas = true; break }
@@ -664,7 +662,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
             if (vistos.has(clave(p))) continue
             vistos.add(clave(p))
             nuevos.push(p)
-            if (verTodo || !decidido(p)) novedades++
+            if (modo === 'cines' || !decidido(p)) novedades++
           }
         }
         if (!vivo) return
@@ -691,10 +689,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
       }
     }, 220)
     return () => { vivo = false; clearTimeout(t) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- verTodo solo
-    // decide cuánto prefetch hace falta en esta carga, no debe disparar una
-    // nueva por sí solo: alternarlo ya revela lo escondido del `res` actual
-  }, [tipo, modo, provs, genero, anio, calidad, pagina, buscado])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipo, modo, provs, genero, anio, pagina, buscado])
 
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
@@ -792,7 +788,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // vista un instante y la petición (ya con su respiro) la sustituye sola.
   const cambiarSuave = fn => (...a) => { fn(...a); setPagina(1) }
   const cambiarTipo = cambiar(t => {
-    setTipo(t); setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
+    setTipo(t); setProvs([]); setGenero(''); setAnio('')
     if (t === 'tv' && modo === 'cines') setModo('tendencias')
   })
 
@@ -800,9 +796,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // una es la sala y la otra el streaming.
   const cambiarModo = cambiar(m => {
     setModo(m)
-    // en cartelera no aplicamos nada de esto: un estreno de esta semana
-    // todavía no tiene votos y el filtro de calidad lo dejaría vacío
-    if (m === 'cines') { setProvs([]); setGenero(''); setAnio(''); setCalidad(false) }
+    // en cartelera no aplicamos nada de esto: es lo que hay en las salas
+    if (m === 'cines') { setProvs([]); setGenero(''); setAnio('') }
   })
 
   // Y al revés: si marcas una plataforma estando en un modo que no admite
@@ -813,9 +808,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   }
   const cambiarGenero = cambiarSuave(g => { setGenero(g); if (g) saltarSiHaceFalta() })
   const cambiarAnio = cambiarSuave(a => { setAnio(a); if (a) saltarSiHaceFalta() })
-  const alternarCalidad = cambiar(() => {
-    setCalidad(v => { if (!v) saltarSiHaceFalta(); return !v })
-  })
   const alternarPlat = cambiar(id => {
     setProvs(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]))
     saltarSiHaceFalta()
@@ -833,8 +825,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     setQ(v)
     if (v.trim().length < 2 && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
   }
-  const hayFiltros = provs.length > 0 || genero || anio || calidad
-  const nFiltros = provs.length + [genero, anio, calidad, verTodo].filter(Boolean).length
+  const hayFiltros = provs.length > 0 || genero || anio
+  const nFiltros = provs.length + [genero, anio].filter(Boolean).length
 
   /**
    * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
@@ -852,7 +844,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // explorar, para no repasar lo mismo.
   // En cines se ve la cartelera entera, decidida o no: es para saber qué
   // hay en los cines, y lo ya decidido lleva su marca en la carátula
-  const todoALaVista = verTodo || !explorando || modo === 'cines'
+  const todoALaVista = !explorando || modo === 'cines'
   const visibles = todoALaVista ? res : res.filter(p => !decidido(p))
   const escondidas = res.length - visibles.length
   const modosVisibles = MODOS.filter(m =>
@@ -981,29 +973,14 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                   {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
                 </select>
               </div>
-              <button className={`interruptor${calidad ? ' activo' : ''}`}
-                onClick={alternarCalidad} aria-pressed={calidad}>
-                <span className="bolita" />
-                Quitar peor valoradas
-              </button>
-              <button className={`interruptor${verTodo ? ' activo' : ''}`}
-                onClick={() => setVerTodo(v => !v)} aria-pressed={verTodo}>
-                <span className="bolita" />
-                Ver las ya decididas
-              </button>
-              {calidad && (
-                <div className="ayuda" style={{ margin: '10px 0 0' }}>
-                  Solo con nota igual o superior a 6 y al menos 250 votos.
-                </div>
-              )}
-              {!verTodo && escondidas > 0 && (
-                <div className="ayuda" style={{ margin: '6px 0 0' }}>
-                  {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya propuesta{escondidas === 1 ? '' : 's'} o descartada{escondidas === 1 ? '' : 's'}.
+              {escondidas > 0 && (
+                <div className="ayuda" style={{ margin: 0 }}>
+                  {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya decidida{escondidas === 1 ? '' : 's'}. Búscala por nombre para verla.
                 </div>
               )}
               {hayFiltros && (
                 <button className="limpiar" onClick={() => {
-                  setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
+                  setProvs([]); setGenero(''); setAnio('')
                   setPagina(1); setRes([])
                 }}>Limpiar filtros</button>
               )}
