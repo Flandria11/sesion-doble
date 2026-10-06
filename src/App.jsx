@@ -736,6 +736,22 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     return null
   }
 
+  // Lo mismo en dos palabras, para la carátula: el detalle (quién la
+  // propuso, qué votó cada uno) ya sale en la ficha al abrirla
+  const marcaCorta = p => {
+    const e = estado(p)
+    if (e && e.tipo === 'juntos') return 'Vista juntos'
+    if (e && e.tipo === 'coincide') return 'Coinciden'
+    if (e && e.tipo === 'mio') return 'Propuesta'
+    if (e && e.tipo === 'suyo') {
+      const v = miVoto(e.t.id)
+      return v === 'no' ? 'No te apetece' : v === 'vista' ? 'Ya vista' : 'Para votar'
+    }
+    if (descartada(p)) return motivoDescarte(p) === 'vista' ? 'Ya vista' : 'No te interesa'
+    if (guardada(p)) return 'Para mí'
+    return null
+  }
+
   async function actuar(p, nota = '') {
     const e = estado(p)
     if (anadiendo || (e && ['mio', 'coincide', 'juntos'].includes(e.tipo))) return
@@ -1007,7 +1023,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
           // la otra persona la propuso y aún no has dicho nada: el botón vota que sí
           const suya = e && e.tipo === 'suyo' && !miVoto(e.t.id)
           const yaVotada = e && e.tipo === 'suyo' && !suya
-          const marca = marcaDe(p)
+          const marca = marcaCorta(p)
           const nota = [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
           return (
             <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
