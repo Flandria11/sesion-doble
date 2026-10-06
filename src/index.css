@@ -962,7 +962,14 @@ nav .num {
   border-radius: 12px; border: 2px solid transparent;
   transition: border-color .15s ease, transform .15s ease;
 }
-.aspirante:hover img, .aspirante:focus-visible img {
+/* El :hover solo con ratón: en el móvil, tras tocar una, el "hover" se
+   quedaba pegado a ese sitio y la carátula del siguiente duelo salía ya
+   marcada en amarillo sin haberla tocado. Con el dedo se marca solo
+   mientras se pulsa. */
+@media (hover: hover) {
+  .aspirante:hover img { border-color: var(--ambar); transform: translateY(-3px); }
+}
+.aspirante:active img, .aspirante:focus-visible img {
   border-color: var(--ambar); transform: translateY(-3px);
 }
 .aspirante span {
