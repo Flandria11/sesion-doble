@@ -3101,8 +3101,6 @@ function Torneo({ lista, onFicha }) {
     }
   }
 
-  const duelos = Math.max(0, (tope === 0 ? grupo.length : Math.min(tope, grupo.length)) - 1)
-
   const cabecera = (
     <>
       <Filtro valor={filtro} onCambio={f => setFiltro(f)} pelis={pelis} series={series} />
@@ -3114,9 +3112,6 @@ function Torneo({ lista, onFicha }) {
             {nombre}
           </button>
         ))}
-      </div>
-      <div className="ayuda" style={{ margin: '8px 0 0' }}>
-        {duelos} duelo{duelos === 1 ? '' : 's'} hasta la ganadora.
       </div>
     </>
   )
