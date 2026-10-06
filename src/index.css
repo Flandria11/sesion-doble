@@ -194,6 +194,12 @@ input::placeholder { color: #61539A; }
 
 /* variante chica, para Añadir (Películas/Series) */
 .pestanas.chica button { padding: 5px; font-size: 11px; }
+/* Películas/Series y el botón de Filtrar, en la misma fila */
+.fila-tipo { display: flex; gap: 7px; align-items: stretch; margin-top: 10px; }
+.fila-tipo .pestanas { flex: 1; margin-top: 0; }
+.fila-tipo .plegable { flex: none; }
+.panel-filtros .fila-plataformas { margin: 0; }
+.panel-filtros .limpiar { align-self: flex-start; }
 
 .mis-pelis .pestanas.fina button { padding: 5px; font-size: 11px; }
 .mis-pelis .pestanas.fina em { font-size: 9.5px; }

@@ -815,6 +815,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     if (v.trim().length < 2 && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
   }
   const hayFiltros = provs.length > 0 || genero || anio || calidad
+  const nFiltros = provs.length + [genero, anio, calidad, verTodo].filter(Boolean).length
 
   /**
    * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
@@ -874,11 +875,24 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
 
       {explorando && (
         <>
-          <div className="pestanas chica">
-            <button className={tipo === 'movie' ? 'activo' : ''}
-              onClick={() => cambiarTipo('movie')}>Películas</button>
-            <button className={tipo === 'tv' ? 'activo' : ''}
-              onClick={() => cambiarTipo('tv')}>Series</button>
+          <div className="fila-tipo">
+            <div className="pestanas chica">
+              <button className={tipo === 'movie' ? 'activo' : ''}
+                onClick={() => cambiarTipo('movie')}>Películas</button>
+              <button className={tipo === 'tv' ? 'activo' : ''}
+                onClick={() => cambiarTipo('tv')}>Series</button>
+            </div>
+            {/* Plataformas, género, año... se ponen una vez y se dejan: van
+                plegados para que las carátulas salgan antes. El número
+                recuerda que hay algo puesto aunque no se vea. */}
+            {!ocultarPlataformas && (
+              <button className={`plegable${panel ? ' abierto' : ''}`}
+                onClick={() => setPanel(v => !v)} aria-expanded={panel}>
+                Filtrar
+                {nFiltros > 0 && <em>{nFiltros}</em>}
+                <span className="flecha">{panel ? '▴' : '▾'}</span>
+              </button>
+            )}
           </div>
 
           <div className="filtros">
@@ -888,108 +902,92 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
             ))}
           </div>
 
-          {plats.length > 0 && !ocultarPlataformas && (
-            <div className="fila-plataformas">
-              {/* la fila no tenía scrollbar ni pista alguna de que seguía
-                  hacia la derecha: con ratón, sin arrastre táctil, no
-                  había forma de saber que se podía desplazar */}
-              <button type="button" className="flecha-plats izq"
-                aria-label="Ver plataformas anteriores"
-                onClick={() => filaPlats.current?.scrollBy({ left: -160, behavior: 'smooth' })}>
-                ‹
-              </button>
-              <div className="plataformas" ref={filaPlats}
-                onWheel={e => {
-                  if (e.deltaY === 0) return
-                  e.currentTarget.scrollLeft += e.deltaY
-                  e.preventDefault()
-                }}>
-                {plats.map(pl => (
-                  <button key={pl.id}
-                    className={provs.includes(pl.id) ? 'activo' : ''}
-                    onClick={() => alternarPlat(pl.id)}
-                    title={pl.nombre} aria-label={pl.nombre}
-                    aria-pressed={provs.includes(pl.id)}>
-                    <img src={pl.logo} alt="" loading="lazy" />
-                  </button>
-                ))}
-              </div>
-              <button type="button" className="flecha-plats der"
-                aria-label="Ver más plataformas"
-                onClick={() => filaPlats.current?.scrollBy({ left: 160, behavior: 'smooth' })}>
-                ›
-              </button>
-            </div>
-          )}
-
           {ocultarPlataformas && (
             <div className="ayuda" style={{ marginTop: 12, marginBottom: 0 }}>
               Estrenos en salas de España. Aquí no aplican las plataformas.
             </div>
           )}
 
-          {!ocultarPlataformas && (
-            <>
-              <div className="barra-filtros">
-                <button className={`plegable${panel ? ' abierto' : ''}`}
-                  onClick={() => setPanel(v => !v)} aria-expanded={panel}>
-                  Más filtros
-                  {(genero || anio || calidad || verTodo) && (
-                    <em>{[genero, anio, calidad, verTodo].filter(Boolean).length}</em>
-                  )}
-                  <span className="flecha">{panel ? '▴' : '▾'}</span>
-                </button>
-                {hayFiltros && (
-                  <button className="limpiar" onClick={() => {
-                    setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
-                    setPagina(1); setRes([])
-                  }}>Limpiar</button>
-                )}
-              </div>
-
-              {panel && (
-                <div className="panel-filtros">
-                  <div className="barra-filtros">
-                    <select value={genero} onChange={e => cambiarGenero(e.target.value)}
-                      aria-label="Filtrar por género">
-                      <option value="">Todos los géneros</option>
-                      {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-                    </select>
-                    <select value={anio} onChange={e => cambiarAnio(e.target.value)}
-                      aria-label="Filtrar por año">
-                      {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
-                    </select>
+          {!ocultarPlataformas && panel && (
+            <div className="panel-filtros">
+              {plats.length > 0 && (
+                <div className="fila-plataformas">
+                  {/* la fila no tenía scrollbar ni pista alguna de que seguía
+                      hacia la derecha: con ratón, sin arrastre táctil, no
+                      había forma de saber que se podía desplazar */}
+                  <button type="button" className="flecha-plats izq"
+                    aria-label="Ver plataformas anteriores"
+                    onClick={() => filaPlats.current?.scrollBy({ left: -160, behavior: 'smooth' })}>
+                    ‹
+                  </button>
+                  <div className="plataformas" ref={filaPlats}
+                    onWheel={e => {
+                      if (e.deltaY === 0) return
+                      e.currentTarget.scrollLeft += e.deltaY
+                      e.preventDefault()
+                    }}>
+                    {plats.map(pl => (
+                      <button key={pl.id}
+                        className={provs.includes(pl.id) ? 'activo' : ''}
+                        onClick={() => alternarPlat(pl.id)}
+                        title={pl.nombre} aria-label={pl.nombre}
+                        aria-pressed={provs.includes(pl.id)}>
+                        <img src={pl.logo} alt="" loading="lazy" />
+                      </button>
+                    ))}
                   </div>
-                  <button className={`interruptor${calidad ? ' activo' : ''}`}
-                    onClick={alternarCalidad} aria-pressed={calidad}>
-                    <span className="bolita" />
-                    Quitar peor valoradas
+                  <button type="button" className="flecha-plats der"
+                    aria-label="Ver más plataformas"
+                    onClick={() => filaPlats.current?.scrollBy({ left: 160, behavior: 'smooth' })}>
+                    ›
                   </button>
-                  <button className={`interruptor${verTodo ? ' activo' : ''}`}
-                    onClick={() => setVerTodo(v => !v)} aria-pressed={verTodo}>
-                    <span className="bolita" />
-                    Ver las ya decididas
-                  </button>
-                  {calidad && (
-                    <div className="ayuda" style={{ margin: '10px 0 0' }}>
-                      Solo con nota igual o superior a 6 y al menos 250 votos.
-                    </div>
-                  )}
-                  {!verTodo && escondidas > 0 && (
-                    <div className="ayuda" style={{ margin: '6px 0 0' }}>
-                      {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya propuesta{escondidas === 1 ? '' : 's'} o descartada{escondidas === 1 ? '' : 's'}.
-                    </div>
-                  )}
                 </div>
               )}
-            </>
-          )}
-
-          {provs.length > 0 && (
-            <div className="ayuda" style={{ marginTop: 10, marginBottom: 0 }}>
-              Solo lo incluido en la suscripción de {provs.length === 1 ? 'esa plataforma' : 'esas plataformas'} en España.
+              {provs.length > 0 && (
+                <div className="ayuda" style={{ margin: 0 }}>
+                  Solo lo incluido en la suscripción de {provs.length === 1 ? 'esa plataforma' : 'esas plataformas'} en España.
+                </div>
+              )}
+              <div className="barra-filtros">
+                <select value={genero} onChange={e => cambiarGenero(e.target.value)}
+                  aria-label="Filtrar por género">
+                  <option value="">Todos los géneros</option>
+                  {gens.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                </select>
+                <select value={anio} onChange={e => cambiarAnio(e.target.value)}
+                  aria-label="Filtrar por año">
+                  {ANOS.map(a => <option key={a.id || 'todos'} value={a.id}>{a.nombre}</option>)}
+                </select>
+              </div>
+              <button className={`interruptor${calidad ? ' activo' : ''}`}
+                onClick={alternarCalidad} aria-pressed={calidad}>
+                <span className="bolita" />
+                Quitar peor valoradas
+              </button>
+              <button className={`interruptor${verTodo ? ' activo' : ''}`}
+                onClick={() => setVerTodo(v => !v)} aria-pressed={verTodo}>
+                <span className="bolita" />
+                Ver las ya decididas
+              </button>
+              {calidad && (
+                <div className="ayuda" style={{ margin: '10px 0 0' }}>
+                  Solo con nota igual o superior a 6 y al menos 250 votos.
+                </div>
+              )}
+              {!verTodo && escondidas > 0 && (
+                <div className="ayuda" style={{ margin: '6px 0 0' }}>
+                  {escondidas} escondida{escondidas === 1 ? '' : 's'} por estar ya propuesta{escondidas === 1 ? '' : 's'} o descartada{escondidas === 1 ? '' : 's'}.
+                </div>
+              )}
+              {hayFiltros && (
+                <button className="limpiar" onClick={() => {
+                  setProvs([]); setGenero(''); setAnio(''); setCalidad(false)
+                  setPagina(1); setRes([])
+                }}>Limpiar filtros</button>
+              )}
             </div>
           )}
+
         </>
       )}
 
