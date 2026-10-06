@@ -215,14 +215,29 @@ const filtrarBase = (lista, esPeli) =>
   )
 
 /**
- * En cines es distinto: son estrenos de los últimos días, así que casi
- * ninguno llega a los 80 votos del suelo normal. Exigirlo dejaba la lista
- * en nada. Aquí solo se corta lo que sí tiene datos suficientes para saber
- * que es mala (20 votos) y aun así no llega a la nota mínima; lo recién
- * estrenado sin apenas votos pasa igual.
+ * En cines: TMDB da como "en cartelera" en España más de cien títulos,
+ * pero detrás de las veinte o treinta de verdad (Resident Evil, La bola
+ * negra...) vienen pases sueltos, conciertos y estrenos de una sala con
+ * cero votos. Se quedan las que tienen tirón (popularidad) o al menos
+ * algo de público (votos), que es donde está el corte. La nota no se
+ * mira: aquí se quiere ver qué hay en los cines, sea buena o mala.
  */
-const filtrarCines = lista =>
-  lista.filter(x => x.vote_count < 20 || x.vote_average >= NOTA_MINIMA_ANADIR)
+const enCartelera = x => x.popularity >= 10 || x.vote_count >= 10
+
+/** Toda la cartelera de una vez (son pocas páginas), por popularidad. */
+async function cartelera() {
+  const primera = await pedir('/movie/now_playing', { page: '1', region: REGION })
+  const total = Math.min(primera.total_pages || 1, 8)
+  const resto = await Promise.all(
+    Array.from({ length: total - 1 }, (_, i) =>
+      pedir('/movie/now_playing', { page: String(i + 2), region: REGION })
+        .then(d => d.results).catch(() => [])))
+  const vistos = new Set()
+  const todas = [primera.results, ...resto].flat()
+    .filter(x => enCartelera(x) && !vistos.has(x.id) && vistos.add(x.id))
+    .sort((a, b) => b.popularity - a.popularity)
+  return limpiar(todas, 'movie')
+}
 
 export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', anio = '', calidad = false, pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
@@ -231,8 +246,8 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
 
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
-      const d = await pedir('/movie/now_playing', { ...base, region: REGION })
-      return limpiar(filtrarCines(d.results), 'movie')
+      // va entera en la primera carga; las siguientes ya no traen nada
+      return pagina === 1 ? cartelera() : []
     }
     if (modo === 'tendencias') {
       const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)

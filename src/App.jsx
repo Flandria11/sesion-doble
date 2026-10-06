@@ -629,7 +629,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
       // se hace con filtros anchos (sin plataforma/género/año/nota): con
       // filtros estrechos hay pocas páginas y arrancar lejos podía dejar
       // la exploración vacía a la primera.
-      const barajable = modo !== 'valoradas' && modo !== 'novedades'
+      const barajable = !['valoradas', 'novedades', 'cines'].includes(modo)
       proximaPaginaTmdb.current = (barajable && !hayFiltros) ? 1 + Math.floor(Math.random() * 4) : 1
     }
     let vivo = true
@@ -668,11 +668,14 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
           }
         }
         if (!vivo) return
-        // Tendencias/Populares/Cines siempre traen el mismo orden de TMDB, así
+        // Tendencias/Populares siempre traen el mismo orden de TMDB, así
         // que cada visita repetía exactamente las mismas primeras tarjetas.
         // Se baraja aquí (no en Valoradas ni Novedades, donde el orden sí
-        // significa algo: nota o fecha de estreno).
-        const barajable = modo !== 'valoradas' && modo !== 'novedades'
+        // significa algo: nota o fecha de estreno). Tampoco en Cines: lo que
+        // está de verdad en cartel va en la primera página y detrás vienen
+        // pases sueltos y estrenos minúsculos; barajado (o empezando por la
+        // página 3) salían esos y no las que hay en los cines.
+        const barajable = !['valoradas', 'novedades', 'cines'].includes(modo)
         const listos = barajable ? barajar(nuevos) : nuevos
         setRes(ant => {
           if (pagina === 1) return listos
@@ -831,7 +834,10 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   // Al buscar algo concreto sale siempre, aunque ya esté decidido: se busca
   // justo para saber qué pasó con él. Esconderlo solo tiene sentido al
   // explorar, para no repasar lo mismo.
-  const visibles = verTodo || !explorando ? res : res.filter(p => !decidido(p))
+  // En cines se ve la cartelera entera, decidida o no: es para saber qué
+  // hay en los cines, y lo ya decidido lleva su marca en la carátula
+  const todoALaVista = verTodo || !explorando || modo === 'cines'
+  const visibles = todoALaVista ? res : res.filter(p => !decidido(p))
   const escondidas = res.length - visibles.length
   const modosVisibles = MODOS.filter(m =>
     (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
