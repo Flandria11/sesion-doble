@@ -518,8 +518,11 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 // cuántos títulos nuevos (ni propuestos, ni coincididos, ni descartados) se
 // intentan reunir por carga, y cuántas páginas de TMDB como máximo se piden
 // para lograrlo antes de rendirse
-const OBJETIVO_NOVEDADES = 12
-const PAGINAS_MAX_POR_CARGA = 6
+// cuántas carátulas nuevas reunir antes de enseñar el "Ver más"
+const OBJETIVO_NOVEDADES = 36
+const PAGINAS_MAX_POR_CARGA = 15
+// páginas de TMDB que se piden a la vez en cada vuelta
+const PAGINAS_A_LA_VEZ = 3
 
 function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaciones, onVistaJuntos, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
   const [q, setQ] = useState('')
@@ -655,16 +658,23 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
         let vueltas = 0
         let agotadas = false
         while (vivo && vueltas < PAGINAS_MAX_POR_CARGA && novedades < OBJETIVO_NOVEDADES) {
-          const r = await explorar({ tipo, modo, proveedores: provs, genero, desde, hasta, pagina: proximaPaginaTmdb.current })
-          vueltas++
-          proximaPaginaTmdb.current++
-          if (!r.length) { agotadas = true; break }
+          // de tres en tres y a la vez: una detrás de otra, reunir tantas
+          // se notaba en la espera
+          const desdePag = proximaPaginaTmdb.current
+          const tanda = await Promise.all(Array.from({ length: PAGINAS_A_LA_VEZ }, (_, k) =>
+            explorar({ tipo, modo, proveedores: provs, genero, desde, hasta, pagina: desdePag + k })))
+          vueltas += PAGINAS_A_LA_VEZ
+          proximaPaginaTmdb.current += PAGINAS_A_LA_VEZ
+          const r = tanda.flat()
+          if (tanda.some(t => !t.length)) agotadas = true
+          if (!r.length) break
           for (const p of r) {
             if (vistos.has(clave(p))) continue
             vistos.add(clave(p))
             nuevos.push(p)
             if (modo === 'cines' || !decidido(p)) novedades++
           }
+          if (agotadas) break
         }
         if (!vivo) return
         // Tendencias/Populares siempre traen el mismo orden de TMDB, así
