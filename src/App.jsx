@@ -2637,8 +2637,8 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
 function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   vistas, puntuaciones, yo, nombres, onPuntuar, onQuitarNota }) {
   const [ficha, setFicha] = useState(null)
-  const [juego, setJuego] = useState('lista')
-  const [eligiendo, setEligiendo] = useState(false)
+  // null: la lista; 'elegir': las tarjetas flotantes; 'ruleta' / 'torneo'
+  const [juego, setJuego] = useState(null)
   // si a alguien le falta poner su nota, se abre directamente en Vistas juntos
   const [apartado, setApartado] = useState(() =>
     vistas.some(v => !puntuaciones.some(x => x.titulo_id === v.id && x.usuario_id === yo)) ? 'vistas' : 'porver')
@@ -2698,22 +2698,18 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   const enVistas = hayVistas && apartado === 'vistas'
   const esVista = ficha && vistas.some(v => v.id === ficha.id)
 
-  const jugando = !enVistas && lista.length > 0 && juego !== 'lista'
-
   return (
     <>
       <h2>Coincidencias</h2>
       {/* jugando, solo el juego: las pestañas de Por ver / Vistas juntos
           distraían y se volvía a la lista con "← Lista" */}
-      {!jugando && (
-        <div className="ayuda">
-          {enVistas
-            ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
-            : 'Os apetecen a los dos. De aquí sale el plan.'}
-        </div>
-      )}
+      <div className="ayuda">
+        {enVistas
+          ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
+          : 'Os apetecen a los dos. De aquí sale el plan.'}
+      </div>
 
-      {hayVistas && !jugando && (
+      {hayVistas && (
         <div className="pestanas">
           <button className={!enVistas ? 'activo' : ''} onClick={() => setApartado('porver')}>
             Por ver ({lista.length})
@@ -2742,31 +2738,15 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
         </div>
       ) : (
         <>
-          {juego === 'lista'
-            ? <button className="chip-juego" onClick={() => setEligiendo(true)}>🎲 Juego</button>
-            : <button className="chip-juego" onClick={() => setJuego('lista')}>← Lista</button>}
-
-          {juego !== 'lista' && (
-            <div className="pestanas">
-              <button className={juego === 'ruleta' ? 'activo' : ''} onClick={() => setJuego('ruleta')}>Ruleta</button>
-              <button className={juego === 'torneo' ? 'activo' : ''} onClick={() => setJuego('torneo')}>Torneo</button>
-            </div>
-          )}
-
-          {juego === 'lista' && (
-            <>
-              {bloque('Películas', lista.filter(p => p.tipo !== 'tv'))}
-              {bloque('Series', lista.filter(p => p.tipo === 'tv'))}
-            </>
-          )}
-          {juego === 'ruleta' && <Ruleta lista={lista} onFicha={setFicha} />}
-          {juego === 'torneo' && <Torneo lista={lista} onFicha={setFicha} />}
+          <button className="chip-juego" onClick={() => setJuego('elegir')}>🎲 Juego</button>
+          {bloque('Películas', lista.filter(p => p.tipo !== 'tv'))}
+          {bloque('Series', lista.filter(p => p.tipo === 'tv'))}
         </>
       )}
 
-      {eligiendo && (
-        <ElegirJuego lista={lista} onCerrar={() => setEligiendo(false)}
-          onElegir={j => { setJuego(j); setEligiendo(false) }} />
+      {juego && (
+        <SalaDeJuego lista={lista} juego={juego} onJuego={setJuego}
+          onCerrar={() => setJuego(null)} onFicha={setFicha} />
       )}
 
       {ficha && (
@@ -3054,15 +3034,29 @@ function Ruleta({ lista, onFicha }) {
   )
 }
 
-/* ---- elegir juego: dos tarjetas flotando sobre la pantalla difuminada ----
- * Antes "Juego" entraba directo en la ruleta y el torneo quedaba en una
- * pestaña que casi no se veía.
+/* ---- sala de juego: todo sobre la pantalla difuminada ----
+ * Primero dos tarjetas flotando para elegir, y luego el juego ahí mismo,
+ * sin volver a la página normal: así no se rompe el ambiente.
  */
-function ElegirJuego({ lista, onElegir, onCerrar }) {
+function SalaDeJuego({ lista, juego, onJuego, onCerrar, onFicha }) {
   // dos carátulas de vuestras coincidencias para el cara a cara del torneo
   const [cara] = useState(() => barajar(lista.filter(p => p.cartel)).slice(0, 2))
+  const onElegir = onJuego
+  const eligiendo = juego === 'elegir'
+
   return createPortal(
-    <div className="telon elegir-juego" onClick={onCerrar}>
+    <div className="telon elegir-juego" onClick={eligiendo ? onCerrar : undefined}>
+      {!eligiendo ? (
+        <div className="escena-juego">
+          <div className="barra-juego">
+            <button onClick={() => onJuego('elegir')}>← Juegos</button>
+            <b>{juego === 'ruleta' ? '🎡 Ruleta' : '🏆 Torneo'}</b>
+            <button onClick={onCerrar} aria-label="Salir del juego">✕</button>
+          </div>
+          {juego === 'ruleta' && <Ruleta lista={lista} onFicha={onFicha} />}
+          {juego === 'torneo' && <Torneo lista={lista} onFicha={onFicha} />}
+        </div>
+      ) : (
       <div className="juegos" onClick={e => e.stopPropagation()}>
         <h3>¿A qué jugamos?</h3>
         <button className="tarjeta-juego ruleta" onClick={() => onElegir('ruleta')}>
@@ -3083,6 +3077,7 @@ function ElegirJuego({ lista, onElegir, onCerrar }) {
         </button>
         <button className="cerrar-juegos" onClick={onCerrar}>Cancelar</button>
       </div>
+      )}
     </div>,
     document.body
   )

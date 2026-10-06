@@ -1322,7 +1322,32 @@ textarea::placeholder { color: #61539A; }
 @keyframes juego-brillo { 0%, 70% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 @keyframes juego-girar { to { transform: rotate(360deg); } }
 
+/* el juego ya elegido, en la misma sala */
+.telon.elegir-juego { z-index: 45; }
+.escena-juego {
+  width: 100%; max-width: 480px; max-height: 100%;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: max(6px, env(safe-area-inset-top)) 2px 20px;
+  animation: juego-subir .35s ease both;
+}
+.barra-juego {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.barra-juego b {
+  font-family: 'Anton', sans-serif; font-weight: 400; font-size: 18px;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ambar);
+}
+.barra-juego button {
+  padding: 7px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+  background: rgba(29, 16, 51, .8); border: 1px solid var(--borde); color: var(--papel);
+}
+/* en la sala, las carátulas del duelo y del tambor flotan como las tarjetas */
+.escena-juego .aspirante { animation: juego-flotar 4.2s ease-in-out infinite; }
+.escena-juego .aspirante + .aspirante { animation-duration: 4.8s; animation-delay: -1.6s; }
+.escena-juego .tambor:not(.girando) { animation: juego-flotar 5s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .telon.elegir-juego, .juegos h3, .tarjeta-juego, .tarjeta-juego::before,
-  .icono-juego.girando, .cerrar-juegos { animation: none; }
+  .icono-juego.girando, .cerrar-juegos, .escena-juego,
+  .escena-juego .aspirante, .escena-juego .tambor { animation: none; }
 }
