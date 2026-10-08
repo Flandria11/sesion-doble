@@ -1321,7 +1321,17 @@ textarea::placeholder { color: #61539A; }
 }
 .tarjeta-juego i { font-style: normal; font-size: 13px; color: #D6CCF2; }
 .icono-juego { font-size: 52px; line-height: 1.1; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .5)); }
-.icono-juego.girando { animation: juego-girar 7s linear infinite; }
+/* la noria: gira la rueda sobre su eje y cada cabina gira al revés sobre
+   sí misma, así se quedan colgando derechas como en una de verdad */
+.noria { display: block; margin: 0 auto; overflow: visible; }
+.noria-rueda {
+  transform-box: view-box; transform-origin: 32px 26px;
+  animation: juego-girar 9s linear infinite;
+}
+.noria-cabina {
+  transform-box: fill-box; transform-origin: center;
+  animation: juego-girar 9s linear infinite reverse;
+}
 .cara-a-cara { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .cara-a-cara img {
   width: 58px; aspect-ratio: 2/3; object-fit: cover; border-radius: 8px;
@@ -1371,6 +1381,6 @@ textarea::placeholder { color: #61539A; }
 
 @media (prefers-reduced-motion: reduce) {
   .telon.elegir-juego, .juegos h3, .tarjeta-juego, .tarjeta-juego::before,
-  .icono-juego.girando, .cerrar-juegos, .escena-juego,
+  .noria-rueda, .noria-cabina, .cerrar-juegos, .escena-juego,
   .escena-juego .aspirante, .escena-juego .tambor { animation: none; }
 }

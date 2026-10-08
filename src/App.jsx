@@ -3084,6 +3084,38 @@ function Ruleta({ lista, onFicha }) {
   )
 }
 
+/* ---- noria de la tarjeta de la ruleta ----
+ * El emoji 🎡 giraba entero, con la base dando vueltas. Dibujada aparte,
+ * la base se queda quieta, la rueda gira y las cabinas siguen derechas.
+ */
+const CABINAS = Array.from({ length: 8 }, (_, i) => {
+  const a = (i / 8) * 2 * Math.PI
+  return { x: 32 + 19 * Math.cos(a), y: 26 + 19 * Math.sin(a) }
+})
+const COLORES_CABINA = ['#F5C451', '#F0607E', '#7FD1AE', '#8AB4F8']
+
+function Noria() {
+  return (
+    <svg className="noria" viewBox="0 0 64 64" width="58" height="58" aria-hidden="true">
+      <g className="noria-rueda">
+        <circle cx="32" cy="26" r="19" fill="none" stroke="#F5C451" strokeWidth="2.2" />
+        <circle cx="32" cy="26" r="12" fill="none" stroke="#F5C451" strokeWidth="1" opacity=".5" />
+        {CABINAS.map((c, i) => (
+          <line key={i} x1="32" y1="26" x2={c.x} y2={c.y} stroke="#F7F2E9" strokeWidth="1" opacity=".7" />
+        ))}
+        {CABINAS.map((c, i) => (
+          <rect key={i} className="noria-cabina" x={c.x - 3} y={c.y - 1} width="6" height="5.5" rx="1.6"
+            fill={COLORES_CABINA[i % COLORES_CABINA.length]} />
+        ))}
+      </g>
+      {/* la base va después: queda por delante de la rueda */}
+      <path d="M32 26 L19 58 M32 26 L45 58 M15 58 H49" stroke="#D6CCF2" strokeWidth="2.6"
+        strokeLinecap="round" fill="none" />
+      <circle cx="32" cy="26" r="3" fill="#F5C451" />
+    </svg>
+  )
+}
+
 /* ---- sala de juego: todo sobre la pantalla difuminada ----
  * Primero dos tarjetas flotando para elegir, y luego el juego ahí mismo,
  * sin volver a la página normal: así no se rompe el ambiente.
@@ -3110,7 +3142,7 @@ function SalaDeJuego({ lista, juego, onJuego, onCerrar, onFicha }) {
       <div className="juegos" onClick={e => e.stopPropagation()}>
         <h3>¿A qué jugamos?</h3>
         <button className="tarjeta-juego ruleta" onClick={() => onElegir('ruleta')}>
-          <span className="icono-juego girando">🎡</span>
+          <span className="icono-juego"><Noria /></span>
           <b>Ruleta</b>
           <i>Que decida la suerte</i>
         </button>
