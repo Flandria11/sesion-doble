@@ -386,6 +386,29 @@ input::placeholder { color: #61539A; }
 }
 .marca-foto.si { color: var(--si); }
 
+/* plataformas de streaming, abajo a la izquierda (la nota va a la
+   derecha); con la franja de estado puesta, suben por encima de ella */
+.plats-foto {
+  position: absolute; left: 6px; bottom: 6px; z-index: 2;
+  display: flex; gap: 3px; pointer-events: none;
+}
+.plats-foto.alto { bottom: 28px; }
+.plats-foto img {
+  width: 20px; height: 20px; border-radius: 5px; object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+}
+/* en el juego, algo más grandes; en el torneo, arriba (abajo va el
+   título) y sin heredar el estilo de la carátula ni del rótulo */
+.tambor { position: relative; }
+.tambor .plats-foto { left: 10px; bottom: 10px; gap: 5px; }
+.tambor .plats-foto img { width: 28px; height: 28px; border-radius: 7px; }
+.aspirante { position: relative; }
+.aspirante .plats-foto { display: flex; margin: 0; top: 8px; left: 8px; bottom: auto; }
+.aspirante .plats-foto img {
+  width: 24px; height: 24px; aspect-ratio: auto; border: 0;
+  border-radius: 6px; transform: none;
+}
+
 .lamina .check {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;

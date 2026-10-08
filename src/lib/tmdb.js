@@ -615,14 +615,28 @@ export async function generos(tmdbId, tipo) {
   }
 }
 
-/** Dónde se puede ver en España. Se usa en la ficha. */
-export async function dondeVerla(tmdbId, tipo) {
+/**
+ * Dónde se puede ver en España. Se usa en la ficha y en las carátulas de
+ * Añadir: se guarda por título para no pedirlo dos veces (al abrir la
+ * ficha de una tarjeta ya pintada, por ejemplo).
+ */
+const donde = new Map()
+export function dondeVerla(tmdbId, tipo) {
+  const clave = `${tipo}-${tmdbId}`
+  if (!donde.has(clave)) donde.set(clave, pedirDonde(tmdbId, tipo))
+  return donde.get(clave)
+}
+
+async function pedirDonde(tmdbId, tipo) {
   try {
     const d = await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/watch/providers`)
     const es = (d.results || {})[REGION]
     if (!es) return []
     const vistos = new Set()
+    // "Amazon Prime Video with Ads" y compañía son la misma plataforma con
+    // otra tarifa: salía el mismo logo dos veces
     return [...(es.flatrate || []), ...(es.free || [])]
+      .filter(x => !/with ads$/i.test(x.provider_name || ''))
       .filter(x => !vistos.has(x.provider_id) && vistos.add(x.provider_id))
       .slice(0, 4)
       .map(x => ({ nombre: x.provider_name, logo: logo(x.logo_path) }))

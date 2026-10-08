@@ -1026,6 +1026,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                 <img src={p.cartel} alt="" loading="lazy" />
                 <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
                 {p.voto && !visible && !marca && <span className="nota">★ {p.voto}</span>}
+                <LogosPlataforma p={p} alto={!!marca} />
                 {visible && <span className="check">{visible === 'juntos' ? '🍿' : visible === 'coincide' ? '★' : '✓'}</span>}
                 {/* qué hay decidido, sobre la carátula: debajo, con un título
                     largo, se cortaba y no se llegaba a ver */}
@@ -1130,6 +1131,35 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
 
       {fiesta && <Fiesta p={fiesta} onCerrar={() => setFiesta(null)} />}
     </>
+  )
+}
+
+/* ---- plataformas de streaming sobre la carátula (Añadir y el juego) ----
+ * Solo suscripción o gratis (lo que da dondeVerla): lo que está en cines o
+ * solo de alquiler no lleva nada. Se pide al acercarse la tarjeta a la
+ * pantalla: de golpe serían decenas de peticiones a TMDB por carga.
+ */
+function LogosPlataforma({ p, alto }) {
+  const [lista, setLista] = useState([])
+  const caja = useRef(null)
+
+  useEffect(() => {
+    const el = caja.current
+    if (!el) return
+    let vivo = true
+    const ojo = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return
+      ojo.disconnect()
+      dondeVerla(p.tmdb_id, p.tipo).then(l => vivo && setLista(l))
+    }, { rootMargin: '300px' })
+    ojo.observe(el)
+    return () => { vivo = false; ojo.disconnect() }
+  }, [p.tmdb_id, p.tipo])
+
+  return (
+    <span className={`plats-foto${alto ? ' alto' : ''}`} ref={caja}>
+      {lista.slice(0, 3).map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
+    </span>
   )
 }
 
@@ -3038,7 +3068,7 @@ function Ruleta({ lista, onFicha }) {
       <Filtro valor={filtro} onCambio={cambiarFiltro} pelis={pelis} series={series} />
       <div className={`tambor${girando ? ' girando' : ''}`}>
         {p
-          ? <img src={p.cartel} alt="" />
+          ? <><img src={p.cartel} alt="" />{!girando && <LogosPlataforma p={p} />}</>
           : <div className="hueco">Dale al botón y que decida la suerte</div>}
       </div>
       {elegida && (
@@ -3185,7 +3215,7 @@ function Torneo({ lista, onFicha }) {
     return (
       <div className="ruleta">
         {cabecera}
-        <div className="tambor"><img src={campeona.cartel} alt="" /></div>
+        <div className="tambor"><img src={campeona.cartel} alt="" /><LogosPlataforma p={campeona} /></div>
         <div className="veredicto">
           <span>Ganadora del torneo</span>
           <button onClick={() => onFicha(campeona)}>{campeona.titulo}</button>
@@ -3212,6 +3242,7 @@ function Torneo({ lista, onFicha }) {
         {[a, b].map(p => (
           <button className="aspirante" key={p.id} onClick={() => elegir(p)}>
             <img src={p.cartel} alt="" />
+            <LogosPlataforma p={p} />
             <span>{p.titulo}</span>
           </button>
         ))}
