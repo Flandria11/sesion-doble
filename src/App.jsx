@@ -1026,7 +1026,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                 <img src={p.cartel} alt="" loading="lazy" />
                 <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
                 {p.voto && !visible && !marca && <span className="nota">★ {p.voto}</span>}
-                <LogosPlataforma p={p} alto={!!marca} />
                 {visible && <span className="check">{visible === 'juntos' ? '🍿' : visible === 'coincide' ? '★' : '✓'}</span>}
                 {/* qué hay decidido, sobre la carátula: debajo, con un título
                     largo, se cortaba y no se llegaba a ver */}
@@ -1134,12 +1133,12 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   )
 }
 
-/* ---- plataformas de streaming sobre la carátula (Añadir y el juego) ----
+/* ---- plataformas de streaming sobre la carátula del juego ----
  * Solo suscripción o gratis (lo que da dondeVerla): lo que está en cines o
  * solo de alquiler no lleva nada. Se pide al acercarse la tarjeta a la
  * pantalla: de golpe serían decenas de peticiones a TMDB por carga.
  */
-function LogosPlataforma({ p, alto }) {
+function LogosPlataforma({ p }) {
   const [lista, setLista] = useState([])
   const caja = useRef(null)
 
@@ -1157,7 +1156,7 @@ function LogosPlataforma({ p, alto }) {
   }, [p.tmdb_id, p.tipo])
 
   return (
-    <span className={`plats-foto${alto ? ' alto' : ''}`} ref={caja}>
+    <span className="plats-foto" ref={caja}>
       {lista.slice(0, 3).map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
     </span>
   )

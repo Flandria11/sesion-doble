@@ -386,13 +386,11 @@ input::placeholder { color: #61539A; }
 }
 .marca-foto.si { color: var(--si); }
 
-/* plataformas de streaming, abajo a la izquierda (la nota va a la
-   derecha); con la franja de estado puesta, suben por encima de ella */
+/* plataformas de streaming sobre la carátula, en el juego */
 .plats-foto {
   position: absolute; left: 6px; bottom: 6px; z-index: 2;
   display: flex; gap: 3px; pointer-events: none;
 }
-.plats-foto.alto { bottom: 28px; }
 .plats-foto img {
   width: 20px; height: 20px; border-radius: 5px; object-fit: cover;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
