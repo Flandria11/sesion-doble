@@ -2160,11 +2160,21 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
       <section className={`diapo suelta${abierta ? ' abierta' : ''}`}
         onClick={e => e.stopPropagation()}>
         <div className="lienzo">
-          {(p.fondo || p.cartel) && <img src={p.fondo || p.cartel} alt="" />}
+          {/* sin tráiler, la carátula, como en Ver: el fotograma de fondo es
+              apaisado y, estirado a lo alto de la ficha, solo dejaba ver un
+              trozo del centro (con "No dejes a los niños solos", casi negro) */}
+          {(p.fondo || p.cartel) && <img src={trailer === '' ? p.cartel || p.fondo : p.fondo || p.cartel} alt="" />}
           {trailer && <Trailer clave={trailer} titulo={p.titulo} cartel={p.fondo || p.cartel}
             tmdb={{ id: p.tmdb_id, tipo: p.tipo }} />}
         </div>
         <div className="velo" />
+
+        {trailer === '' && (
+          <a className="sin-trailer" target="_blank" rel="noreferrer"
+            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${p.titulo} tráiler`)}`}>
+            Sin tráiler · Buscar en YouTube ↗
+          </a>
+        )}
 
         <button className="cerrar" onClick={onCerrar} aria-label="Cerrar">×</button>
 
