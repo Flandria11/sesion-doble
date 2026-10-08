@@ -479,7 +479,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 puntuaciones={puntuaciones} onVistaJuntos={vistaJuntosDesde}
                 descartada={descartada} onDescartar={descartar}
                 guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
-            {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar} />}
+            {vista === 'votar' && <Votar cola={cola} nombres={nombres} onVotar={votar}
+                motivoDescarte={motivoDescarte} guardada={guardada} />}
             {vista === 'mias' && <Mias lista={mios} suVoto={suVoto} vistaJuntos={vistaJuntos} onQuitar={quitar}
                 guardados={guardados} guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
                 descartada={descartada} motivoDescarte={motivoDescarte}
@@ -2252,7 +2253,7 @@ function useTrailerDe(p) {
 /* Mismo formato que Estrenos: una tarjeta por pantalla, el tráiler sonando
    y las tres opciones abajo. El tráiler ya viene guardado con el título,
    así que aquí no hay que pedirle nada a TMDB. */
-function Votar({ cola, nombres, onVotar }) {
+function Votar({ cola, nombres, onVotar, motivoDescarte, guardada }) {
   const [activo, setActivo] = useState(0)
   const [abierta, setAbierta] = useState(null)
   const pista = useRef(null)
@@ -2313,6 +2314,16 @@ function Votar({ cola, nombres, onVotar }) {
                   .filter(Boolean).join(' · ')}
               </div>
               <div className="tit">{p.titulo}</div>
+              {/* lo que ya hiciste con ella en Añadir: Vista, Paso o Para mí
+                  no impiden que te llegue (con Vista puede apetecer repetir
+                  con quien la propone), pero conviene saberlo al votar */}
+              {(motivoDescarte(p) || guardada(p)) && (
+                <div className="aviso-ficha izq">
+                  {motivoDescarte(p) === 'vista' ? 'Ya la viste · ¿repetir juntos?'
+                    : motivoDescarte(p) ? 'Ya le diste a Paso'
+                    : 'La tenías guardada para ti'}
+                </div>
+              )}
               {p.nota && (
                 <div className="comentario">
                   <b>{nombres[p.propuesto_por] || 'Alguien'}:</b> {p.nota}
