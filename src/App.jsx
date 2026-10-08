@@ -3104,7 +3104,9 @@ function Noria() {
           <line key={i} x1="32" y1="26" x2={c.x} y2={c.y} stroke="#F7F2E9" strokeWidth="1" opacity=".7" />
         ))}
         {CABINAS.map((c, i) => (
-          <rect key={i} className="noria-cabina" x={c.x - 3} y={c.y - 1} width="6" height="5.5" rx="1.6"
+          // centrada justo en el aro: un poco desplazada, ese desfase giraba
+          // con la rueda y unas quedaban más dentro y otras más fuera
+          <rect key={i} className="noria-cabina" x={c.x - 3} y={c.y - 2.75} width="6" height="5.5" rx="1.6"
             fill={COLORES_CABINA[i % COLORES_CABINA.length]} />
         ))}
       </g>
