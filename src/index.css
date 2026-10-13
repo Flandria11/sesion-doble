@@ -231,6 +231,8 @@ input::placeholder { color: #61539A; }
 .plataformas {
   display: flex; gap: 7px; padding: 2px 1px 3px;
   overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0;
+  /* sin el rebote de iOS al llegar a un extremo: dejaba un hueco en blanco */
+  overscroll-behavior-x: contain;
 }
 .plataformas::-webkit-scrollbar { display: none; }
 .plataformas button {
@@ -252,6 +254,9 @@ input::placeholder { color: #61539A; }
   opacity: .8; transition: opacity .16s ease;
 }
 .flecha-plats:hover, .flecha-plats:focus-visible { opacity: 1; }
+/* sin sitio hacia ese lado: se esconde pero guarda su hueco, para que
+   la fila no salte de lado al aparecer o desaparecer */
+.flecha-plats.oculta { visibility: hidden; }
 
 .barra-filtros { display: flex; gap: 7px; align-items: center; margin-top: 8px; }
 .barra-filtros select {

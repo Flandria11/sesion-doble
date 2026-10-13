@@ -597,6 +597,25 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   const [panel, setPanel] = useState(false)
   const [agotado, setAgotado] = useState(false)
   const filaPlats = useRef(null)
+  // qué flechas tienen sentido: la de la izquierda salía siempre, también
+  // al principio, y en algunos iPhone pulsarla solo estiraba la fila y
+  // dejaba un hueco en blanco
+  const [lados, setLados] = useState({ izq: false, der: true })
+  const medirPlats = useCallback(() => {
+    const el = filaPlats.current
+    if (!el) return
+    const izq = el.scrollLeft > 2
+    const der = el.scrollLeft + el.clientWidth < el.scrollWidth - 2
+    setLados(l => (l.izq === izq && l.der === der ? l : { izq, der }))
+  }, [])
+  // al abrir el panel, al llegar las plataformas o al girar el móvil: si
+  // caben todas, tampoco hace falta la de la derecha
+  useEffect(() => {
+    if (!panel) return
+    const id = requestAnimationFrame(medirPlats)
+    window.addEventListener('resize', medirPlats)
+    return () => { cancelAnimationFrame(id); window.removeEventListener('resize', medirPlats) }
+  }, [panel, plats.length, modo, medirPlats])
   // página real de TMDB que toca pedir a continuación: puede ir por delante
   // de `pagina` (que solo cuenta "cargas" del usuario) porque una sola carga
   // puede consumir varias páginas de TMDB hasta reunir resultados nuevos
@@ -991,12 +1010,13 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                   {/* la fila no tenía scrollbar ni pista alguna de que seguía
                       hacia la derecha: con ratón, sin arrastre táctil, no
                       había forma de saber que se podía desplazar */}
-                  <button type="button" className="flecha-plats izq"
+                  <button type="button" className={`flecha-plats izq${lados.izq ? '' : ' oculta'}`}
+                    tabIndex={lados.izq ? 0 : -1} aria-hidden={!lados.izq}
                     aria-label="Ver plataformas anteriores"
                     onClick={() => filaPlats.current?.scrollBy({ left: -160, behavior: 'smooth' })}>
                     ‹
                   </button>
-                  <div className="plataformas" ref={filaPlats}
+                  <div className="plataformas" ref={filaPlats} onScroll={medirPlats}
                     onWheel={e => {
                       if (e.deltaY === 0) return
                       e.currentTarget.scrollLeft += e.deltaY
@@ -1012,7 +1032,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                       </button>
                     ))}
                   </div>
-                  <button type="button" className="flecha-plats der"
+                  <button type="button" className={`flecha-plats der${lados.der ? '' : ' oculta'}`}
+                    tabIndex={lados.der ? 0 : -1} aria-hidden={!lados.der}
                     aria-label="Ver más plataformas"
                     onClick={() => filaPlats.current?.scrollBy({ left: 160, behavior: 'smooth' })}>
                     ›
