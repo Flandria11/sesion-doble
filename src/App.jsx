@@ -206,18 +206,20 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   const [descartes, setDescartes] = useState([])
   const [guardados, setGuardados] = useState([])
   const [puntuaciones, setPuntuaciones] = useState([])
+  const [aparcadas, setAparcadas] = useState([])
   const [aviso, setAviso] = useState('')
   const [ajustes, setAjustes] = useState(false)
   const [cargando, setCargando] = useState(true)
 
   const recargar = useCallback(async () => {
-    const [t, v, p, d, g, n] = await Promise.all([
+    const [t, v, p, d, g, n, a] = await Promise.all([
       supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado', { ascending: false }),
       supabase.from('votos').select('*'),
       supabase.from('perfiles').select('id, nombre'),
       supabase.from('descartes').select('*'),
       supabase.from('guardados').select('*').order('creado', { ascending: false }),
-      supabase.from('puntuaciones').select('*').order('creado', { ascending: false })
+      supabase.from('puntuaciones').select('*').order('creado', { ascending: false }),
+      supabase.from('aparcadas').select('*')
     ])
     // si una consulta falla, se deja lo que ya había en vez de vaciarlo:
     // mejor una lista algo vieja que una lista vacía que no es verdad
@@ -229,6 +231,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     // las notas de lo visto juntos no avisan si fallan: mientras no exista
     // la tabla, el resto de la app sigue igual
     if (!n.error) setPuntuaciones(n.data || [])
+    if (!a.error) setAparcadas(a.data || [])
     setCargando(false)
     // si alguna consulta falla, se avisa en vez de dejar la pantalla a medias
     const fallo = [t, v, p, d, g].find(r => r && r.error)
@@ -244,6 +247,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       .on('postgres_changes', { event: '*', schema: 'public', table: 'titulos' }, recargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, recargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'puntuaciones' }, recargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aparcadas' }, recargar)
       .subscribe()
     return () => { supabase.removeChannel(canal) }
   }, [recargar])
@@ -261,6 +265,12 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     ...mios.filter(t => suVoto(t.id) === 'si'),
     ...suyos.filter(t => miVoto(t.id) === 'si')
   ].filter(t => !vistaJuntos(t.id))
+  // Aparcadas para más adelante (en cines, aún no está en ninguna
+  // plataforma...): siguen siendo coincidencia, pero no salen en Por ver
+  // ni en el juego hasta que alguien las recupera
+  const aparcada = id => aparcadas.some(x => x.titulo_id === id)
+  const porVer = matches.filter(t => !aparcada(t.id))
+  const masAdelante = matches.filter(t => aparcada(t.id))
   const ultimaNota = id => puntuaciones.find(x => x.titulo_id === id)?.creado || ''
   const vistas = titulos.filter(t => vistaJuntos(t.id))
     .sort((a, b) => ultimaNota(b.id).localeCompare(ultimaNota(a.id)))
@@ -287,6 +297,26 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     let t = titulos.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
     if (!t) t = await anadir(p)
     if (t) await puntuar(t.id, nota)
+  }
+
+  async function aparcar(tituloId) {
+    const anteriores = aparcadas
+    setAparcadas(l => [...l, { titulo_id: tituloId, usuario_id: yo }])
+    const { error } = await supabase.from('aparcadas').insert({ titulo_id: tituloId })
+    if (error) {
+      setAviso('No se ha podido dejar para más adelante: ' + detalle(error))
+      setAparcadas(anteriores)
+    }
+  }
+
+  async function desaparcar(tituloId) {
+    const anteriores = aparcadas
+    setAparcadas(l => l.filter(x => x.titulo_id !== tituloId))
+    const { error } = await supabase.from('aparcadas').delete().eq('titulo_id', tituloId)
+    if (error) {
+      setAviso('No se ha podido recuperar: ' + detalle(error))
+      setAparcadas(anteriores)
+    }
   }
 
   async function quitarNota(tituloId) {
@@ -444,7 +474,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     ['buscar', 'Añadir', 0],
     ['reel', 'Ver', 0],
     ['votar', 'Votar', cola.length],
-    ['match', 'Coinciden', matches.length + sinMiNota.length],
+    ['match', 'Coinciden', porVer.length + sinMiNota.length],
     ['mias', 'Mis pelis', 0]
   ]
 
@@ -488,7 +518,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 onComentar={comentar} codigo={pareja.codigo}
                 todos={titulos} votos={votos} descartes={descartes} yo={yo}
                 onVotarTitulo={votar} />}
-            {vista === 'match' && <Matches lista={matches} onRectificar={rectificar}
+            {vista === 'match' && <Matches lista={porVer} adelante={masAdelante}
+                onAparcar={aparcar} onDesaparcar={desaparcar} onRectificar={rectificar}
                 guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
                 vistas={vistas} puntuaciones={puntuaciones} yo={yo} nombres={nombres}
                 onPuntuar={puntuar} onQuitarNota={quitarNota} />}
@@ -2684,7 +2715,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
 }
 
 /* ======================= coincidencias ======================= */
-function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
+function Matches({ lista, adelante, onAparcar, onDesaparcar, onRectificar, guardada, onGuardar, onOlvidar,
   vistas, puntuaciones, yo, nombres, onPuntuar, onQuitarNota }) {
   const [ficha, setFicha] = useState(null)
   // null: la lista; 'elegir': las tarjetas flotantes; 'ruleta' / 'torneo'
@@ -2742,6 +2773,9 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
   )
 
   const hayVistas = vistas.length > 0
+  const hayAdelante = adelante.length > 0
+  const enAdelante = hayAdelante && apartado === 'adelante'
+  const esAparcada = ficha && adelante.some(a => a.id === ficha.id)
   const pendientes = vistas.filter(v => miNota(v.id) === undefined)
   // lo que te falta por votar, primero
   const ordenadas = [...pendientes, ...vistas.filter(v => miNota(v.id) !== undefined)]
@@ -2756,18 +2790,27 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
       <div className="ayuda">
         {enVistas
           ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
-          : 'Os apetecen a los dos. De aquí sale el plan.'}
+          : enAdelante
+            ? 'Os apetecen a los dos, pero para más adelante. No salen en el juego.'
+            : 'Os apetecen a los dos. De aquí sale el plan.'}
       </div>
 
-      {hayVistas && (
+      {(hayVistas || hayAdelante) && (
         <div className="pestanas">
-          <button className={!enVistas ? 'activo' : ''} onClick={() => setApartado('porver')}>
+          <button className={!enVistas && !enAdelante ? 'activo' : ''} onClick={() => setApartado('porver')}>
             Por ver ({lista.length})
           </button>
-          <button className={enVistas ? 'activo' : ''} onClick={() => setApartado('vistas')}>
-            Vistas juntos ({vistas.length})
-            {pendientes.length > 0 && <span className="num-falta">{pendientes.length}</span>}
-          </button>
+          {hayAdelante && (
+            <button className={enAdelante ? 'activo' : ''} onClick={() => setApartado('adelante')}>
+              Más adelante ({adelante.length})
+            </button>
+          )}
+          {hayVistas && (
+            <button className={enVistas ? 'activo' : ''} onClick={() => setApartado('vistas')}>
+              Vistas juntos ({vistas.length})
+              {pendientes.length > 0 && <span className="num-falta">{pendientes.length}</span>}
+            </button>
+          )}
         </div>
       )}
 
@@ -2781,10 +2824,17 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
           {bloque('Películas', ordenadas.filter(p => p.tipo !== 'tv'), true)}
           {bloque('Series', ordenadas.filter(p => p.tipo === 'tv'), true)}
         </>
+      ) : enAdelante ? (
+        <>
+          {bloque('Películas', adelante.filter(p => p.tipo !== 'tv'))}
+          {bloque('Series', adelante.filter(p => p.tipo === 'tv'))}
+        </>
       ) : !lista.length ? (
         <div className="vacio">
-          <b>Todavía ninguna</b>
-          En cuanto dos digáis que sí a lo mismo, aparece aquí.
+          <b>{hayAdelante ? 'Nada para ahora' : 'Todavía ninguna'}</b>
+          {hayAdelante
+            ? 'Lo que coincide lo habéis dejado para más adelante.'
+            : 'En cuanto dos digáis que sí a lo mismo, aparece aquí.'}
         </div>
       ) : (
         <>
@@ -2831,6 +2881,14 @@ function Matches({ lista, onRectificar, guardada, onGuardar, onOlvidar,
               <button className={`redondo${guardada(ficha) ? ' marcado' : ''}`}
                 onClick={() => (guardada(ficha) ? onOlvidar : onGuardar)(ficha)}>
                 <span>🔖</span><i>{guardada(ficha) ? 'Guardada' : 'Para mí'}</i>
+              </button>
+              <button className="redondo"
+                onClick={async () => {
+                  const id = ficha.id
+                  setFicha(null)
+                  await (esAparcada ? onDesaparcar : onAparcar)(id)
+                }}>
+                <span>{esAparcada ? '↩' : '⏳'}</span><i>{esAparcada ? 'Para ya' : 'Más adelante'}</i>
               </button>
               <button className="redondo" onClick={() => marcar('no')}>
                 <span>✕</span><i>Paso</i>
