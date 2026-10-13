@@ -2335,7 +2335,7 @@ function Votar({ cola, nombres, onVotar, motivoDescarte, guardada }) {
 
   if (!cola.length) {
     return (
-      <div className="vacio">
+      <div className="vacio lleno">
         <b>Nada que votar</b>
         Cuando alguien proponga algo nuevo, aparecerá aquí.
       </div>

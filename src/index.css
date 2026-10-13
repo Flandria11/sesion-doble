@@ -914,6 +914,17 @@ nav .num {
   display: block; margin-bottom: 7px; font-size: 17px;
   font-family: 'Anton', sans-serif; color: var(--papel);
 }
+/* Variante a pantalla completa (Votar sin nada): el recuadro llena todo el
+   hueco entre la cabecera y la barra de abajo, con el texto en el centro.
+   La app pasa a columna solo en ese caso, para no tocar el resto de vistas;
+   abajo se deja justo la barra (sin el colchón de 108px) para que el hueco
+   bajo el recuadro sea el mismo que el de arriba */
+.app:has(.vacio.lleno) {
+  display: flex; flex-direction: column; min-height: 100dvh;
+  padding-bottom: calc(48px + max(8px, env(safe-area-inset-bottom)));
+}
+main:has(> .vacio.lleno) { flex: 1; width: 100%; display: flex; flex-direction: column; }
+.vacio.lleno { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .error {
   background: #3A1730; border: 1px solid #7A3556; border-radius: 10px;
   padding: 13px 15px; font-size: 13px; color: #F2C5D6; line-height: 1.5; margin: 14px 0;
