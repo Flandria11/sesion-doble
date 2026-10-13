@@ -167,6 +167,8 @@ input::placeholder { color: #61539A; }
   margin: 0 0 4px;
 }
 .chip-juego:hover, .chip-juego:focus-visible { border-color: var(--ambar); color: var(--ambar); }
+/* debajo de las pestañas de Coincidencias iba pegado a la barra */
+.pestanas + .chip-juego { margin-top: 12px; }
 .codigo {
   font-family: 'Anton', sans-serif; font-size: 40px; letter-spacing: .16em;
   color: var(--ambar); background: var(--sala); border: 1px dashed var(--borde);
