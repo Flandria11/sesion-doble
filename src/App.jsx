@@ -211,46 +211,73 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   const [ajustes, setAjustes] = useState(false)
   const [cargando, setCargando] = useState(true)
 
-  const recargar = useCallback(async () => {
-    const [t, v, p, d, g, n, a] = await Promise.all([
-      supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado', { ascending: false }),
-      supabase.from('votos').select('*'),
-      supabase.from('perfiles').select('id, nombre'),
-      supabase.from('descartes').select('*'),
-      supabase.from('guardados').select('*').order('creado', { ascending: false }),
-      supabase.from('puntuaciones').select('*').order('creado', { ascending: false }),
-      supabase.from('aparcadas').select('*')
-    ])
+  /**
+   * Cada tabla se puede recargar por separado: antes cualquier cambio (un
+   * voto, también los tuyos, que ya estaban en pantalla) volvía a pedir las
+   * siete enteras. Lo personal (descartes, guardados) se pide solo tuyo:
+   * las reglas de la base de datos ya lo limitan, pero así no depende de ellas.
+   */
+  const recargarTablas = useCallback(async nombres => {
+    const consultas = {
+      titulos: () => supabase.from('titulos').select('*').eq('pareja_id', pareja.id).order('creado', { ascending: false }),
+      votos: () => supabase.from('votos').select('*'),
+      perfiles: () => supabase.from('perfiles').select('id, nombre'),
+      descartes: () => supabase.from('descartes').select('*').eq('usuario_id', yo),
+      guardados: () => supabase.from('guardados').select('*').eq('usuario_id', yo).order('creado', { ascending: false }),
+      puntuaciones: () => supabase.from('puntuaciones').select('*').order('creado', { ascending: false }),
+      aparcadas: () => supabase.from('aparcadas').select('*')
+    }
+    const poner = {
+      titulos: d => setTitulos(d),
+      votos: d => setVotos(d),
+      perfiles: d => setNombres(Object.fromEntries(d.map(x => [x.id, x.nombre || 'Alguien']))),
+      descartes: d => setDescartes(d),
+      guardados: d => setGuardados(d),
+      puntuaciones: d => setPuntuaciones(d),
+      aparcadas: d => setAparcadas(d)
+    }
+    const lista = nombres || Object.keys(consultas)
+    const res = await Promise.all(lista.map(n => consultas[n]()))
     // si una consulta falla, se deja lo que ya había en vez de vaciarlo:
     // mejor una lista algo vieja que una lista vacía que no es verdad
-    if (!t.error) setTitulos(t.data || [])
-    if (!v.error) setVotos(v.data || [])
-    if (!p.error) setNombres(Object.fromEntries((p.data || []).map(x => [x.id, x.nombre || 'Alguien'])))
-    if (!d.error) setDescartes(d.data || [])
-    if (!g.error) setGuardados(g.data || [])
-    // las notas de lo visto juntos no avisan si fallan: mientras no exista
-    // la tabla, el resto de la app sigue igual
-    if (!n.error) setPuntuaciones(n.data || [])
-    if (!a.error) setAparcadas(a.data || [])
+    lista.forEach((n, i) => { if (!res[i].error) poner[n](res[i].data || []) })
     setCargando(false)
-    // si alguna consulta falla, se avisa en vez de dejar la pantalla a medias
-    const fallo = [t, v, p, d, g].find(r => r && r.error)
+    // las notas y las aparcadas no avisan si fallan: son añadidos, y el
+    // resto de la app sigue igual sin ellos
+    const fallo = res.find((r, i) => r.error && !['puntuaciones', 'aparcadas'].includes(lista[i]))
     if (fallo) setAviso(`Error al cargar: ${fallo.error.message}`)
-  }, [pareja.id])
+  }, [pareja.id, yo])
+  const recargar = useCallback(() => recargarTablas(), [recargarTablas])
 
   useEffect(() => { recargar() }, [recargar])
 
-  // refresco en vivo: si la otra persona añade o vota, aparece solo
+  // Refresco en vivo: si la otra persona añade o vota, aparece solo. Se
+  // recarga solo la tabla que ha cambiado, y se espera un momento por si
+  // llegan varios avisos seguidos (proponer con nota son dos o tres)
   useEffect(() => {
+    const pendientes = new Set()
+    let reloj = null
+    const avisar = tabla => () => {
+      pendientes.add(tabla)
+      clearTimeout(reloj)
+      reloj = setTimeout(() => {
+        const nombres = [...pendientes]
+        pendientes.clear()
+        recargarTablas(nombres)
+      }, 400)
+    }
     const canal = supabase
-      .channel('sesion-doble')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'titulos' }, recargar)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, recargar)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'puntuaciones' }, recargar)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aparcadas' }, recargar)
+      .channel(`sesion-doble-${pareja.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'titulos', filter: `pareja_id=eq.${pareja.id}` }, avisar('titulos'))
+      // con filtro, Supabase no manda los borrados: van aparte, sin filtro
+      // (solo traen el id, y lo único que se hace es recargar los títulos)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'titulos' }, avisar('titulos'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, avisar('votos'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'puntuaciones' }, avisar('puntuaciones'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aparcadas' }, avisar('aparcadas'))
       .subscribe()
-    return () => { supabase.removeChannel(canal) }
-  }, [recargar])
+    return () => { clearTimeout(reloj); supabase.removeChannel(canal) }
+  }, [recargarTablas, pareja.id])
 
   // En iPhone, con la app en segundo plano, iOS corta el refresco en vivo y
   // al volver no se veía lo que la otra persona había hecho mientras tanto
@@ -317,10 +344,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       if (nueva) await quitar(t.id)
       return false
     }
-    // anadir() ya pidió recargar antes de que existiera la nota: si esa
-    // recarga llegaba después, borraba la nota de la pantalla hasta el
-    // siguiente refresco. Esta la trae ya guardada
-    recargar()
+    // se trae de la base de datos la nota ya guardada, por si un refresco
+    // en vivo de justo antes la hubiera pisado en pantalla
+    recargarTablas(['puntuaciones'])
     return true
   }
 
@@ -393,7 +419,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
       nota: nota || null
     }).select().single()
     if (error) { console.error('titulos:', error); setAviso('No se ha podido proponer: ' + detalle(error)); return null }
-    recargar()
+    // la fila nueva ya viene en la respuesta: se pone sin recargarlo todo
+    setTitulos(l => [data, ...l.filter(t => t.id !== data.id)])
     return data
   }
 
