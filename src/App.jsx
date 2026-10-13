@@ -9,6 +9,11 @@ import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, 
 const detalle = e =>
   [e.message, e.details, e.hint, e.code && `(${e.code})`].filter(Boolean).join(' · ')
 
+/** Carátula pequeña para rejillas y juegos: las tarjetas miden unos
+ *  120 px y la de 500 de ancho pesaba el doble sin verse mejor. También
+ *  vale para las guardadas en la base de datos, que llevan la de 500. */
+const chico = url => (url ? url.replace('/t/p/w500/', '/t/p/w342/') : url)
+
 /* ======================= raíz ======================= */
 export default function App() {
   const [sesion, setSesion] = useState(undefined)
@@ -1163,7 +1168,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
               <button className={`lamina${visible || fuera || yaVotada ? ' puesta' : ''}${suya ? ' suya' : ''}`}
                 onClick={() => setFicha(p)}
                 aria-label={`Ver información de ${p.titulo}`}>
-                <img src={p.cartel} alt="" loading="lazy" />
+                <img src={chico(p.cartel)} alt="" loading="lazy" />
                 <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
                 {p.voto && !visible && !marca && <span className="nota">★ {p.voto}</span>}
                 {visible && <span className="check">{visible === 'juntos' ? '🍿' : visible === 'coincide' ? '★' : '✓'}</span>}
@@ -2835,7 +2840,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
               <button className={`lamina${v === 'no' ? ' puesta' : ''}`}
                 onClick={() => setFicha(p)}
                 aria-label={`Ver información de ${p.titulo}`}>
-                <img src={p.cartel} alt="" loading="lazy" />
+                <img src={chico(p.cartel)} alt="" loading="lazy" />
                 {p.nota && <span className="tag">💬</span>}
                 <span className={`sello-foto ${juntos ? 'si' : v || ''}`}>{juntos ? '🍿 Vista juntos' : texto_voto(v)}</span>
               </button>
@@ -2889,7 +2894,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
                   <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
                     <button className="lamina" onClick={() => setFicha(p)}
                       aria-label={`Ver información de ${p.titulo}`}>
-                      <img src={p.cartel} alt="" loading="lazy" />
+                      <img src={chico(p.cartel)} alt="" loading="lazy" />
                       <span className="tag">{p.tipo === 'tv' ? 'Serie' : 'Peli'}</span>
                       {descartada(p) && (
                         <span className={`sello-foto ${motivoDescarte(p) === 'vista' ? 'vista' : 'no'}`}>
@@ -3009,7 +3014,7 @@ function Matches({ lista, adelante, onAparcar, onDesaparcar, onRectificar, guard
             <button className={`lamina${conNotas && miNota(p.id) === undefined ? ' falta' : ''}`}
               onClick={() => setFicha(p)}
               aria-label={`Ver información de ${p.titulo}`}>
-              <img src={p.cartel} alt="" loading="lazy" />
+              <img src={chico(p.cartel)} alt="" loading="lazy" />
               {conNotas && media(p.id) && <span className="nota">★ {media(p.id)}</span>}
               {conNotas && miNota(p.id) === undefined && <span className="aviso-falta">Te falta votar</span>}
             </button>
@@ -3315,7 +3320,7 @@ function Historial({ todos, votos, descartes, yo, puntuaciones, nombres, onRecup
               <div className="tarjeta" key={f.clave}>
                 <button className="lamina puesta" onClick={() => setFicha(f)}
                   aria-label={`Ver información de ${f.titulo}`}>
-                  {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
+                  {f.cartel && <img src={chico(f.cartel)} alt="" loading="lazy" />}
                   {buscando && (
                     <span className={`sello-foto ${f.estado}`}>
                       {f.origen === 'juntos' ? '🍿 Juntos' : f.estado === 'vista' ? '👁 Vista' : '✕ No interesa'}
@@ -3419,7 +3424,7 @@ function Ruleta({ lista, onFicha }) {
       <Filtro valor={filtro} onCambio={cambiarFiltro} pelis={pelis} series={series} />
       <div className={`tambor${girando ? ' girando' : ''}`}>
         {p
-          ? <><img src={p.cartel} alt="" />{!girando && <LogosPlataforma p={p} />}</>
+          ? <><img src={chico(p.cartel)} alt="" />{!girando && <LogosPlataforma p={p} />}</>
           : <div className="hueco">Dale al botón y que decida la suerte</div>}
       </div>
       {elegida && (
@@ -3626,7 +3631,7 @@ function Torneo({ lista, onFicha }) {
       <div className="duelo">
         {[a, b].map(p => (
           <button className="aspirante" key={p.id} onClick={() => elegir(p)}>
-            <img src={p.cartel} alt="" />
+            <img src={chico(p.cartel)} alt="" />
             <LogosPlataforma p={p} />
             <span>{p.titulo}</span>
           </button>
