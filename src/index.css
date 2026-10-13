@@ -335,7 +335,9 @@ input::placeholder { color: #61539A; }
   background: transparent; border: 1px solid var(--borde);
   padding: 4px 10px; font-size: 11px;
 }
-.filtros.sub button.activo { border-color: var(--ambar); }
+/* el fondo transparente de arriba pisaba el ámbar del activo y dejaba el
+   texto oscuro sobre fondo oscuro: no se leía cuál estaba marcado */
+.filtros.sub button.activo { background: var(--ambar); color: var(--noche); border-color: var(--ambar); }
 
 .catalogo {
   display: grid; grid-template-columns: repeat(3, 1fr);

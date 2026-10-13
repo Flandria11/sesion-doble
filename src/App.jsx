@@ -2841,13 +2841,6 @@ function Matches({ lista, adelante, onAparcar, onDesaparcar, onRectificar, guard
       <h2>Coincidencias</h2>
       {/* jugando, solo el juego: las pestañas de Por ver / Vistas juntos
           distraían y se volvía a la lista con "← Lista" */}
-      <div className="ayuda">
-        {enVistas
-          ? 'Lo que ya habéis visto juntos, con la nota de cada uno.'
-          : enAdelante
-            ? 'Os apetecen a los dos, pero para más adelante. No salen en el juego.'
-            : 'Os apetecen a los dos. De aquí sale el plan.'}
-      </div>
 
       {(hayVistas || hayAdelante) && (
         <div className="pestanas">
@@ -3090,10 +3083,6 @@ function Historial({ todos, votos, descartes, yo, puntuaciones, nombres, onRecup
 
   return (
     <>
-      <div className="ayuda">
-        Tus decisiones. La otra persona no ve esta pantalla.
-      </div>
-
       <input className="busca" type="text" placeholder="Buscar por nombre…"
         value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
 
