@@ -181,7 +181,7 @@ export const ANOS = Array.from({ length: new Date().getFullYear() - ANO_MAS_ANTI
 const VOTOS = { valoradas: 1000, normal: 80 }
 const NOTA_MINIMA_ANADIR = 5.2
 const NOTA_MINIMA_ANADIR_TV = 5.8
-const NOTA_MINIMA_TOP = 7
+const NOTA_MINIMA_TOP = 7.3
 const NOTA_MINIMA_TOP_TV = 7.7
 const NOTA_MINIMA_ESTRENOS = 6.1
 const NOTA_MINIMA_ESTRENOS_TV = 6.7
@@ -514,7 +514,7 @@ export async function topValoradas(pagina = 1) {
     include_adult: 'false',
     sort_by: 'popularity.desc'
   }
-  const filtroPelis = { 'vote_count.gte': '3000', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace }
+  const filtroPelis = { 'vote_count.gte': '3500', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace }
   const filtroSeries = { 'vote_count.gte': '2000', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace }
 
   if (pagina === 1 || !ordenTop) {
