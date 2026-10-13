@@ -294,7 +294,9 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     if (error) {
       setAviso('No se ha podido guardar la nota: ' + detalle(error))
       setPuntuaciones(anteriores)
+      return false
     }
+    return true
   }
 
   /**
@@ -304,8 +306,22 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
    */
   async function vistaJuntosDesde(p, nota) {
     let t = titulos.find(x => x.tmdb_id === p.tmdb_id && x.tipo === p.tipo)
+    const nueva = !t
     if (!t) t = await anadir(p)
-    if (t) await puntuar(t.id, nota)
+    if (!t) return false
+    const ok = await puntuar(t.id, nota)
+    // Si la nota no llega a guardarse, la propuesta recién creada se retira:
+    // antes se quedaba a medias, como propuesta tuya en Mis pelis y sin
+    // nota, así que ni era vista juntos ni dejaba volver a marcarla bien
+    if (!ok) {
+      if (nueva) await quitar(t.id)
+      return false
+    }
+    // anadir() ya pidió recargar antes de que existiera la nota: si esa
+    // recarga llegaba después, borraba la nota de la pantalla hasta el
+    // siguiente refresco. Esta la trae ya guardada
+    recargar()
+    return true
   }
 
   async function aparcar(tituloId) {
@@ -1220,9 +1236,10 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
             onGuardar={async nota => {
               const p = puntuando
               setPuntuando(null); setFicha(null)
-              await onVistaJuntos(p, nota)
-              setFlash(`${p.titulo} está en Vistas juntos`)
-              setTimeout(() => setFlash(''), 2600)
+              const ok = await onVistaJuntos(p, nota)
+              setFlash(ok ? `${p.titulo} está en Vistas juntos`
+                : `No se ha podido marcar ${p.titulo} como vista juntos. Prueba otra vez`)
+              setTimeout(() => setFlash(''), ok ? 2600 : 4000)
             }} />
         )
       })()}
@@ -2244,9 +2261,10 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
           onGuardar={async nota => {
             const p = puntuando
             setPuntuando(null)
-            await onVistaJuntos(p, nota)
-            setAvisoVoto(`${p.titulo} está en Vistas juntos`)
-            setTimeout(() => setAvisoVoto(''), 3200)
+            const ok = await onVistaJuntos(p, nota)
+            setAvisoVoto(ok ? `${p.titulo} está en Vistas juntos`
+              : `No se ha podido marcar ${p.titulo} como vista juntos. Prueba otra vez`)
+            setTimeout(() => setAvisoVoto(''), ok ? 3200 : 4000)
           }} />
       )}
 
