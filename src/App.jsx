@@ -1662,18 +1662,58 @@ const memoriaTop = { lista: [], pagina: 1, scroll: 0, fin: false }
  * su propio scroll; aquí solo se atiende el gesto cuando es más
  * horizontal que vertical, así los dos conviven sin pisarse. */
 const UMBRAL_DESLIZAR = 110
+// píxeles que hay que mover el dedo antes de decidir si el gesto es de
+// lado (tarjeta) o de arriba abajo (scroll de la pista)
+const UMBRAL_DIRECCION = 8
 
 function Deslizable({ className, dataI, onSi, onNo, children }) {
   const [dx, setDx] = useState(0)
   const [modo, setModo] = useState('quieto') // quieto | arrastrando | volando
   const inicio = useRef(null)
   const arrastro = useRef(false)
+  // 'h' | 'v' | null: una vez decidida, la dirección no cambia hasta soltar.
+  // Antes se miraba en cada movimiento, y un arrastre de lado que se torcía
+  // un poco hacia abajo dejaba de mover la tarjeta a mitad de camino
+  const direccion = useRef(null)
+  const caja = useRef(null)
+  // lo último que se ha movido, al momento: en un deslizamiento rápido el
+  // dedo se suelta antes de que React pinte el último dx, y con el del
+  // estado no se llegaba al umbral aunque el dedo sí lo hubiera pasado
+  const ultimoDx = useRef(0)
+
+  const decidir = (x, y) => {
+    if (direccion.current || !inicio.current) return
+    const dif = x - inicio.current.x
+    const alto = y - inicio.current.y
+    if (Math.abs(dif) < UMBRAL_DIRECCION && Math.abs(alto) < UMBRAL_DIRECCION) return
+    direccion.current = Math.abs(dif) > Math.abs(alto) ? 'h' : 'v'
+  }
+
+  // En iPhone, Safari empieza el scroll de la pista en cuanto el dedo baja
+  // un poco (y siempre baja algo), y entonces corta el arrastre con un
+  // pointercancel: la tarjeta volvía a su sitio a medio deslizar. Los
+  // eventos pointer no pueden impedir ese scroll; touchmove sí, pero solo
+  // con un oyente no pasivo, que React no permite poner con onTouchMove.
+  // Si el gesto es de lado, se bloquea el scroll y la tarjeta sigue el dedo.
+  useEffect(() => {
+    const el = caja.current
+    if (!el) return
+    const alMover = e => {
+      const t = e.touches[0]
+      if (t) decidir(t.clientX, t.clientY)
+      if (direccion.current === 'h' && e.cancelable) e.preventDefault()
+    }
+    el.addEventListener('touchmove', alMover, { passive: false })
+    return () => el.removeEventListener('touchmove', alMover)
+  }, [])
 
   const empezar = e => {
     // los botones y controles del vídeo siguen funcionando con su propio toque
     if (e.target.closest('button, .mandos-video, .centro')) return
     inicio.current = { x: e.clientX, y: e.clientY }
     arrastro.current = false
+    direccion.current = null
+    ultimoDx.current = 0
     setModo('arrastrando')
     setDx(0)
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -1683,9 +1723,10 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
     const dif = e.clientX - inicio.current.x
     const alto = e.clientY - inicio.current.y
     if (Math.abs(dif) > 6 || Math.abs(alto) > 6) arrastro.current = true
-    // si el gesto es más vertical que horizontal, se deja para el scroll
-    // de la pista y no se mueve la tarjeta
-    if (Math.abs(dif) >= Math.abs(alto)) setDx(dif)
+    decidir(e.clientX, e.clientY)
+    // si el gesto es vertical, se deja para el scroll de la pista y no se
+    // mueve la tarjeta
+    if (direccion.current === 'h') { ultimoDx.current = dif; setDx(dif) }
   }
   const volar = (lado, accion) => {
     setModo('volando')
@@ -1695,21 +1736,30 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
   const soltar = e => {
     if (!inicio.current) return
     inicio.current = null
+    direccion.current = null
     // se libera a mano en vez de fiarse del navegador: dentro de una pista
     // con scroll-snap, en Android a veces el pointerup no suelta la
     // captura del todo, y el siguiente toque (aunque fuera en un botón)
     // se quedaba sin respuesta hasta que algo más lo desatascaba
     try { e && e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* ya liberado */ }
-    if (dx > UMBRAL_DESLIZAR) volar('si', onSi)
-    else if (dx < -UMBRAL_DESLIZAR) volar('no', onNo)
+    const final = ultimoDx.current
+    ultimoDx.current = 0
+    if (final > UMBRAL_DESLIZAR) volar('si', onSi)
+    else if (final < -UMBRAL_DESLIZAR) volar('no', onNo)
     else { setModo('quieto'); setDx(0) }
   }
   // red de seguridad: si el navegador suelta la captura por su cuenta
   // (cambia de gesto, pierde el foco...) sin pasar por soltar(), el
   // estado se queda a medias y bloquea el siguiente toque. Esto lo repone.
+  // Solo si el arrastre seguía abierto: soltar() libera la captura a mano y
+  // eso también dispara lostpointercapture, que llegaba con la tarjeta ya
+  // saliendo volando y la devolvía a su sitio a mitad de la animación.
   const perderCaptura = () => {
+    if (!inicio.current) return
     inicio.current = null
     arrastro.current = false
+    direccion.current = null
+    ultimoDx.current = 0
     setModo('quieto')
     setDx(0)
   }
@@ -1726,11 +1776,14 @@ function Deslizable({ className, dataI, onSi, onNo, children }) {
 
   const estilo = dx === 0 ? undefined : {
     transform: `translateX(${dx}px) rotate(${dx / 18}deg)`,
-    transition: modo === 'arrastrando' ? 'none' : 'transform .25s ease'
+    transition: modo === 'arrastrando' ? 'none' : 'transform .25s ease',
+    // capa propia mientras se mueve: sin esto, en iPhone la tarjeta (con el
+    // vídeo dentro) se repintaba entera en cada píxel y el arrastre iba a saltos
+    willChange: 'transform'
   }
 
   return (
-    <section className={className} data-i={dataI} style={estilo}
+    <section ref={caja} className={className} data-i={dataI} style={estilo}
       onPointerDown={empezar} onPointerMove={mover}
       onPointerUp={soltar} onPointerCancel={soltar}
       onLostPointerCapture={perderCaptura}
