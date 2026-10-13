@@ -1109,7 +1109,9 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
             etiquetaBoton={e && e.tipo === 'suyo' ? 'Me apetece' : undefined}
             aviso={marca}
             onCerrar={() => setFicha(null)}
-            onProponer={async nota => { setFicha(null); await actuar(ficha, nota) }}
+            // la ficha se queda abierta: si estabas a mitad del tráiler, sigue;
+            // el botón pasa a "Propuesta" y sales tú cuando quieras
+            onProponer={async nota => { await actuar(ficha, nota) }}
             acciones={
               <>
                 <button className={`redondo${juntos ? ' marcado' : ''}`}
@@ -1890,6 +1892,14 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
   const [comentando, setComentando] = useState(null)
   const [avisoVoto, setAvisoVoto] = useState('')
   const [puntuando, setPuntuando] = useState(null)
+  // Propuestas con el botón: se quedan en la pista (con su ✓) para poder
+  // acabar de ver el tráiler; antes desaparecían al momento. Deslizar sí
+  // las saca, como siempre
+  const [retenidas, setRetenidas] = useState(() => new Set())
+  const soltarRetenida = clave => setRetenidas(r => {
+    if (!r.has(clave)) return r
+    const n = new Set(r); n.delete(clave); return n
+  })
   const pista = useRef(null)
 
   const estado = p => {
@@ -1909,7 +1919,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
     if (descartada(p)) return false
     if (guardada(p)) return false
     const e = estado(p)
-    if (e && (e.tipo === 'mio' || e.tipo === 'coincide')) return false
+    if (e && (e.tipo === 'mio' || e.tipo === 'coincide') && !retenidas.has(`${p.tipo}-${p.tmdb_id}`)) return false
     if (e && ['no', 'vista'].includes(miVoto(e.t.id))) return false
     if (e && puntuaciones.some(n => n.titulo_id === e.t.id)) return false
     return true
@@ -2056,7 +2066,8 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
           return (
             <Deslizable className={`diapo${abierta === clave ? ' abierta' : ''}`}
               dataI={i} key={clave}
-              onSi={() => proponer(p)} onNo={() => onDescartar(p, 'no_interesa')}>
+              onSi={() => { soltarRetenida(clave); proponer(p) }}
+              onNo={() => { soltarRetenida(clave); onDescartar(p, 'no_interesa') }}>
               <div className="lienzo">
                 {/* sin tráiler, la carátula: es vertical como la tarjeta y
                     dice más que el fotograma de fondo, que queda recortado */}
@@ -2066,7 +2077,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
 
               <div className="torre">
                 <button className={`redondo principal${puesto ? ' hecho' : ''}`}
-                  onClick={() => proponer(p)}
+                  onClick={() => { setRetenidas(r => new Set(r).add(clave)); proponer(p) }}
                   disabled={!!puesto || anadiendo === p.tmdb_id}>
                   <span>{puesto ? '✓' : '+'}</span>
                   <i>{puesto ? 'Puesta' : 'Proponer'}</i>
