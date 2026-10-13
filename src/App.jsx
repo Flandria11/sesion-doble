@@ -2715,11 +2715,13 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
   const [editando, setEditando] = useState(null)
   const [texto, setTexto] = useState('')
 
+  // es el voto de la otra persona: "Sin votar" parecía decir que te
+  // faltaba votar a ti, y tu propia propuesta no se vota
   const texto_voto = v =>
     v === 'si' ? '♥ Le gusta'
     : v === 'vista' ? '👁 Vista'
     : v === 'no' ? '✕ Descartada'
-    : 'Sin votar'
+    : '⏳ Esperando su voto'
 
   function abrirComentario(p) {
     setEditando(p.id)
