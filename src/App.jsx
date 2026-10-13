@@ -1896,6 +1896,9 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
   // acabar de ver el tráiler; antes desaparecían al momento. Deslizar sí
   // las saca, como siempre
   const [retenidas, setRetenidas] = useState(() => new Set())
+  // comentarios escritos antes de proponer, por tarjeta: al proponer (con
+  // el botón o deslizando) la propuesta se guarda ya con ellos
+  const [borradores, setBorradores] = useState({})
   const soltarRetenida = clave => setRetenidas(r => {
     if (!r.has(clave)) return r
     const n = new Set(r); n.delete(clave); return n
@@ -2032,8 +2035,10 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
         await onVotar(e.t.id, 'si')
         setFiesta(p)
       } else {
-        const fila = await onAdd(p)
+        const clave = `${p.tipo}-${p.tmdb_id}`
+        const fila = await onAdd(p, borradores[clave] || '')
         if (fila) {
+          setBorradores(b => { const n = { ...b }; delete n[clave]; return n })
           setRecien({ ...fila, titulo: p.titulo })
           setTimeout(() => setRecien(r => (r && r.id === fila.id ? null : r)), 6000)
         }
@@ -2095,6 +2100,16 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
                   onClick={() => onGuardar(p)} disabled={guardada(p)}>
                   <span>🔖</span><i>{guardada(p) ? 'Guardada' : 'Para mí'}</i>
                 </button>
+                {/* el comentario va con la propuesta: si la propuso la otra
+                    persona, el que cuenta es el suyo */}
+                {(!e || e.tipo === 'mio') && (
+                  <button className={`redondo${borradores[clave] || (e && e.t.nota) ? ' marcado' : ''}`}
+                    onClick={() => setComentando(e
+                      ? { id: e.t.id, titulo: p.titulo, nota: e.t.nota }
+                      : { clave, titulo: p.titulo, nota: borradores[clave] })}>
+                    <span>💬</span><i>{borradores[clave] || (e && e.t.nota) ? 'Comentada' : 'Comentar'}</i>
+                  </button>
+                )}
               </div>
 
               <div className="cuerpo">
@@ -2132,6 +2147,12 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
         <Comentario titulo={comentando.titulo} inicial={comentando.nota || ''}
           onCerrar={() => setComentando(null)}
           onGuardar={async nota => {
+            // aún sin proponer: se guarda para cuando la propongas
+            if (!comentando.id) {
+              setBorradores(b => ({ ...b, [comentando.clave]: nota }))
+              setComentando(null)
+              return
+            }
             await onComentar(comentando.id, nota)
             setComentando(null); setRecien(null)
           }} />
