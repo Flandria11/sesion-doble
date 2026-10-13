@@ -604,6 +604,27 @@ export async function topValoradas(pagina = 1) {
 // ejemplo, con "Una noche al año". Se dejan para el final.
 const DE_OTRO_PAIS = /\b(uk|u\.k\.|australia|australian|canada|canadian|india|irish|nz|new zealand|south africa)\b/i
 
+/**
+ * Ficha completa de un título en UNA petición: datos, vídeos (español e
+ * inglés) y dónde verla. Antes la ficha hacía cinco (tráiler en dos
+ * idiomas, géneros, plataformas y sinopsis) y proponer cuatro, pidiendo
+ * dos veces lo mismo. Se guarda por título durante la sesión.
+ */
+const detalles = new Map()
+function detalle(tmdbId, tipo) {
+  const clave = `${tipo}-${tmdbId}`
+  if (!detalles.has(clave)) {
+    const promesa = pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
+      append_to_response: 'videos,watch/providers',
+      include_video_language: 'es,en'
+    })
+    detalles.set(clave, promesa)
+    // si falla, que se pueda volver a pedir
+    promesa.catch(() => detalles.delete(clave))
+  }
+  return detalles.get(clave)
+}
+
 const listas = new Map()
 
 /**
@@ -615,11 +636,10 @@ const listas = new Map()
 export function buscarTrailers(tmdbId, tipo) {
   const clave = `${tipo}-${tmdbId}`
   if (listas.has(clave)) return listas.get(clave)
-  const ruta = `/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/videos`
   const promesa = (async () => {
-    // los dos idiomas a la vez: uno detrás de otro se notaba al arrancar
-    const respuestas = await Promise.all(['es-ES', 'en-US'].map(idioma =>
-      pedir(ruta, { language: idioma }).catch(() => ({ results: [] }))))
+    // vienen juntos los dos idiomas: se separan para mirar antes el español
+    const videos = await detalle(tmdbId, tipo).then(d => d.videos?.results || []).catch(() => [])
+    const respuestas = ['es', 'en'].map(idioma => ({ results: videos.filter(v => v.iso_639_1 === idioma) }))
     const claves = []
     const nota = x => (x.type === 'Trailer' ? 0 : 2) + (DE_OTRO_PAIS.test(x.name || '') ? 1 : 0)
     // el español primero, luego el inglés: el orden del array lo mantiene
@@ -659,7 +679,7 @@ export async function buscarTrailer(tmdbId, tipo) {
 /** Géneros legibles de un título, para la ficha. */
 export async function generos(tmdbId, tipo) {
   try {
-    const d = await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`)
+    const d = await detalle(tmdbId, tipo)
     return (d.genres || []).map(g => g.name).slice(0, 2).join(' · ')
   } catch (e) {
     return ''
@@ -680,8 +700,13 @@ export function dondeVerla(tmdbId, tipo) {
 
 async function pedirDonde(tmdbId, tipo) {
   try {
-    const d = await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/watch/providers`)
-    const es = (d.results || {})[REGION]
+    // si la ficha completa ya está pedida, sale de ahí; si no (las carátulas
+    // de la rejilla), se pide solo esto, que pesa mucho menos
+    const ficha = detalles.get(`${tipo}-${tmdbId}`)
+    const d = ficha
+      ? (await ficha)['watch/providers']
+      : await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/watch/providers`)
+    const es = ((d && d.results) || {})[REGION]
     if (!es) return []
     const vistos = new Set()
     // "Amazon Prime Video with Ads" y compañía son la misma plataforma con
@@ -704,6 +729,9 @@ async function pedirDonde(tmdbId, tipo) {
  */
 export async function sinopsisDe(tmdbId, tipo) {
   try {
+    const base = await detalle(tmdbId, tipo)
+    if (base.overview) return base.overview
+    // las traducciones pesan bastante: solo si no la hay en español
     const d = await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
       append_to_response: 'translations'
     })
