@@ -1,0 +1,31 @@
+# Rehace cada semana la tabla notas_ajustadas (ver scripts/notas-imdb.mjs).
+# Necesita dos secretos en GitHub > Settings > Secrets and variables > Actions:
+#   TMDB_KEY      la misma clave de TMDB que VITE_TMDB_KEY en .env.local
+#   DATABASE_URL  la conexión directa a Postgres de .env.local
+name: Notas IMDb
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'   # los lunes a las 4:00 UTC
+  workflow_dispatch:       # y a mano, desde la pestaña Actions
+
+jobs:
+  notas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # aparte del proyecto: pg solo hace falta aquí, no en la app
+      - name: Preparar
+        run: |
+          mkdir -p "$RUNNER_TEMP/notas" && cp scripts/notas-imdb.mjs "$RUNNER_TEMP/notas/"
+          cd "$RUNNER_TEMP/notas" && npm init -y > /dev/null && npm install --silent pg@8
+      - name: Cruzar notas
+        working-directory: ${{ runner.temp }}/notas
+        env:
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node notas-imdb.mjs

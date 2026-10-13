@@ -1,3 +1,5 @@
+import { supabase } from './supabase'
+
 const KEY = import.meta.env.VITE_TMDB_KEY
 const BASE = 'https://api.themoviedb.org/3'
 const REGION = 'ES'
@@ -189,15 +191,58 @@ const NOTA_MINIMA_ANIMACION_TOP = 7.5
 const NOTA_MINIMA_ANIMACION_TOP_TV = 8.3
 
 /**
+ * Nota corregida con IMDb. Donde TMDB e IMDb se separan 0,7 o más (en
+ * cualquier sentido) manda la de IMDb: TMDB infla mucho lo que tiene fans
+ * muy fieles (Culpa mía: 7,7 en TMDB, 6,1 en IMDb) y a veces se queda corto
+ * con otras. Solo sirve para decidir qué entra en cada apartado: lo que se
+ * enseña en las tarjetas sigue siendo la nota de TMDB. La tabla la rellena
+ * scripts/notas-imdb.mjs cada semana; aquí se lee una vez por sesión.
+ */
+const MARGEN_AJUSTE = 0.7
+let notasPromesa = null
+function notasAjustadas() {
+  if (!notasPromesa) {
+    notasPromesa = (async () => {
+      // Supabase entrega como mucho 1000 filas por consulta: la primera dice
+      // cuántas hay y el resto de trozos se piden a la vez, no uno tras otro
+      const trozo = desde => supabase.from('notas_ajustadas')
+        .select('tmdb_id, tipo, nota', desde === 0 ? { count: 'exact' } : undefined)
+        .range(desde, desde + 999)
+      const primera = await trozo(0)
+      if (primera.error) throw primera.error
+      const resto = await Promise.all(
+        Array.from({ length: Math.ceil((primera.count || 0) / 1000) - 1 }, (_, i) => trozo((i + 1) * 1000)))
+      const m = new Map()
+      for (const r of [primera, ...resto]) {
+        if (r.error) throw r.error
+        for (const f of r.data) m.set(`${f.tipo}-${f.tmdb_id}`, Number(f.nota))
+      }
+      return m
+    })().catch(() => {
+      // sin la lista se usa la nota de TMDB, y se reintenta en la próxima carga
+      notasPromesa = null
+      return new Map()
+    })
+  }
+  return notasPromesa
+}
+const notaDe = (aj, x, tipo) => aj.get(`${tipo}-${x.id}`) ?? x.vote_average
+// lo que pasa el listón con la nota corregida
+const pasaNota = (aj, tipo, minimo) => x => notaDe(aj, x, tipo) >= minimo
+// A TMDB se le pide algo por debajo del listón, para que lleguen también
+// las que IMDb sube por encima; luego pasaNota deja solo lo que toca
+const minimoPedido = (aj, minimo) => String(aj.size ? Math.round((minimo - MARGEN_AJUSTE) * 10) / 10 : minimo)
+
+/**
  * Suelo de calidad en Añadir: sin
  * esto colaban pelis de serie Z con nota de 2 con tal de tener algo de
  * votos. Tendencias/Populares/Cines/Valoradas siguen ordenados como
  * los da TMDB (por eso salen antes las más populares); esto solo
  * recorta lo que se cuela por detrás.
  */
-const filtrarBase = (lista, esPeli) =>
+const filtrarBase = (aj, lista, esPeli) =>
   lista.filter(x =>
-    x.vote_average >= (esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV) &&
+    notaDe(aj, x, esPeli ? 'movie' : 'tv') >= (esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV) &&
     x.vote_count >= VOTOS.normal
   )
 
@@ -230,6 +275,7 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
   const esPeli = tipo !== 'tv'
   const base = { page: String(pagina) }
   const filtrando = proveedores.length > 0 || genero || desde || hasta
+  const aj = await notasAjustadas()
 
   if (!filtrando) {
     if (modo === 'cines' && esPeli) {
@@ -238,11 +284,11 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     }
     if (modo === 'tendencias') {
       const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)
-      return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
+      return limpiar(filtrarBase(aj, d.results, esPeli), esPeli ? 'movie' : 'tv')
     }
     if (modo === 'populares') {
       const d = await pedir(`/${esPeli ? 'movie' : 'tv'}/popular`, { ...base, region: REGION })
-      return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
+      return limpiar(filtrarBase(aj, d.results, esPeli), esPeli ? 'movie' : 'tv')
     }
     // Mejor valoradas ya no usa /top_rated: ahí entraban títulos con 400
     // votos (Batman: Knightfall, Socias por accidente...) por delante de
@@ -257,7 +303,7 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     'vote_count.gte': String(
       modo === 'valoradas' ? VOTOS.valoradas : VOTOS.normal
     ),
-    'vote_average.gte': String(esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV)
+    'vote_average.gte': minimoPedido(aj, esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV)
   }
 
   // filtro de año: desde el 1 de enero de uno hasta el 31 de diciembre del otro
@@ -288,7 +334,8 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
   }
 
   const d = await pedir(`/discover/${esPeli ? 'movie' : 'tv'}`, p)
-  return limpiar(d.results, esPeli ? 'movie' : 'tv')
+  const minimo = esPeli ? NOTA_MINIMA_ANADIR : NOTA_MINIMA_ANADIR_TV
+  return limpiar(d.results.filter(pasaNota(aj, esPeli ? 'movie' : 'tv', minimo)), esPeli ? 'movie' : 'tv')
 }
 
 /**
@@ -360,7 +407,7 @@ export async function estrenos(pagina = 1) {
     include_adult: 'false'
   }
 
-  const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
+  const [mapaPelis, mapaSeries, aj] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv'), notasAjustadas()])
 
   /**
    * De pelis se piden dos páginas por tanda y de series una. TMDB tiene
@@ -372,11 +419,11 @@ export async function estrenos(pagina = 1) {
     ...comun,
     page: String(pg),
     'vote_count.gte': v.votos,
-    'vote_average.gte': String(NOTA_MINIMA_ESTRENOS),
+    'vote_average.gte': minimoPedido(aj, NOTA_MINIMA_ESTRENOS),
     sort_by: 'primary_release_date.desc',
     'primary_release_date.gte': v.desde,
     'primary_release_date.lte': v.hasta
-  }).then(d => limpiar(d.results, 'movie', mapaPelis)).catch(() => [])
+  }).then(d => limpiar(d.results.filter(pasaNota(aj, 'movie', NOTA_MINIMA_ESTRENOS)), 'movie', mapaPelis)).catch(() => [])
 
   const tandas = await Promise.all(
     ventanas.flatMap(v => [
@@ -385,11 +432,11 @@ export async function estrenos(pagina = 1) {
         ...comun,
         page: String(pagina),
         'vote_count.gte': v.votosTv,
-        'vote_average.gte': String(NOTA_MINIMA_ESTRENOS_TV),
+        'vote_average.gte': minimoPedido(aj, NOTA_MINIMA_ESTRENOS_TV),
         sort_by: 'first_air_date.desc',
         'first_air_date.gte': v.desde,
         'first_air_date.lte': v.hasta
-      }).then(d => limpiar(d.results, 'tv', mapaSeries)).catch(() => [])
+      }).then(d => limpiar(d.results.filter(pasaNota(aj, 'tv', NOTA_MINIMA_ESTRENOS_TV)), 'tv', mapaSeries)).catch(() => [])
     ])
   )
 
@@ -444,8 +491,8 @@ const GENERO_ANIMACION = 16
  * pasar como mucho 1 de cada 6, para que siga saliendo pero sin
  * comerse el resto.
  */
-function limitarAnimacion(resultados, notaMinima) {
-  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION) && x.vote_average >= notaMinima)
+function limitarAnimacion(resultados, notaMinima, aj, tipo) {
+  const anim = resultados.filter(x => x.genre_ids?.includes(GENERO_ANIMACION) && notaDe(aj, x, tipo) >= notaMinima)
   const resto = resultados.filter(x => !x.genre_ids?.includes(GENERO_ANIMACION))
   const maxAnim = Math.ceil(resto.length / 5)
   return [...resto, ...anim.slice(0, maxAnim)]
@@ -477,16 +524,20 @@ let ordenTop = null
 const TOTALES_TOP = 'sd:top-totales'
 
 async function totalesTop(comun, filtroPelis, filtroSeries) {
+  // con otros mínimos hay otras páginas: lo guardado solo vale si se
+  // contó con los mismos (si no, al cambiarlos se usaban cuentas viejas)
+  const firma = JSON.stringify([filtroPelis['vote_count.gte'], filtroPelis['vote_average.gte'],
+    filtroSeries['vote_count.gte'], filtroSeries['vote_average.gte']])
   try {
     const g = JSON.parse(localStorage.getItem(TOTALES_TOP) || 'null')
-    if (g && Date.now() - g.t < 864e5) return g
+    if (g && g.firma === firma && Date.now() - g.t < 864e5) return g
   } catch { /* sin almacenamiento: se pregunta */ }
   const [a, b] = await Promise.all([
     pedir('/discover/movie', { ...comun, ...filtroPelis, page: '1' }),
     pedir('/discover/tv', { ...comun, ...filtroSeries, page: '1' })
   ])
   // TMDB no deja pasar de la página 500
-  const t = { t: Date.now(), pelis: Math.min(a.total_pages || 1, 500), series: Math.min(b.total_pages || 1, 500) }
+  const t = { t: Date.now(), firma, pelis: Math.min(a.total_pages || 1, 500), series: Math.min(b.total_pages || 1, 500) }
   try { localStorage.setItem(TOTALES_TOP, JSON.stringify(t)) } catch { /* privada */ }
   return t
 }
@@ -513,8 +564,9 @@ export async function topValoradas(pagina = 1) {
     include_adult: 'false',
     sort_by: 'popularity.desc'
   }
-  const filtroPelis = { 'vote_count.gte': '3500', 'vote_average.gte': String(NOTA_MINIMA_TOP), 'primary_release_date.lte': hace }
-  const filtroSeries = { 'vote_count.gte': '2400', 'vote_average.gte': String(NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace }
+  const aj = await notasAjustadas()
+  const filtroPelis = { 'vote_count.gte': '3500', 'vote_average.gte': minimoPedido(aj, NOTA_MINIMA_TOP), 'primary_release_date.lte': hace }
+  const filtroSeries = { 'vote_count.gte': '2400', 'vote_average.gte': minimoPedido(aj, NOTA_MINIMA_TOP_TV), 'first_air_date.lte': hace }
 
   if (pagina === 1 || !ordenTop) {
     const tot = await totalesTop(comun, filtroPelis, filtroSeries)
@@ -527,17 +579,17 @@ export async function topValoradas(pagina = 1) {
   // lista sabe que ha llegado al final.
   const pagPelis = [ordenTop.pelis[2 * (pagina - 1)], ordenTop.pelis[2 * (pagina - 1) + 1]]
   const pagSeries = ordenTop.series[pagina - 1]
-  const pide = (ruta, filtro, pg, tipo, mapa, notaAnim) => (pg
+  const pide = (ruta, filtro, pg, tipo, mapa, nota, notaAnim) => (pg
     ? pedir(ruta, { ...comun, ...filtro, page: String(pg) })
-        .then(d => limpiar(limitarAnimacion(d.results, notaAnim), tipo, mapa))
+        .then(d => limpiar(limitarAnimacion(d.results.filter(pasaNota(aj, tipo, nota)), notaAnim, aj, tipo), tipo, mapa))
         .catch(() => [])
     : Promise.resolve([]))
 
   const [mapaPelis, mapaSeries] = await Promise.all([mapaGeneros('movie'), mapaGeneros('tv')])
 
   const [pelis1, pelis2, series] = await Promise.all([
-    ...pagPelis.map(pg => pide('/discover/movie', filtroPelis, pg, 'movie', mapaPelis, NOTA_MINIMA_ANIMACION_TOP)),
-    pide('/discover/tv', filtroSeries, pagSeries, 'tv', mapaSeries, NOTA_MINIMA_ANIMACION_TOP_TV)
+    ...pagPelis.map(pg => pide('/discover/movie', filtroPelis, pg, 'movie', mapaPelis, NOTA_MINIMA_TOP, NOTA_MINIMA_ANIMACION_TOP)),
+    pide('/discover/tv', filtroSeries, pagSeries, 'tv', mapaSeries, NOTA_MINIMA_TOP_TV, NOTA_MINIMA_ANIMACION_TOP_TV)
   ])
 
   return barajar([...pelis1, ...pelis2, ...series])
