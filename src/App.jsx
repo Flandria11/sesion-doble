@@ -2100,19 +2100,23 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
                   onClick={() => onGuardar(p)} disabled={guardada(p)}>
                   <span>🔖</span><i>{guardada(p) ? 'Guardada' : 'Para mí'}</i>
                 </button>
-                {/* el comentario va con la propuesta: si la propuso la otra
-                    persona, el que cuenta es el suyo */}
-                {(!e || e.tipo === 'mio') && (
-                  <button className={`redondo${borradores[clave] || (e && e.t.nota) ? ' marcado' : ''}`}
-                    onClick={() => setComentando(e
-                      ? { id: e.t.id, titulo: p.titulo, nota: e.t.nota }
-                      : { clave, titulo: p.titulo, nota: borradores[clave] })}>
-                    <span>💬</span><i>{borradores[clave] || (e && e.t.nota) ? 'Comentada' : 'Comentar'}</i>
-                  </button>
-                )}
               </div>
 
               <div className="cuerpo">
+                {/* encima del título y no en la columna de botones: ahí ya
+                    eran seis. Con comentario, se ve el propio texto. Va con
+                    la propuesta: si la propuso la otra persona, cuenta el suyo */}
+                {(!e || e.tipo === 'mio') && (() => {
+                  const texto = e ? e.t.nota : borradores[clave]
+                  return (
+                    <button className={`chip-comentario${texto ? ' con' : ''}`}
+                      onClick={() => setComentando(e
+                        ? { id: e.t.id, titulo: p.titulo, nota: e.t.nota }
+                        : { clave, titulo: p.titulo, nota: borradores[clave] })}>
+                      💬 {texto ? `“${texto}”` : 'Añadir comentario'}
+                    </button>
+                  )
+                })()}
                 <div className="meta">
                   {[p.tipo === 'tv' ? 'Serie' : 'Película', p.anio, p.genero, p.voto && `★ ${p.voto}`]
                     .filter(Boolean).join(' · ')}
