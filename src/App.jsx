@@ -1444,6 +1444,7 @@ function Trailer({ clave: pedida, titulo, cartel, tmdb }) {
     if (!c) { pausaMia.current = true; pl.pauseVideo(); return }
     cargada.current = c
     pausaMia.current = false
+    setParadoDe(null)
     cambioEn.current = Date.now()
     anota(`cargar ${c}`)
     pl.loadVideoById(c)
@@ -1495,6 +1496,15 @@ function Trailer({ clave: pedida, titulo, cartel, tmdb }) {
             onStateChange: e => {
               if (!vivo) return
               anota(`${NOMBRE_ESTADO[e.data] ?? e.data}${e.target.isMuted() ? ' (mudo)' : ' (sonido)'}`)
+              // El ▶ del centro sigue al reproductor, no a lo que se tocó:
+              // antes se recordaba "lo pausaste tú" hasta volver a tocar el
+              // centro, y si el vídeo volvía a arrancar por otro lado (al
+              // volver a esa tarjeta, por ejemplo) se quedaba el ▶ encima
+              // con el vídeo en marcha. Solo el icono: pausaMia no se toca,
+              // porque si pausas justo al arrancar, el aviso de "en marcha"
+              // puede llegar tarde y desharía tu pausa
+              if (e.data === 1) setParadoDe(null)
+              if (e.data === 2 && pausaMia.current) setParadoDe(cargada.current)
               // Al terminar, YouTube enseña su pantalla final con vídeos
               // sugeridos y su logo. Rebobinamos antes de que aparezca.
               if (e.data === 0) { e.target.seekTo(0); e.target.playVideo() }
