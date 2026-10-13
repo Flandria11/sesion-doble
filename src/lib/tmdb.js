@@ -244,10 +244,9 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
       const d = await pedir(`/${esPeli ? 'movie' : 'tv'}/popular`, { ...base, region: REGION })
       return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
     }
-    if (modo === 'valoradas') {
-      const d = await pedir(`/${esPeli ? 'movie' : 'tv'}/top_rated`, { ...base, region: REGION })
-      return limpiar(filtrarBase(d.results, esPeli), esPeli ? 'movie' : 'tv')
-    }
+    // Mejor valoradas ya no usa /top_rated: ahí entraban títulos con 400
+    // votos (Batman: Knightfall, Socias por accidente...) por delante de
+    // los clásicos. Va por /discover, como con filtros, con su mínimo de votos
   }
 
   // /discover: acepta plataformas, género y orden
