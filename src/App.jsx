@@ -252,6 +252,15 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     return () => { supabase.removeChannel(canal) }
   }, [recargar])
 
+  // En iPhone, con la app en segundo plano, iOS corta el refresco en vivo y
+  // al volver no se veía lo que la otra persona había hecho mientras tanto
+  // (ni lo que no llegó a guardarse). Al volver a la app, se recarga
+  useEffect(() => {
+    const alVolver = () => { if (document.visibilityState === 'visible') recargar() }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => document.removeEventListener('visibilitychange', alVolver)
+  }, [recargar])
+
   const mios = titulos.filter(t => t.propuesto_por === yo)
   const suyos = titulos.filter(t => t.propuesto_por !== yo)
   const miVoto = id => votos.find(v => v.titulo_id === id && v.usuario_id === yo)?.voto
