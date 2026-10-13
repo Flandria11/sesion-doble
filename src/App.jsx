@@ -556,6 +556,27 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
 }
 
 /* ======================= añadir ======================= */
+/* Filtros de Añadir: se leen una vez del móvil y se mantienen aquí, fuera
+ * de React, para que sobrevivan a cambiar de pestaña. Si lo guardado no
+ * tiene buena pinta (versión vieja, a medias), se usa lo de fábrica. */
+const filtrosGuardados = (() => {
+  const fabrica = { tipo: 'movie', modo: 'tendencias', provs: [], genero: '', desde: '', hasta: '' }
+  try {
+    const g = JSON.parse(localStorage.getItem('sd:filtros') || 'null')
+    if (!g || typeof g !== 'object') return fabrica
+    return {
+      tipo: g.tipo === 'tv' ? 'tv' : 'movie',
+      modo: MODOS.some(m => m.id === g.modo) ? g.modo : fabrica.modo,
+      provs: Array.isArray(g.provs) ? g.provs.filter(x => typeof x === 'number') : [],
+      genero: typeof g.genero === 'string' ? g.genero : '',
+      desde: typeof g.desde === 'string' ? g.desde : '',
+      hasta: typeof g.hasta === 'string' ? g.hasta : ''
+    }
+  } catch {
+    return fabrica
+  }
+})()
+
 // cuántos títulos nuevos (ni propuestos, ni coincididos, ni descartados) se
 // intentan reunir por carga, y cuántas páginas de TMDB como máximo se piden
 // para lograrlo antes de rendirse
@@ -577,12 +598,20 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
   const [personas, setPersonas] = useState([])
   const [persona, setPersona] = useState(null)
   const [puntuando, setPuntuando] = useState(null)
-  const [tipo, setTipo] = useState('movie')
-  const [modo, setModo] = useState('tendencias')
-  const [provs, setProvs] = useState([])
-  const [genero, setGenero] = useState('')
-  const [desde, setDesde] = useState('')
-  const [hasta, setHasta] = useState('')
+  // Los filtros se recuerdan en el móvil: antes, al ir a Votar o a Ver y
+  // volver, Añadir se creaba de nuevo y se perdían. Solo se quitan a mano
+  const [tipo, setTipo] = useState(() => filtrosGuardados.tipo)
+  const [modo, setModo] = useState(() => filtrosGuardados.modo)
+  const [provs, setProvs] = useState(() => filtrosGuardados.provs)
+  const [genero, setGenero] = useState(() => filtrosGuardados.genero)
+  const [desde, setDesde] = useState(() => filtrosGuardados.desde)
+  const [hasta, setHasta] = useState(() => filtrosGuardados.hasta)
+  useEffect(() => {
+    Object.assign(filtrosGuardados, { tipo, modo, provs, genero, desde, hasta })
+    try {
+      localStorage.setItem('sd:filtros', JSON.stringify({ tipo, modo, provs, genero, desde, hasta }))
+    } catch { /* navegación privada: se recuerdan igual mientras la app esté abierta */ }
+  }, [tipo, modo, provs, genero, desde, hasta])
   const [pagina, setPagina] = useState(1)
 
   const [plats, setPlats] = useState([])
@@ -908,6 +937,10 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     if (v.trim().length < 2 && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
   }
   const hayFiltros = provs.length > 0 || genero || desde || hasta
+  const limpiarFiltros = () => {
+    setProvs([]); setGenero(''); setDesde(''); setHasta('')
+    setPagina(1); setRes([])
+  }
   const nFiltros = provs.length + [genero, desde || hasta].filter(Boolean).length
 
   /**
@@ -988,6 +1021,12 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                 <span className="flecha">{panel ? '▴' : '▾'}</span>
               </button>
             )}
+            {/* los filtros se quedan puestos hasta quitarlos: esto los quita
+                todos de un toque, sin abrir el panel */}
+            {!ocultarPlataformas && hayFiltros && (
+              <button className="quitar-filtros" onClick={limpiarFiltros}
+                aria-label="Quitar todos los filtros">✕</button>
+            )}
           </div>
 
           <div className="filtros">
@@ -1056,10 +1095,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                   opciones={[{ id: '', nombre: 'Hoy' }, ...ANOS.map(a => ({ id: a, nombre: a }))]} />
               </div>
               {hayFiltros && (
-                <button className="limpiar" onClick={() => {
-                  setProvs([]); setGenero(''); setDesde(''); setHasta('')
-                  setPagina(1); setRes([])
-                }}>Limpiar filtros</button>
+                <button className="limpiar" onClick={limpiarFiltros}>Limpiar filtros</button>
               )}
             </div>
           )}
