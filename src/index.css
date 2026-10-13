@@ -329,6 +329,13 @@ input::placeholder { color: #61539A; }
   white-space: nowrap;
 }
 .filtros button.activo { background: var(--ambar); color: var(--noche); font-weight: 800; }
+/* segunda fila (con quién, dentro de Ya vistas): más discreta que la primera */
+.filtros.sub { margin-top: 4px; }
+.filtros.sub button {
+  background: transparent; border: 1px solid var(--borde);
+  padding: 4px 10px; font-size: 11px;
+}
+.filtros.sub button.activo { border-color: var(--ambar); }
 
 .catalogo {
   display: grid; grid-template-columns: repeat(3, 1fr);

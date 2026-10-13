@@ -517,7 +517,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
                 onDescartar={descartar} onRecuperar={recuperar}
                 onComentar={comentar} codigo={pareja.codigo}
                 todos={titulos} votos={votos} descartes={descartes} yo={yo}
-                onVotarTitulo={votar} />}
+                onVotarTitulo={votar} puntuaciones={puntuaciones} nombres={nombres} />}
             {vista === 'match' && <Matches lista={porVer} adelante={masAdelante}
                 onAparcar={aparcar} onDesaparcar={desaparcar} onRectificar={rectificar}
                 guardada={guardada} onGuardar={guardar} onOlvidar={olvidar}
@@ -2607,7 +2607,7 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 /* ======================= mis pelis ======================= */
 function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGuardar, onOlvidar,
   descartada, motivoDescarte, onDescartar, onRecuperar, onComentar, codigo,
-  todos, votos, descartes, yo, onVotarTitulo }) {
+  todos, votos, descartes, yo, onVotarTitulo, puntuaciones, nombres }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
   const [editando, setEditando] = useState(null)
@@ -2711,6 +2711,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
 
       {pestana === 'historial' && (
         <Historial todos={todos} votos={votos} descartes={descartes} yo={yo}
+          puntuaciones={puntuaciones} nombres={nombres}
           onRecuperar={onRecuperar} onVotar={onVotarTitulo}
           guardada={guardada} onGuardar={onGuardar} onOlvidar={onOlvidar} />
       )}
@@ -2992,8 +2993,11 @@ function Puntuar({ titulo, inicial, primera, onGuardar, onCerrar }) {
  * Coincidencias solo guarda lo que os gusta a los dos. Aquí se ve todo
  * lo demás: lo descartado y lo ya visto, y de quién es cada voto.
  */
-function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada, onGuardar, onOlvidar }) {
-  const [estado, setEstado] = useState('no')
+function Historial({ todos, votos, descartes, yo, puntuaciones, nombres, onRecuperar, onVotar, guardada, onGuardar, onOlvidar }) {
+  // lo visto va primero: es lo que más se consulta
+  const [estado, setEstado] = useState('vista')
+  // dentro de Ya vistas: 'todas' | 'yo' | el id de la persona con quien
+  const [conQuien, setConQuien] = useState('todas')
   const [ficha, setFicha] = useState(null)
   const [q, setQ] = useState('')
 
@@ -3029,15 +3033,52 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
       dato: t
     }))
 
-  const fichas = [...deDescartes, ...deVotos]
+  /**
+   * Lo visto juntos (con nota en Coincidencias) también es visto. Se apunta
+   * quién más le puso nota, para poder filtrar "con quién". Si en el grupo
+   * solo hay otra persona, todo lo visto juntos es con ella, aunque todavía
+   * no haya puesto su nota.
+   */
+  const notasDe = id => puntuaciones.filter(x => x.titulo_id === id)
+  const juntos = todos.filter(t => notasDe(t.id).length > 0)
+  const otros = [...new Set(juntos.flatMap(t => notasDe(t.id).map(x => x.usuario_id)))]
+    .filter(u => u !== yo)
+  const deJuntos = juntos.map(t => ({
+    clave: `j-${t.id}`,
+    titulo: t.titulo, cartel: t.cartel, anio: t.anio,
+    tipo: t.tipo, tmdb_id: t.tmdb_id,
+    estado: 'vista',
+    origen: 'juntos',
+    con: otros.length <= 1 ? otros : notasDe(t.id).map(x => x.usuario_id).filter(u => u !== yo),
+    dato: t
+  }))
+  // si la marcaste vista tú y luego la visteis juntos, sale una vez, como juntos
+  const yaJuntos = new Set(deJuntos.map(f => `${f.tipo}-${f.tmdb_id}`))
+  const solas = [...deDescartes, ...deVotos]
+    .filter(f => !(f.estado === 'vista' && yaJuntos.has(`${f.tipo}-${f.tmdb_id}`)))
+
+  const fichas = [...deJuntos, ...solas]
   const cuenta = e => fichas.filter(f => f.estado === e).length
+  const quien = u => nombres[u] && nombres[u] !== 'Alguien' ? nombres[u] : 'otra persona'
+  const subfiltros = [
+    ['todas', 'Todas', cuenta('vista')],
+    ['yo', 'Solo yo', solas.filter(f => f.estado === 'vista').length],
+    ...(otros.length
+      ? otros.map(u => [u, `Con ${quien(u)}`, deJuntos.filter(f => f.con.includes(u)).length])
+      : [['juntos', 'Juntos', deJuntos.length]])
+  ]
+  const pasaQuien = f =>
+    conQuien === 'todas' ? true
+    : conQuien === 'yo' ? f.origen !== 'juntos'
+    : conQuien === 'juntos' ? f.origen === 'juntos'
+    : f.origen === 'juntos' && f.con.includes(conQuien)
   // Al buscar por nombre se mira en los dos apartados a la vez: quien
   // busca no tiene por qué acordarse de dónde la dejó
   const sinAcentos = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   const buscando = sinAcentos(q.trim())
   const visibles = buscando
     ? fichas.filter(f => sinAcentos(f.titulo).includes(buscando))
-    : fichas.filter(f => f.estado === estado)
+    : fichas.filter(f => f.estado === estado && (estado !== 'vista' || pasaQuien(f)))
 
   async function deshacer(f) {
     if (f.origen === 'descarte') await onRecuperar(f.dato)
@@ -3058,10 +3099,21 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
 
       {!buscando && (
         <div className="filtros">
-          {[['no', 'No me interesan'], ['vista', 'Ya vistas']].map(([id, nombre]) => (
+          {[['vista', 'Ya vistas'], ['no', 'No me interesan']].map(([id, nombre]) => (
             <button key={id} className={estado === id ? 'activo' : ''}
               onClick={() => setEstado(id)}>
               {nombre} · {cuenta(id)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!buscando && estado === 'vista' && cuenta('vista') > 0 && (
+        <div className="filtros sub">
+          {subfiltros.map(([id, nombre, n]) => (
+            <button key={id} className={conQuien === id ? 'activo' : ''}
+              onClick={() => setConQuien(id)}>
+              {nombre} · {n}
             </button>
           ))}
         </div>
@@ -3080,7 +3132,7 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
                   {f.cartel && <img src={f.cartel} alt="" loading="lazy" />}
                   {buscando && (
                     <span className={`sello-foto ${f.estado}`}>
-                      {f.estado === 'vista' ? '👁 Vista' : '✕ No interesa'}
+                      {f.origen === 'juntos' ? '🍿 Juntos' : f.estado === 'vista' ? '👁 Vista' : '✕ No interesa'}
                     </span>
                   )}
                 </button>
@@ -3096,10 +3148,13 @@ function Historial({ todos, votos, descartes, yo, onRecuperar, onVotar, guardada
           onProponer={() => setFicha(null)}
           acciones={
             <div className="acciones-redondas">
-              <button className="redondo" aria-label={etiquetaDeshacer(ficha)}
-                onClick={async () => { await deshacer(ficha); setFicha(null) }}>
-                <span>↺</span><i>{ficha.estado === 'vista' ? 'De nuevo' : 'Me interesa'}</i>
-              </button>
+              {/* lo visto juntos se rectifica en Coincidencias, con la nota */}
+              {ficha.origen !== 'juntos' && (
+                <button className="redondo" aria-label={etiquetaDeshacer(ficha)}
+                  onClick={async () => { await deshacer(ficha); setFicha(null) }}>
+                  <span>↺</span><i>{ficha.estado === 'vista' ? 'De nuevo' : 'Me interesa'}</i>
+                </button>
+              )}
               <button className={`redondo${guardada(ficha.dato) ? ' marcado' : ''}`}
                 onClick={() => (guardada(ficha.dato) ? onOlvidar : onGuardar)(ficha.dato)}>
                 <span>🔖</span><i>{guardada(ficha.dato) ? 'Guardada' : 'Para mí'}</i>
