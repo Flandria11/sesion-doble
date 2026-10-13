@@ -1406,3 +1406,13 @@ textarea::placeholder { color: #61539A; }
   .noria-rueda, .noria-cabina, .cerrar-juegos, .escena-juego,
   .escena-juego .aspirante, .escena-juego .tambor { animation: none; }
 }
+
+/* Safari de iPhone amplía toda la página al tocar un campo con letra de
+   menos de 16px, y no deshace el zoom al salir: con la ficha a pantalla
+   completa quedaba descolocada, con el texto de arriba cortado. Solo en
+   iOS, para no cambiar el aspecto en Android ni en el ordenador */
+@supports (-webkit-touch-callout: none) {
+  textarea, select, input[type=text], input[type=email], input[type=password],
+  .nota-corta, .barra-filtros select { font-size: 16px; }
+  .diapo.suelta .nota-corta { font-size: 16px; height: 36px; padding: 7px 11px; }
+}
