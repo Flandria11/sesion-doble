@@ -1407,6 +1407,17 @@ function Registro() {
 }
 const NOMBRE_ESTADO = { '-1': 'sin empezar', 0: 'terminado', 1: 'REPRODUCE', 2: 'pausa', 3: 'cargando', 5: 'preparado' }
 
+/* Algo tapa la app (el menú del perfil): los tráilers se callan mientras
+ * tanto. Va por un aviso global porque el tráiler vive dentro de Ver o de
+ * una ficha y el menú cuelga de arriba del todo, sin nada en común. */
+const AVISO_TAPADO = 'sd:tapado'
+function useTapaTrailers() {
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(AVISO_TAPADO, { detail: true }))
+    return () => window.dispatchEvent(new CustomEvent(AVISO_TAPADO, { detail: false }))
+  }, [])
+}
+
 function Trailer({ clave: pedida, titulo, cartel, tmdb }) {
   const caja = useRef(null)
   const player = useRef(null)
@@ -1614,6 +1625,32 @@ function Trailer({ clave: pedida, titulo, cartel, tmdb }) {
     }, 700)
     return () => clearInterval(t)
   }, [hay])
+
+  // Con el menú del perfil abierto el tráiler seguía sonando debajo. Se
+  // pausa como si lo hubieras pausado tú (así el vigilante no lo arranca)
+  // y al cerrar vuelve solo si estaba en marcha: si lo tenías pausado, sigue
+  useEffect(() => {
+    let lopare = false
+    const alTapar = e => {
+      const pl = player.current
+      if (!pl || typeof pl.getPlayerState !== 'function') return
+      try {
+        if (e.detail) {
+          if (pausaMia.current) return
+          lopare = true
+          pausaMia.current = true
+          pl.pauseVideo()
+        } else if (lopare) {
+          lopare = false
+          pausaMia.current = false
+          setParadoDe(null)
+          pl.playVideo()
+        }
+      } catch { /* reproductor ya destruido */ }
+    }
+    window.addEventListener(AVISO_TAPADO, alTapar)
+    return () => window.removeEventListener(AVISO_TAPADO, alTapar)
+  }, [])
 
   // cambio de tarjeta: mismo reproductor, otro vídeo
   useEffect(() => {
@@ -2591,6 +2628,7 @@ function Votar({ cola, nombres, onVotar, motivoDescarte, guardada }) {
 
 /* ======================= ajustes ======================= */
 function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecargarParejas, onSalir, onCerrar }) {
+  useTapaTrailers()
   const [seccion, setSeccion] = useState('cuenta')
   const [nombre, setNombre] = useState(nombres[yo] === 'Alguien' ? '' : (nombres[yo] || ''))
   const [pass, setPass] = useState('')
