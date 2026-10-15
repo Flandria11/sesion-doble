@@ -972,31 +972,29 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
     if (t === 'tv' && modo === 'cines') setModo('tendencias')
   })
 
-  // Al elegir "En cines" quitamos las plataformas: son cosas distintas,
-  // una es la sala y la otra el streaming. Género y año sí se quedan
+  // Al elegir un modo que no admite plataforma (En cines, Tendencias) se
+  // quitan las plataformas: género y año sí se quedan
   const cambiarModo = cambiar(m => {
     setModo(m)
-    if (m === 'cines') setProvs([])
+    if (!MODOS.find(x => x.id === m)?.filtrable) setProvs([])
   })
 
-  // Y al revés: si marcas una plataforma estando en un modo que no admite
-  // filtros, pasamos a Populares en vez de enseñarte algo que no es.
+  // Y al revés: si marcas una plataforma estando en un modo que no la
+  // admite, pasamos a Populares en vez de enseñarte algo que no es.
   const saltarSiHaceFalta = () => {
     const m = MODOS.find(x => x.id === modo)
     if (m && !m.filtrable) setModo('populares')
   }
-  const cambiarGenero = cambiarSuave(g => { setGenero(g); if (g) saltarSiHaceFalta() })
+  const cambiarGenero = cambiarSuave(g => setGenero(g))
   // si "desde" queda por detrás de "hasta" (o al revés), se ajusta el otro
   // para que el rango siga teniendo sentido
   const cambiarDesde = cambiarSuave(a => {
     setDesde(a)
     if (a && hasta && hasta < a) setHasta('')
-    if (a) saltarSiHaceFalta()
   })
   const cambiarHasta = cambiarSuave(a => {
     setHasta(a)
     if (a && desde && desde > a) setDesde('')
-    if (a) saltarSiHaceFalta()
   })
   const alternarPlat = cambiar(id => {
     setProvs(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]))
@@ -1040,9 +1038,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
   // hay en los cines, y lo ya decidido lleva su marca en la carátula
   const todoALaVista = !explorando || modo === 'cines'
   const visibles = todoALaVista ? res : res.filter(p => !decidido(p))
-  const modosVisibles = MODOS.filter(m =>
-    (tipo === 'movie' || !m.soloPelis) && (!hayFiltros || m.filtrable)
-  )
+  // siempre los mismos, haya filtros o no: así se vuelve a cualquiera de un toque
+  const modosVisibles = MODOS.filter(m => tipo === 'movie' || !m.soloPelis)
   const modoActual = MODOS.find(m => m.id === modo)
   const ocultarPlataformas = !!(modoActual && modoActual.sinPlataforma)
 

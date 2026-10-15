@@ -110,15 +110,15 @@ export async function filmografia(personaId) {
  * ------------------------------------------------------------------ */
 
 /**
- * `filtrable` marca los modos que TMDB puede combinar con plataforma o
- * género. Tendencias es una lista cerrada que no los admite, así que se
- * oculta cuando hay alguno puesto en vez de devolver otra cosa por detrás.
- * En cines sí deja filtrar por género y año (se filtra la cartelera aquí
- * mismo), pero no por plataforma: `sinPlataforma`, porque no aplica.
+ * Todos los modos dejan filtrar por género y año, y la fila de modos es
+ * siempre la misma. `filtrable` marca los que además admiten plataforma:
+ * Tendencias y En cines son listas cerradas de TMDB, así que el género y
+ * el año se aplican aquí sobre ellas, pero la plataforma no se puede.
+ * En cines ni se ofrece (`sinPlataforma`): es lo que hay en las salas.
  */
 export const MODOS = [
   { id: 'tendencias', nombre: 'Tendencias', filtrable: false },
-  { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: true, sinPlataforma: true },
+  { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: false, sinPlataforma: true },
   { id: 'novedades', nombre: 'Novedades', filtrable: true },
   { id: 'populares', nombre: 'Populares', filtrable: true },
   { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true }
@@ -257,6 +257,14 @@ const filtrarBase = (aj, lista, esPeli) =>
  */
 const enCartelera = x => x.popularity >= 10 || x.vote_count >= 10
 
+/** Género y año sobre una lista ya traída, para las que no van por /discover. */
+const porGeneroYAnio = (lista, { genero = '', desde = '', hasta = '' }) => lista
+  .filter(x => !genero || (x.genre_ids || []).includes(Number(genero)))
+  .filter(x => {
+    const anio = (x.release_date || x.first_air_date || '').slice(0, 4)
+    return (!desde || anio >= desde) && (!hasta || anio <= hasta)
+  })
+
 /**
  * Toda la cartelera de una vez (son pocas páginas), por popularidad. El
  * género y el año se aplican sobre ella: /discover no sabe qué está en
@@ -271,13 +279,8 @@ async function cartelera({ genero = '', desde = '', hasta = '' } = {}) {
       pedir('/movie/now_playing', { page: String(i + 2), region: REGION })
         .then(d => d.results).catch(() => [])))
   const vistos = new Set()
-  const todas = [primera.results, ...resto].flat()
-    .filter(x => enCartelera(x) && !vistos.has(x.id) && vistos.add(x.id))
-    .filter(x => !genero || (x.genre_ids || []).includes(Number(genero)))
-    .filter(x => {
-      const anio = (x.release_date || '').slice(0, 4)
-      return (!desde || anio >= desde) && (!hasta || anio <= hasta)
-    })
+  const todas = porGeneroYAnio([primera.results, ...resto].flat()
+    .filter(x => enCartelera(x) && !vistos.has(x.id) && vistos.add(x.id)), { genero, desde, hasta })
     .sort((a, b) => b.popularity - a.popularity)
   return limpiar(todas, 'movie')
 }
@@ -294,11 +297,15 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     return pagina === 1 ? cartelera({ genero, desde, hasta }) : []
   }
 
+  // Tendencias: con género o año se filtra aquí cada página (puede quedar
+  // corta; la exploración ya encadena páginas hasta reunir suficientes).
+  // Con plataforma no llega: Añadir pasa antes a Populares
+  if (modo === 'tendencias' && !proveedores.length) {
+    const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)
+    return limpiar(porGeneroYAnio(filtrarBase(aj, d.results, esPeli), { genero, desde, hasta }), esPeli ? 'movie' : 'tv')
+  }
+
   if (!filtrando) {
-    if (modo === 'tendencias') {
-      const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)
-      return limpiar(filtrarBase(aj, d.results, esPeli), esPeli ? 'movie' : 'tv')
-    }
     if (modo === 'populares') {
       const d = await pedir(`/${esPeli ? 'movie' : 'tv'}/popular`, { ...base, region: REGION })
       return limpiar(filtrarBase(aj, d.results, esPeli), esPeli ? 'movie' : 'tv')
