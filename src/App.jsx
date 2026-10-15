@@ -602,6 +602,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
           </>
         )}
       </main>
+      {/* Descubrir y Votar van por tarjetas a pantalla completa: ahí no */}
+      {['buscar', 'match', 'mias'].includes(vista) && <VolverArriba key={vista} />}
       {ajustes && (
         <Ajustes yo={yo} nombres={nombres} parejas={parejas} pareja={pareja}
           email={sesion.user.email}
@@ -3008,6 +3010,27 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 }
 
 /* ======================= mis pelis ======================= */
+/* ---- flechita para volver arriba ----
+ * En Inicio, Coinciden y Mis pelis se baja mucho: pasada una pantalla y
+ * media, sale arriba en el centro, discreta, y de un toque sube del todo.
+ */
+function VolverArriba() {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const mirar = () => setVisible(window.scrollY > window.innerHeight * 1.5)
+    mirar()
+    window.addEventListener('scroll', mirar, { passive: true })
+    return () => window.removeEventListener('scroll', mirar)
+  }, [])
+  return (
+    <button type="button" className={`volver-arriba${visible ? ' visible' : ''}`}
+      aria-label="Volver arriba" tabIndex={visible ? 0 : -1}
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+      ↑
+    </button>
+  )
+}
+
 /* ---- caja de búsqueda con su ✕ para vaciarla de golpe, como en Añadir ---- */
 function CajaBusqueda({ valor, onCambio, placeholder = 'Buscar por nombre…' }) {
   return (

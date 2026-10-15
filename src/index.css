@@ -69,6 +69,18 @@ h1, h2, .detalle h3, .vacio b, .tit, .confeti h2 { text-transform: uppercase; }
 /* ---------- estructura ---------- */
 .app { padding-bottom: 108px; }
 
+/* volver arriba: arriba en el centro, discreta; por debajo de las fichas */
+.volver-arriba {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 10px); z-index: 40;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(18, 9, 31, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(247, 242, 233, .18); color: rgba(247, 242, 233, .8);
+  font-size: 16px; font-weight: 700; line-height: 1;
+  opacity: 0; pointer-events: none; transform: translate(-50%, -8px);
+  transition: opacity .2s, transform .2s;
+}
+.volver-arriba.visible { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+
 /* En iPhone la app llega bajo la barra de estado (viewport-fit=cover):
    sin el safe-area, "DOS BUTACAS" quedaba debajo de la cámara. En
    Android el safe-area es 0 y se queda en los 15px de siempre. */
