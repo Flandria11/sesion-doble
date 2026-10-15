@@ -602,8 +602,11 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
           </>
         )}
       </main>
-      {/* Descubrir y Votar van por tarjetas a pantalla completa: ahí no */}
-      {['buscar', 'match', 'mias'].includes(vista) && <VolverArriba key={vista} />}
+      {/* Descubrir y Votar van por tarjetas a pantalla completa: ahí no.
+          Su key no puede ser la misma que la de <main> (vista): con dos
+          hermanos con la misma key, React no quitaba la pantalla anterior
+          al cambiar de pestaña y se quedaba la de antes */}
+      {['buscar', 'match', 'mias'].includes(vista) && <VolverArriba key={`arriba-${vista}`} />}
       {ajustes && (
         <Ajustes yo={yo} nombres={nombres} parejas={parejas} pareja={pareja}
           email={sesion.user.email}
