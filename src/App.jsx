@@ -1101,12 +1101,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
                 <span className="flecha">{panel ? '▴' : '▾'}</span>
               </button>
             )}
-            {/* los filtros se quedan puestos hasta quitarlos: esto los quita
-                todos de un toque, sin abrir el panel */}
-            {!ocultarPlataformas && hayFiltros && (
-              <button className="quitar-filtros" onClick={limpiarFiltros}
-                aria-label="Quitar todos los filtros">✕</button>
-            )}
           </div>
 
           <div className="filtros">

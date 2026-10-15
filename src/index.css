@@ -278,12 +278,6 @@ input::placeholder { color: #61539A; }
   border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 800;
 }
 .plegable .flecha { margin-left: auto; font-size: 11px; }
-.quitar-filtros {
-  flex: none; width: 30px; border-radius: 8px;
-  border: 1px solid var(--ambar); color: var(--ambar);
-  font-size: 12px; font-weight: 800;
-}
-
 .panel-filtros {
   margin-top: 8px; padding: 12px; border-radius: 12px;
   background: var(--sala); border: 1px solid var(--borde);
