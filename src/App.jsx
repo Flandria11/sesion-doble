@@ -514,6 +514,25 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
     else await votar(p.id, voto)
   }
 
+  /**
+   * Volver a tocar Proponer cuando te arrepientes: si la propuse yo, se
+   * retira; si era suya y dije que me apetecía, se quita mi voto y vuelve
+   * a quedar pendiente en Votar.
+   */
+  async function deshacer(t) {
+    if (t.propuesto_por === yo) return quitar(t.id)
+    const anterior = votos.find(v => v.titulo_id === t.id && v.usuario_id === yo)
+    setVotos(v => v.filter(x => !(x.titulo_id === t.id && x.usuario_id === yo)))
+    // con .select() se sabe si de verdad se borró: si la base de datos no
+    // dejara borrar, no da error, simplemente no borra nada
+    const { data, error } = await supabase.from('votos').delete()
+      .eq('titulo_id', t.id).eq('usuario_id', yo).select()
+    if (error || !data?.length) {
+      setAviso('No se ha podido deshacer: ' + (error ? detalle(error) : 'el voto sigue guardado'))
+      if (anterior) setVotos(v => [...v, anterior])
+    }
+  }
+
   async function quitar(id) {
     const anterior = titulos.find(x => x.id === id)
     setTitulos(t => t.filter(x => x.id !== id))
@@ -556,13 +575,13 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
         {cargando ? <div className="cargando">Cargando…</div> : (
           <>
             {vista === 'buscar' && <Anadir titulos={titulos} yo={yo} nombres={nombres}
-                miVoto={miVoto} suVoto={suVoto} onAdd={anadir} onVotar={votar}
+                miVoto={miVoto} suVoto={suVoto} onAdd={anadir} onVotar={votar} onDeshacer={deshacer}
                 puntuaciones={puntuaciones} onVistaJuntos={vistaJuntosDesde}
                 descartada={descartada} motivoDescarte={motivoDescarte}
                 onDescartar={descartar} onRecuperar={recuperar}
                 guardada={guardada} onGuardar={guardar} onOlvidar={olvidar} />}
             {vista === 'reel' && <Ver titulos={titulos} yo={yo}
-                miVoto={miVoto} onAdd={anadir} onVotar={votar}
+                miVoto={miVoto} onAdd={anadir} onVotar={votar} onDeshacer={deshacer}
                 puntuaciones={puntuaciones} onVistaJuntos={vistaJuntosDesde}
                 descartada={descartada} onDescartar={descartar}
                 guardada={guardada} onGuardar={guardar} onComentar={comentar} />}
@@ -634,7 +653,7 @@ const PAGINAS_MAX_POR_CARGA = 15
 // páginas de TMDB que se piden a la vez en cada vuelta
 const PAGINAS_A_LA_VEZ = 3
 
-function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaciones, onVistaJuntos, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
+function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshacer, puntuaciones, onVistaJuntos, descartada, motivoDescarte, onDescartar, onRecuperar, guardada, onGuardar, onOlvidar }) {
   const [q, setQ] = useState('')
   // el buscador busca títulos o, con el otro botón, actores: de estos se
   // enseña su filmografía
@@ -928,6 +947,19 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
     }
   }
 
+  // segundo toque sobre una ya propuesta (o con "me apetece"): se deshace.
+  // Lo ya visto juntos no, que lleva notas y se cambia desde allí
+  async function deshacerla(p) {
+    const e = estado(p)
+    if (anadiendo || !e || !['mio', 'coincide'].includes(e.tipo)) return
+    setAnadiendo(p.tmdb_id)
+    try {
+      await onDeshacer(e.t)
+    } finally {
+      setAnadiendo(null)
+    }
+  }
+
   // cualquier cambio de filtro devuelve a la primera página
   const cambiar = fn => (...a) => { fn(...a); setPagina(1); setRes([]) }
   // año y género van en un <select>: con las flechas del teclado cada
@@ -1177,9 +1209,9 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
                 {marca && <span className={`marca-foto${suya ? ' si' : ''}`}>{suya ? '♥ ' : ''}{marca}</span>}
               </button>
               <button className={`mas${visible ? ' ya' : ''}${fuera ? ' volver' : ''}`}
-                onClick={() => (fuera ? onRecuperar(p) : actuar(p))}
-                disabled={!!visible || anadiendo === p.tmdb_id}
-                aria-label={fuera ? `Recuperar ${p.titulo}` : visible ? marca : suya ? `Me apetece ${p.titulo}` : `Proponer ${p.titulo}`}>
+                onClick={() => (fuera ? onRecuperar(p) : visible ? deshacerla(p) : actuar(p))}
+                disabled={visible === 'juntos' || anadiendo === p.tmdb_id}
+                aria-label={fuera ? `Recuperar ${p.titulo}` : visible === 'juntos' ? marca : visible ? `${marca}: tocar para deshacer` : suya ? `Me apetece ${p.titulo}` : `Proponer ${p.titulo}`}>
                 {anadiendo === p.tmdb_id ? '·'
                   : visible === 'juntos' ? '🍿'
                   : visible === 'coincide' ? '★'
@@ -1226,6 +1258,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, puntuaci
             // la ficha se queda abierta: si estabas a mitad del tráiler, sigue;
             // el botón pasa a "Propuesta" y sales tú cuando quieras
             onProponer={async nota => { await actuar(ficha, nota) }}
+            onDeshacer={visible && !juntos ? () => deshacerla(ficha) : undefined}
             acciones={
               <>
                 <button className={`redondo${juntos ? ' marcado' : ''}`}
@@ -2033,7 +2066,7 @@ function Sinopsis({ texto, abierta, onAlternar }) {
  * pero pidiendo los títulos con otra función y guardando el progreso en
  * otra memoria, para no mezclar las dos listas.
  */
-function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos, descartada, onDescartar, guardada, onGuardar, onComentar,
+function Reel({ titulos, yo, miVoto, onAdd, onVotar, onDeshacer, puntuaciones, onVistaJuntos, descartada, onDescartar, guardada, onGuardar, onComentar,
   cargar = estrenos, memoria = memoriaReel,
   textoCargando = 'Buscando estrenos…',
   textoError = 'No se han podido cargar los estrenos.',
@@ -2210,6 +2243,20 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
     }
   }
 
+  // segundo toque en "Puesta": te has arrepentido. La tarjeta sigue en la
+  // pista (está retenida) y vuelve a mostrar Proponer
+  async function deshacerla(p) {
+    const e = estado(p)
+    if (anadiendo || !e || !['mio', 'coincide'].includes(e.tipo)) return
+    setAnadiendo(p.tmdb_id)
+    try {
+      await onDeshacer(e.t)
+      setRecien(r => (r && r.id === e.t.id ? null : r))
+    } finally {
+      setAnadiendo(null)
+    }
+  }
+
   if (error && !visibles.length) return <div className="error">{error}</div>
   // sin nada a la vista pero con más por pedir: se sigue buscando
   if (!visibles.length && (cargando || !fin)) return <div className="cargando">{textoCargando}</div>
@@ -2244,8 +2291,11 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, puntuaciones, onVistaJuntos
 
               <div className="torre">
                 <button className={`redondo principal${puesto ? ' hecho' : ''}`}
-                  onClick={() => { setRetenidas(r => new Set(r).add(clave)); proponer(p) }}
-                  disabled={!!puesto || anadiendo === p.tmdb_id}>
+                  onClick={() => {
+                    if (puesto) { deshacerla(p); return }
+                    setRetenidas(r => new Set(r).add(clave)); proponer(p)
+                  }}
+                  disabled={anadiendo === p.tmdb_id}>
                   <span>{puesto ? '✓' : '+'}</span>
                   <i>{puesto ? 'Puesta' : 'Proponer'}</i>
                 </button>
@@ -2438,7 +2488,7 @@ function useCerrarConAtras(onCerrar) {
  * pantalla completa con el tráiler de fondo. La diferencia es que aquí no
  * se desliza: es una sola y se cierra con la X o tocando fuera.
  */
-function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer }) {
+function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [reserva, setReserva] = useState({ de: null, texto: '' })
@@ -2522,7 +2572,10 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
             {ocultarBoton ? acciones : (
               <div className="acciones-redondas">
                 <button className={`redondo principal${puesta ? ' hecho' : ''}`}
-                  onClick={() => onProponer(nota.trim())} disabled={puesta}>
+                  // ya puesta, un segundo toque la deshace (si quien abre la
+                  // ficha lo permite); si no, el botón se queda quieto
+                  onClick={() => (puesta ? onDeshacer() : onProponer(nota.trim()))}
+                  disabled={puesta && !onDeshacer}>
                   <span>{puesta ? '✓' : '+'}</span>
                   <i>{puesta ? (etiquetaPuesta || 'En tu lista') : (etiquetaBoton || 'Proponer')}</i>
                 </button>
