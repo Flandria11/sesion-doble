@@ -194,8 +194,10 @@ input::placeholder { color: #61539A; }
   font-style: normal; opacity: .6; font-size: 11px; margin-left: 2px;
 }
 
-/* variante chica, para Añadir (Películas/Series) */
+/* variante chica, para Añadir (Películas/Series); fina y chica a la vez,
+   para las pestañas de Mis pelis y Coinciden, con el número pequeño */
 .pestanas.chica button { padding: 5px; font-size: 11px; }
+.pestanas.fina.chica em { font-size: 9.5px; }
 /* Películas/Series y el botón de Filtrar, en la misma fila */
 .fila-tipo { display: flex; gap: 7px; align-items: stretch; margin-top: 10px; }
 .fila-tipo .pestanas { flex: 1; margin-top: 0; }
@@ -229,8 +231,6 @@ input::placeholder { color: #61539A; }
 .elegir-cine .opciones button i { font-style: normal; color: var(--apagado); font-size: 11.5px; margin-left: 6px; }
 .elegir-cine .opciones button.activo i { color: var(--noche); }
 
-.mis-pelis .pestanas.fina button { padding: 5px; font-size: 11px; }
-.mis-pelis .pestanas.fina em { font-size: 9.5px; }
 
 .fila-plataformas {
   display: flex; align-items: center; gap: 4px; margin: 8px 0 0;

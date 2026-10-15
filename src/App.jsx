@@ -3098,7 +3098,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
     <div className="mis-pelis">
       <h2>Mis pelis</h2>
 
-      <div className="pestanas fina">
+      <div className="pestanas fina chica">
         <button className={pestana === 'propuestas' ? 'activo' : ''}
           onClick={() => { setPestana('propuestas'); setQ('') }}>
           Propuestas <em>{propuestas.length}</em>
@@ -3290,18 +3290,18 @@ function Matches({ lista, adelante, onAparcar, onDesaparcar, onRectificar, guard
           distraían y se volvía a la lista con "← Lista" */}
 
       {(hayVistas || hayAdelante) && (
-        <div className="pestanas">
+        <div className="pestanas fina chica">
           <button className={!enVistas && !enAdelante ? 'activo' : ''} onClick={() => setApartado('porver')}>
-            Por ver ({lista.length})
+            Por ver <em>{lista.length}</em>
           </button>
           {hayAdelante && (
             <button className={enAdelante ? 'activo' : ''} onClick={() => setApartado('adelante')}>
-              Más adelante ({adelante.length})
+              Más adelante <em>{adelante.length}</em>
             </button>
           )}
           {hayVistas && (
             <button className={enVistas ? 'activo' : ''} onClick={() => setApartado('vistas')}>
-              Vistas juntos ({vistas.length})
+              Vistas juntos <em>{vistas.length}</em>
               {pendientes.length > 0 && <span className="num-falta">{pendientes.length}</span>}
             </button>
           )}
