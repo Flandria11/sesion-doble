@@ -627,8 +627,9 @@ const detalles = new Map()
 function detalle(tmdbId, tipo) {
   const clave = `${tipo}-${tmdbId}`
   if (!detalles.has(clave)) {
+    // las fechas de estreno solo existen en pelis: dicen si está en cines
     const promesa = pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
-      append_to_response: 'videos,watch/providers',
+      append_to_response: tipo === 'tv' ? 'videos,watch/providers' : 'videos,watch/providers,release_dates',
       include_video_language: 'es,en'
     })
     detalles.set(clave, promesa)
@@ -711,6 +712,48 @@ export function dondeVerla(tmdbId, tipo) {
   return donde.get(clave)
 }
 
+// "Amazon Prime Video with Ads" y compañía son la misma plataforma con
+// otra tarifa: salía el mismo logo dos veces
+function logosDe(lista) {
+  const vistos = new Set()
+  return lista
+    .filter(x => !/with ads$/i.test(x.provider_name || ''))
+    .filter(x => !vistos.has(x.provider_id) && vistos.add(x.provider_id))
+    .slice(0, 4)
+    .map(x => ({ nombre: x.provider_name, logo: logo(x.logo_path) }))
+}
+
+/**
+ * Para la ficha, qué decir cuando no está en ninguna suscripción: si se
+ * puede alquilar o comprar (y dónde), si solo está en cines o si ahora
+ * mismo no está en ningún sitio. Antes, sin plataforma, no salía nada y
+ * no se sabía si faltaba el dato o es que no estaba.
+ * Devuelve { incluida, pago, cines }.
+ */
+export async function disponibilidad(tmdbId, tipo) {
+  try {
+    const d = await detalle(tmdbId, tipo)
+    const es = ((d['watch/providers'] || {}).results || {})[REGION] || {}
+    const incluida = logosDe([...(es.flatrate || []), ...(es.free || [])])
+    const pago = logosDe([...(es.rent || []), ...(es.buy || [])])
+    // En cines: estreno en sala en España (tipo 2 o 3) en los últimos cuatro
+    // meses y todavía sin salida digital (tipo 4)
+    let cines = false
+    if (tipo !== 'tv') {
+      const fechas = ((d.release_dates || {}).results || [])
+        .find(r => r.iso_3166_1 === REGION)?.release_dates || []
+      const ahora = Date.now()
+      const sala = fechas.some(f => [2, 3].includes(f.type) &&
+        new Date(f.release_date) <= ahora && ahora - new Date(f.release_date) < 120 * 864e5)
+      const digital = fechas.some(f => f.type === 4 && new Date(f.release_date) <= ahora)
+      cines = sala && !digital
+    }
+    return { incluida, pago, cines }
+  } catch {
+    return null
+  }
+}
+
 async function pedirDonde(tmdbId, tipo) {
   try {
     // si la ficha completa ya está pedida, sale de ahí; si no (las carátulas
@@ -721,14 +764,7 @@ async function pedirDonde(tmdbId, tipo) {
       : await pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}/watch/providers`)
     const es = ((d && d.results) || {})[REGION]
     if (!es) return []
-    const vistos = new Set()
-    // "Amazon Prime Video with Ads" y compañía son la misma plataforma con
-    // otra tarifa: salía el mismo logo dos veces
-    return [...(es.flatrate || []), ...(es.free || [])]
-      .filter(x => !/with ads$/i.test(x.provider_name || ''))
-      .filter(x => !vistos.has(x.provider_id) && vistos.add(x.provider_id))
-      .slice(0, 4)
-      .map(x => ({ nombre: x.provider_name, logo: logo(x.logo_path) }))
+    return logosDe([...(es.flatrate || []), ...(es.free || [])])
   } catch (e) {
     return []
   }

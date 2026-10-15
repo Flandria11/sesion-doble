@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, sinopsisDe, barajar } from './lib/tmdb'
+import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, disponibilidad, sinopsisDe, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -2473,7 +2473,10 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [reserva, setReserva] = useState({ de: null, texto: '' })
-  const [donde, setDonde] = useState([])
+  // va con la clave del título, como la sinopsis de reserva: mientras llega
+  // (o si falla) no se dice nada, y no queda a la vista la de la anterior
+  const [dondeGuardado, setDonde] = useState({ de: null, d: null })
+  const donde = dondeGuardado.de === `${p.tipo}-${p.tmdb_id}` ? dondeGuardado.d : null
   const [abierta, setAbierta] = useState(false)
   const [nota, setNota] = useState('')
 
@@ -2481,7 +2484,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
     let vivo = true
     buscarTrailer(p.tmdb_id, p.tipo).then(t => vivo && setTrailer(t || ''))
     generos(p.tmdb_id, p.tipo).then(g => vivo && setGen(g))
-    dondeVerla(p.tmdb_id, p.tipo).then(d => vivo && setDonde(d))
+    disponibilidad(p.tmdb_id, p.tipo).then(d => vivo && setDonde({ de: `${p.tipo}-${p.tmdb_id}`, d }))
     // TMDB no siempre la tiene en español: se busca en otro idioma
     if (!p.sinopsis) sinopsisDe(p.tmdb_id, p.tipo).then(texto => vivo && setReserva({ de: `${p.tipo}-${p.tmdb_id}`, texto }))
     return () => { vivo = false }
@@ -2536,12 +2539,21 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
             {aviso && <div className="aviso-ficha">{aviso}</div>}
-            {donde.length > 0 && (
-              <div className="donde">
-                <span>En</span>
-                {donde.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
-              </div>
-            )}
+            {/* Incluida en una suscripción: sus logos. Si no, se dice qué
+                pasa: de pago (alquiler o compra) y dónde, solo en cines o
+                que ahora mismo no está en streaming */}
+            {donde && (() => {
+              const logos = donde.incluida.length ? donde.incluida : donde.pago
+              const texto = donde.incluida.length ? 'En'
+                : donde.pago.length ? (donde.cines ? 'En cines · de pago en' : 'De pago en')
+                : donde.cines ? 'Solo en cines' : 'Ahora no está en streaming en España'
+              return (
+                <div className="donde">
+                  <span>{texto}</span>
+                  {logos.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
+                </div>
+              )
+            })()}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}
