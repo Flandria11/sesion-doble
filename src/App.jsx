@@ -2886,8 +2886,16 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
     const v = suVoto(p.id)
     return !((v === 'no' || v === 'vista') && guardada(p))
   })
-  const pelis = propuestas.filter(p => p.tipo !== 'tv')
-  const series = propuestas.filter(p => p.tipo === 'tv')
+  // dentro de cada bloque, por lo que ha decidido la otra persona: arriba
+  // lo que aún no ha votado, luego lo que le gusta y al final lo que no.
+  // El orden es estable: entre iguales se queda el de siempre
+  const peso = p => {
+    const v = suVoto(p.id)
+    return !v ? 0 : v === 'si' ? 1 : 2
+  }
+  const ordenadas = [...propuestas].sort((a, b) => peso(a) - peso(b))
+  const pelis = ordenadas.filter(p => p.tipo !== 'tv')
+  const series = ordenadas.filter(p => p.tipo === 'tv')
 
   const bloque = (titulo, grupo) => grupo.length > 0 && (
     <section className="grupo" key={titulo}>
