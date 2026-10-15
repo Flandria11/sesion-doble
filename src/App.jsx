@@ -1107,12 +1107,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
             ))}
           </div>
 
-          {ocultarPlataformas && (
-            <div className="ayuda" style={{ marginTop: 12, marginBottom: 0 }}>
-              Estrenos en salas de España. Aquí no aplican las plataformas.
-            </div>
-          )}
-
           {panel && (
             <div className="panel-filtros">
               {/* en cines no hay plataformas: es lo que hay en las salas */}
