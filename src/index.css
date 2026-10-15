@@ -332,6 +332,14 @@ input::placeholder { color: #61539A; }
 /* sesiones de hoy en tu cine, en la ficha */
 .sesiones { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .sesiones span { width: 100%; font-size: 11px; color: var(--apagado); font-weight: 600; }
+/* días de tu cine: una fila que se desliza si no caben */
+.dias-cine { display: flex; gap: 5px; width: 100%; overflow-x: auto; scrollbar-width: none; }
+.dias-cine::-webkit-scrollbar { display: none; }
+.dias-cine button {
+  flex: none; padding: 4px 9px; border-radius: 999px;
+  border: 1px solid var(--terciopelo); color: #D6CCF2; font-size: 11.5px; font-weight: 700;
+}
+.dias-cine button.activo { background: var(--ambar); border-color: var(--ambar); color: var(--noche); }
 .sesiones a, .sesiones b {
   padding: 5px 10px; border-radius: 8px; text-decoration: none;
   background: rgba(8, 4, 16, .55); border: 1px solid var(--ambar); color: var(--papel);

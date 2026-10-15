@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, disponibilidad, sinopsisDe, cinesLista, comparable, barajar } from './lib/tmdb'
+import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, disponibilidad, sinopsisDe, cinesLista, comparable, carteleraDeCine, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -1242,7 +1242,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
         const marca = marcaDe(ficha)
         return (
           <Ficha p={ficha} puesta={!!visible} conNota={!e} enCartel={modo === 'cines' && explorando}
-            sesiones={cineAplicado && explorando ? ficha.sesiones : undefined}
+            conSesiones={!!cineAplicado && explorando && !!ficha.sesiones}
             etiquetaPuesta={juntos ? 'Vista juntos' : visible === 'coincide' ? 'Coincidís' : 'Propuesta'}
             etiquetaBoton={e && e.tipo === 'suyo' ? 'Me apetece' : undefined}
             aviso={marca}
@@ -2555,6 +2555,60 @@ function useCerrarConAtras(onCerrar) {
  * se desliza: es una sola y se cierra con la X o tocando fuera.
  */
 /**
+ * Sesiones de una peli en tu cine, en la ficha. Hoy viene ya con la peli;
+ * si eCartelera tiene más días de ese cine (Yelmo, la semana; Cinesa, solo
+ * hoy), se puede elegir otro y se pide su cartelera, buscando la peli por
+ * el título que le da eCartelera.
+ */
+function SesionesCine({ p }) {
+  const dias = p.dias && p.dias.length > 1 ? p.dias : []
+  const [dia, setDia] = useState(0)
+  const [otras, setOtras] = useState({})   // sesiones de otros días, por ruta
+  const ruta = dias[dia]?.ruta
+
+  useEffect(() => {
+    if (!dia || !ruta || otras[ruta]) return
+    let vivo = true
+    const suyos = new Set((p.titulosCine || []).map(comparable))
+    carteleraDeCine(ruta)
+      .then(c => c.pelis.filter(x => suyos.has(comparable(x.titulo))).flatMap(x => x.sesiones)
+        .sort((a, b) => a.hora.localeCompare(b.hora)))
+      .catch(() => null)
+      .then(l => vivo && setOtras(o => ({ ...o, [ruta]: l })))
+    return () => { vivo = false }
+  }, [dia, ruta, otras, p.titulosCine])
+
+  const lista = dia ? otras[ruta] : p.sesiones
+  // "Viernes 16" → "Vie 16"
+  const corto = n => n.replace(/^(\S{3})\S*/, '$1')
+  const cuando = dia ? `el ${dias[dia].nombre.toLowerCase()}` : 'hoy'
+  return (
+    <div className="sesiones">
+      {dias.length > 0 && (
+        <div className="dias-cine">
+          {dias.map((d, i) => (
+            <button type="button" key={d.ruta} className={i === dia ? 'activo' : ''}
+              onClick={() => setDia(i)}>{i ? corto(d.nombre) : 'Hoy'}</button>
+          ))}
+        </div>
+      )}
+      <span>
+        {lista === undefined ? 'Buscando sesiones…'
+          : lista === null ? 'No se han podido leer las sesiones de ese día.'
+          : lista.length ? `${dia ? dias[dia].nombre : 'Hoy'} en ${p.cine}`
+          : dia ? `No hay sesiones ${cuando} en ${p.cine} (o aún no están publicadas).` : `Hoy ya no quedan sesiones en ${p.cine}`}
+      </span>
+      {(lista || []).map(x => {
+        const texto = `${x.hora}${x.formato ? ` · ${x.formato}` : ''}`
+        return x.url
+          ? <a key={x.url} href={x.url} target="_blank" rel="noreferrer">{texto}</a>
+          : <b key={texto}>{texto}</b>
+      })}
+    </div>
+  )
+}
+
+/**
  * Dónde verla, en la ficha y en Ver. Incluida en una suscripción: sus
  * logos. Si no, se dice qué pasa: de pago (alquiler o compra) y dónde,
  * solo en cines o que ahora mismo no está en streaming.
@@ -2583,7 +2637,7 @@ function Donde({ d, titulo, enCartel }) {
   )
 }
 
-function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer, enCartel, sesiones }) {
+function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer, enCartel, conSesiones }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [reserva, setReserva] = useState({ de: null, texto: '' })
@@ -2653,20 +2707,10 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
             {aviso && <div className="aviso-ficha">{aviso}</div>}
-            {/* con tu cine elegido en En cines: sus sesiones de hoy, cada
-                una con su enlace para comprar la entrada */}
-            {sesiones && (
-              <div className="sesiones">
-                <span>{sesiones.length ? `Hoy en ${p.cine}` : `Hoy ya no quedan sesiones en ${p.cine}`}</span>
-                {sesiones.map(x => {
-                  const texto = `${x.hora}${x.formato ? ` · ${x.formato}` : ''}`
-                  return x.url
-                    ? <a key={x.url} href={x.url} target="_blank" rel="noreferrer">{texto}</a>
-                    : <b key={texto}>{texto}</b>
-                })}
-              </div>
-            )}
-            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel && !sesiones} />}
+            {/* con tu cine elegido en En cines: sus sesiones, cada una con
+                su enlace para comprar la entrada */}
+            {conSesiones && <SesionesCine p={p} />}
+            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel && !conSesiones} />}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}

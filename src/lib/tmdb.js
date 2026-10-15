@@ -312,8 +312,22 @@ export function cinesLista() {
   return cinesEnMemoria
 }
 
-/** Lo que echa hoy un cine: { cine, pelis: [{ titulo, sesiones }] }. */
-async function carteleraDeCine(ruta) {
+/**
+ * Lo que echa un cine un día (la ruta del día, o la del cine para hoy):
+ * { cine, dias, pelis: [{ titulo, sesiones }] }. Se guarda por ruta
+ * durante la sesión, para ir y volver entre días sin pedirlo otra vez.
+ */
+const carteleras = new Map()
+export function carteleraDeCine(ruta) {
+  if (!carteleras.has(ruta)) {
+    const promesa = pedirCarteleraDeCine(ruta)
+    carteleras.set(ruta, promesa)
+    promesa.catch(() => carteleras.delete(ruta))
+  }
+  return carteleras.get(ruta)
+}
+
+async function pedirCarteleraDeCine(ruta) {
   const r = await fetch(`/api/cartelera?cine=${encodeURIComponent(ruta)}`)
   if (!r.ok) throw new Error(`cartelera ${r.status}`)
   return r.json()
@@ -338,7 +352,7 @@ export const comparable = t => (t || '').toLowerCase()
  * quedándose con el resultado más reciente.
  */
 async function peliculasDeCine(ruta, filtros) {
-  const [{ cine, pelis }, enSalas] = await Promise.all([carteleraDeCine(ruta), carteleraBruta()])
+  const [{ cine, dias = [], pelis }, enSalas] = await Promise.all([carteleraDeCine(ruta), carteleraBruta()])
   const porTitulo = new Map()
   for (const x of enSalas) {
     porTitulo.set(comparable(x.title), x)
@@ -360,14 +374,20 @@ async function peliculasDeCine(ruta, filtros) {
   // una misma peli puede venir dos veces (doblada y en VOSE): se juntan
   // sus sesiones, ordenadas por hora
   const sesiones = new Map()
+  const titulos = new Map()
   const crudas = []
   for (const e of encontradas.filter(Boolean)) {
-    if (!sesiones.has(e.x.id)) { sesiones.set(e.x.id, []); crudas.push(e.x) }
+    if (!sesiones.has(e.x.id)) { sesiones.set(e.x.id, []); titulos.set(e.x.id, []); crudas.push(e.x) }
     sesiones.get(e.x.id).push(...e.p.sesiones)
+    titulos.get(e.x.id).push(e.p.titulo)
   }
+  // titulosCine: cómo la llama eCartelera, para encontrarla en los otros
+  // días; dias: los que tiene ese cine, para elegir en la ficha
   return limpiar(porGeneroYAnio(crudas, filtros), 'movie').map(p => ({
     ...p,
     cine,
+    dias,
+    titulosCine: titulos.get(p.tmdb_id),
     sesiones: sesiones.get(p.tmdb_id).sort((a, b) => a.hora.localeCompare(b.hora))
   }))
 }

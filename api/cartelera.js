@@ -1,27 +1,38 @@
 /**
- * Cartelera de hoy de un cine, leída de eCartelera: qué pelis echa y a
+ * Cartelera de un cine (hoy u otro día), leída de eCartelera: qué pelis echa y a
  * qué hora, con el enlace para comprar cada sesión. La usa el filtro
  * "Tu cine" de Añadir → En cines (la lista de cines es public/cines.json,
  * que sale de scripts/cines-ecartelera.mjs).
  *
- *   GET /api/cartelera?cine=92,0,1.html  →  { cine, pelis: [{ titulo, sesiones: [{ hora, formato, url }] }] }
+ *   GET /api/cartelera?cine=92,0,1.html  →  { cine, dias, pelis: [{ titulo, sesiones: [{ hora, formato, url }] }] }
  *   (url vacía si ese cine no vende entradas por eCartelera)
+ *
+ * dias: los días que eCartelera tiene de ese cine, [{ ruta, nombre }], el
+ * primero hoy. Cada uno se pide igual, con su ruta en ?cine. Yelmo, por
+ * ejemplo, tiene la semana entera; Cinesa solo el día de hoy.
  *
  * Va por aquí y no desde el navegador porque eCartelera no deja leerla
  * desde otra web (CORS). La respuesta se guarda en la CDN de Vercel unas
  * horas: así se le pide a eCartelera muy de vez en cuando.
  */
 const UA = 'Mozilla/5.0 (compatible; sesion-doble/1.0)'
-// lo que puede venir en ?cine: las dos formas de dirección de eCartelera
-// ("92,0,1.html" o "balmes-multicines/"); cualquier otra cosa se rechaza
-const RUTA = /^(\d+,0,1\.html|[a-z0-9-]+\/)$/
+// lo que puede venir en ?cine: las dos formas de dirección de eCartelera,
+// con el día o sin él ("92,0,1.html", "92,3,1.html", "balmes-multicines/",
+// "balmes-multicines/3/"); cualquier otra cosa se rechaza
+const RUTA = /^(\d+,\d+,1\.html|[a-z0-9-]+\/(\d+\/)?)$/
 
+const ACENTOS = { aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', ntilde: 'ñ', uuml: 'ü', ccedil: 'ç' }
 const limpio = t => t
   .replace(/&#0?39;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+  .replace(/&(\w+);/g, (m, n) => ACENTOS[n] || m)
   .replace(/\s+/g, ' ').trim()
 
 export function leerCartelera(html) {
   const cine = limpio(/<h1 class="std-tit">([^<]+)<\/h1>/.exec(html)?.[1] || '')
+  const lista = /<ul class="days">([\s\S]*?)<\/ul>/.exec(html)?.[1] || ''
+  const dias = [...lista.matchAll(/href="https:\/\/www\.ecartelera\.com\/cines\/([^"]+)" title="Cartelera del ([^"]+)"/g)]
+    .map(([, ruta, nombre]) => ({ ruta, nombre: limpio(nombre) }))
+    .filter(d => RUTA.test(d.ruta))
   const pelis = []
   // cada peli es un bloque "titem"; se corta por ahí para no mezclar las
   // sesiones de una con el título de la siguiente
@@ -34,7 +45,7 @@ export function leerCartelera(html) {
       .map(([, antes, hora, formato]) => ({ hora, formato: limpio(formato), url: /href="([^"]+)"/.exec(antes)?.[1] || '' }))
     pelis.push({ titulo: limpio(titulo), sesiones })
   }
-  return { cine, pelis }
+  return { cine, dias, pelis }
 }
 
 export default async function handler(req, res) {
