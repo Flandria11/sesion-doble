@@ -547,8 +547,8 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
   }
 
   const pestanas = [
-    ['buscar', 'Añadir', 0],
-    ['reel', 'Ver', 0],
+    ['buscar', 'Inicio', 0],
+    ['reel', 'Descubrir', 0],
     ['votar', 'Votar', cola.length],
     ['match', 'Coinciden', porVer.length + sinMiNota.length],
     ['mias', 'Mis pelis', 0]
@@ -1043,7 +1043,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
   return (
     <>
       {flash && <div className="ok">{flash}</div>}
-      <h2>Añadir</h2>
+      <h2>Inicio</h2>
       <form className="busca-fila" onSubmit={lanzarBusqueda}>
         <span className="busca-caja">
           <input className="busca" type="text" enterKeyHint="search"
@@ -3118,7 +3118,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
           <div className="ayuda">Lo que has propuesto y qué han dicho.</div>
           {propuestas.length > 0 && <CajaBusqueda valor={q} onCambio={setQ} />}
           {propuestas.length === 0
-            ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
+            ? <div className="vacio"><b>Lista vacía</b>Ve a Inicio y busca la primera.</div>
             : ordenadas.length === 0
               ? <div className="vacio"><b>Sin resultados</b>Ninguna propuesta con ese nombre.</div>
               : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
@@ -3130,7 +3130,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
           <div className="ayuda">Solo para ti. Nadie más ve esta lista.</div>
           {guardados.length > 0 && <CajaBusqueda valor={q} onCambio={setQ} />}
           {guardados.length === 0
-            ? <div className="vacio"><b>Nada guardado</b>Usa «Para mí» en Estrenos o en la ficha de cualquier título.</div>
+            ? <div className="vacio"><b>Nada guardado</b>Usa «Para mí» en Descubrir o en la ficha de cualquier título.</div>
             : misGuardados.length === 0
               ? <div className="vacio"><b>Sin resultados</b>Nada guardado con ese nombre.</div>
               : (
