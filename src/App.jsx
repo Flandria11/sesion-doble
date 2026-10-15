@@ -2878,8 +2878,16 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
     setEditando(p.id)
     setTexto(p.nota || '')
   }
-  const pelis = lista.filter(p => p.tipo !== 'tv')
-  const series = lista.filter(p => p.tipo === 'tv')
+  // Propuestas sirve para ver de un vistazo qué ha decidido la otra persona.
+  // Lo ya visto juntos está en Vistas juntos, y lo que rechazó y te has
+  // guardado para ti ya está resuelto: ninguna de las dos pinta aquí
+  const propuestas = lista.filter(p => {
+    if (vistaJuntos(p.id)) return false
+    const v = suVoto(p.id)
+    return !((v === 'no' || v === 'vista') && guardada(p))
+  })
+  const pelis = propuestas.filter(p => p.tipo !== 'tv')
+  const series = propuestas.filter(p => p.tipo === 'tv')
 
   const bloque = (titulo, grupo) => grupo.length > 0 && (
     <section className="grupo" key={titulo}>
@@ -2887,7 +2895,6 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
       <div className="catalogo">
         {grupo.map(p => {
           const v = suVoto(p.id)
-          const juntos = vistaJuntos(p.id)
           return (
             <div className="tarjeta" key={p.id}>
               <button className={`lamina${v === 'no' ? ' puesta' : ''}`}
@@ -2895,7 +2902,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
                 aria-label={`Ver información de ${p.titulo}`}>
                 <img src={chico(p.cartel)} alt="" loading="lazy" />
                 {p.nota && <span className="tag">💬</span>}
-                <span className={`sello-foto ${juntos ? 'si' : v || ''}`}>{juntos ? '🍿 Vista juntos' : texto_voto(v)}</span>
+                <span className={`sello-foto ${v || ''}`}>{texto_voto(v)}</span>
               </button>
               <div className="rotulo">{p.titulo}</div>
               <button className="comentar" onClick={() => abrirComentario(p)}>
@@ -2915,7 +2922,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
       <div className="pestanas fina">
         <button className={pestana === 'propuestas' ? 'activo' : ''}
           onClick={() => setPestana('propuestas')}>
-          Propuestas <em>{lista.length}</em>
+          Propuestas <em>{propuestas.length}</em>
         </button>
         <button className={pestana === 'mias' ? 'activo' : ''}
           onClick={() => setPestana('mias')}>
@@ -2930,7 +2937,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
       {pestana === 'propuestas' && (
         <>
           <div className="ayuda">Lo que has propuesto y qué han dicho.</div>
-          {lista.length === 0
+          {propuestas.length === 0
             ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
             : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
         </>
