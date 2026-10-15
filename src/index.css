@@ -451,9 +451,13 @@ input::placeholder { color: #61539A; }
 /* descartada: el botón pasa a recuperarla */
 .mas.volver { background: rgba(8, 4, 16, .8); color: var(--apagado); border: 1px solid var(--borde); font-size: 15px; }
 
-.rotulo {
-  margin-top: 7px; font-size: 12px; font-weight: 600; line-height: 1.3; color: var(--papel);
+.rotulo { margin-top: 7px; font-size: 12px; font-weight: 600; line-height: 1.3; color: var(--papel); }
+/* el título siempre ocupa dos líneas, aunque sea corto, para que las
+   tarjetas de una fila queden alineadas; si no cabe, puntos suspensivos.
+   Va aparte del año: antes el recorte contaba también esa línea */
+.rotulo .nombre {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 2.6em;
 }
 .rotulo i { display: block; font-style: normal; font-size: 10.5px; color: var(--apagado); margin-top: 3px; }
 .rotulo.marcado i { color: var(--ambar); font-weight: 700; }

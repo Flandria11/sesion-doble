@@ -1221,7 +1221,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
                   : '+'}
               </button>
               <div className="rotulo">
-                {p.titulo}
+                <span className="nombre">{p.titulo}</span>
                 <i>{nota}</i>
               </div>
             </div>
@@ -2904,7 +2904,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
                 {p.nota && <span className="tag">💬</span>}
                 <span className={`sello-foto ${v || ''}`}>{texto_voto(v)}</span>
               </button>
-              <div className="rotulo">{p.titulo}</div>
+              <div className="rotulo"><span className="nombre">{p.titulo}</span></div>
               <button className="comentar" onClick={() => abrirComentario(p)}>
                 {p.nota ? 'Editar comentario' : 'Comentar'}
               </button>
@@ -2962,7 +2962,7 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
                         </span>
                       )}
                     </button>
-                    <div className="rotulo">{p.titulo}<i>{p.anio}</i></div>
+                    <div className="rotulo"><span className="nombre">{p.titulo}</span><i>{p.anio}</i></div>
                     <button className="comentar" onClick={() => onOlvidar(p)}>Quitar</button>
                   </div>
                 ))}
@@ -3079,7 +3079,7 @@ function Matches({ lista, adelante, onAparcar, onDesaparcar, onRectificar, guard
               {conNotas && miNota(p.id) === undefined && <span className="aviso-falta">Te falta votar</span>}
             </button>
             <div className={`rotulo${conNotas && miNota(p.id) === undefined ? ' falta' : ''}`}>
-              {p.titulo}
+              <span className="nombre">{p.titulo}</span>
               {conNotas && <i>{resumen(p.id)}</i>}
             </div>
           </div>
@@ -3387,7 +3387,7 @@ function Historial({ todos, votos, descartes, yo, puntuaciones, nombres, onRecup
                     </span>
                   )}
                 </button>
-                <div className="rotulo">{f.titulo}<i>{f.anio}</i></div>
+                <div className="rotulo"><span className="nombre">{f.titulo}</span><i>{f.anio}</i></div>
               </div>
             ))}
           </div>
