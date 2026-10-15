@@ -877,31 +877,21 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
   const miNotaDe = e => puntuaciones.find(n => n.titulo_id === e.t.id && n.usuario_id === yo)?.nota
 
   /**
-   * Qué hay ya decidido de un título, para ponerlo bajo la carátula: sobre
-   * todo al buscarlo, que es cuando más se quiere saber si ya estaba.
+   * El detalle de lo ya decidido, para la ficha: solo lo que no dice ya la
+   * marca de la carátula (quién la propuso, tu nota, qué ha votado la otra
+   * persona). Si la carátula ya lo dice todo, nada.
    */
   const marcaDe = p => {
     const e = estado(p)
     if (e && e.tipo === 'juntos') {
       const n = miNotaDe(e)
-      return n === undefined ? 'En Vistas juntos · te falta tu nota' : `En Vistas juntos · tu nota ${n}`
+      return n === undefined ? 'Te falta tu nota' : `Tu nota: ${n}`
     }
-    if (e && e.tipo === 'coincide') return 'En Coinciden · os apetece a los dos'
     if (e && e.tipo === 'mio') {
       const v = suVoto(e.t.id)
-      return v === 'no' ? 'En Mis pelis · no le apetece'
-        : v === 'vista' ? 'En Mis pelis · ya la vio'
-        : 'En Mis pelis · esperando su voto'
+      return v === 'no' ? 'No le apetece' : v === 'vista' ? 'Ya la vio' : 'Esperando su voto'
     }
-    if (e && e.tipo === 'suyo') {
-      const de = `La propuso ${nombres[e.t.propuesto_por] || 'alguien'}`
-      const v = miVoto(e.t.id)
-      return v === 'no' ? `${de} · dijiste que no`
-        : v === 'vista' ? `${de} · la marcaste vista`
-        : `${de} · en Votar`
-    }
-    if (descartada(p)) return motivoDescarte(p) === 'vista' ? 'La marcaste vista' : 'No te interesa'
-    if (guardada(p)) return 'Guardada para ti'
+    if (e && e.tipo === 'suyo') return `La propuso ${nombres[e.t.propuesto_por] || 'alguien'}`
     return null
   }
 
