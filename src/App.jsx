@@ -2061,6 +2061,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, onDeshacer, puntuaciones, o
   const [error, setError] = useState('')
   const [activo, setActivo] = useState(0)
   const [trailers, setTrailers] = useState({})
+  const [dondes, setDondes] = useState({})   // dónde verla, por tarjeta
   const [anadiendo, setAnadiendo] = useState(null)
   const [fiesta, setFiesta] = useState(null)
   const [abierta, setAbierta] = useState(null)
@@ -2175,9 +2176,19 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, onDeshacer, puntuaciones, o
         if (vivo) setTrailers(x => ({ ...x, [clave]: t || '' }))
       })
     }
+    // dónde verla sale de la misma ficha de TMDB que el tráiler: no es
+    // otra petición
+    for (const p of [visibles[activo], visibles[activo + 1]]) {
+      if (!p) continue
+      const clave = `${p.tipo}-${p.tmdb_id}`
+      if (dondes[clave] !== undefined) continue
+      disponibilidad(p.tmdb_id, p.tipo).then(d => {
+        if (vivo) setDondes(x => ({ ...x, [clave]: d }))
+      })
+    }
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activo, visibles.length, trailers])
+  }, [activo, visibles.length, trailers, dondes])
 
   // Al acercarse al final se pide la siguiente tanda. También si no queda
   // ninguna a la vista: si todo lo de una tanda ya lo habías visto o
@@ -2317,6 +2328,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, onDeshacer, puntuaciones, o
                 <div className="tit">{p.titulo}</div>
                 <Sinopsis texto={p.sinopsis} abierta={abierta === clave}
                   onAlternar={() => setAbierta(a => (a === clave ? null : clave))} />
+                {dondes[clave] && <Donde d={dondes[clave]} />}
 
               </div>
             </Deslizable>
@@ -2469,6 +2481,24 @@ function useCerrarConAtras(onCerrar) {
  * pantalla completa con el tráiler de fondo. La diferencia es que aquí no
  * se desliza: es una sola y se cierra con la X o tocando fuera.
  */
+/**
+ * Dónde verla, en la ficha y en Ver. Incluida en una suscripción: sus
+ * logos. Si no, se dice qué pasa: de pago (alquiler o compra) y dónde,
+ * solo en cines o que ahora mismo no está en streaming.
+ */
+function Donde({ d }) {
+  const logos = d.incluida.length ? d.incluida : d.pago
+  const texto = d.incluida.length ? 'En'
+    : d.pago.length ? (d.cines ? 'En cines · de pago en' : 'De pago en')
+    : d.cines ? 'Solo en cines' : 'Ahora no está en streaming en España'
+  return (
+    <div className="donde">
+      <span>{texto}</span>
+      {logos.map(x => <img key={x.nombre} src={x.logo} alt={x.nombre} title={x.nombre} />)}
+    </div>
+  )
+}
+
 function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
@@ -2539,21 +2569,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
             {aviso && <div className="aviso-ficha">{aviso}</div>}
-            {/* Incluida en una suscripción: sus logos. Si no, se dice qué
-                pasa: de pago (alquiler o compra) y dónde, solo en cines o
-                que ahora mismo no está en streaming */}
-            {donde && (() => {
-              const logos = donde.incluida.length ? donde.incluida : donde.pago
-              const texto = donde.incluida.length ? 'En'
-                : donde.pago.length ? (donde.cines ? 'En cines · de pago en' : 'De pago en')
-                : donde.cines ? 'Solo en cines' : 'Ahora no está en streaming en España'
-              return (
-                <div className="donde">
-                  <span>{texto}</span>
-                  {logos.map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
-                </div>
-              )
-            })()}
+            {donde && <Donde d={donde} />}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}

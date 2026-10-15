@@ -699,6 +699,10 @@ input::placeholder { color: #61539A; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   flex-shrink: 0; align-self: flex-start; text-align: left;
 }
+/* dónde verla, bajo la sinopsis en Ver: no encoge, la que cede es la sinopsis */
+.cuerpo > .donde { flex-shrink: 0; margin-top: 10px; }
+.cuerpo > .donde img { width: 24px; height: 24px; }
+.cuerpo > .donde span { font-size: 10.5px; }
 .chip-comentario.con { border-style: solid; border-color: var(--ambar); color: var(--papel); font-style: italic; }
 .meta {
   font-size: 10.5px; color: var(--ambar); font-weight: 700;
