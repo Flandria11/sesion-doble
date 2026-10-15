@@ -111,13 +111,14 @@ export async function filmografia(personaId) {
 
 /**
  * `filtrable` marca los modos que TMDB puede combinar con plataforma o
- * género. Tendencias y En cines son listas cerradas que no admiten
- * filtros, así que se ocultan cuando hay alguno puesto en vez de
- * devolver otra cosa por detrás.
+ * género. Tendencias es una lista cerrada que no los admite, así que se
+ * oculta cuando hay alguno puesto en vez de devolver otra cosa por detrás.
+ * En cines sí deja filtrar por género y año (se filtra la cartelera aquí
+ * mismo), pero no por plataforma: `sinPlataforma`, porque no aplica.
  */
 export const MODOS = [
   { id: 'tendencias', nombre: 'Tendencias', filtrable: false },
-  { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: false, sinPlataforma: true },
+  { id: 'cines', nombre: 'En cines', soloPelis: true, filtrable: true, sinPlataforma: true },
   { id: 'novedades', nombre: 'Novedades', filtrable: true },
   { id: 'populares', nombre: 'Populares', filtrable: true },
   { id: 'valoradas', nombre: 'Mejor valoradas', filtrable: true }
@@ -256,8 +257,13 @@ const filtrarBase = (aj, lista, esPeli) =>
  */
 const enCartelera = x => x.popularity >= 10 || x.vote_count >= 10
 
-/** Toda la cartelera de una vez (son pocas páginas), por popularidad. */
-async function cartelera() {
+/**
+ * Toda la cartelera de una vez (son pocas páginas), por popularidad. El
+ * género y el año se aplican sobre ella: /discover no sabe qué está en
+ * cartelera, y con él salían estrenos de los últimos dos meses que ya no
+ * estaban en ninguna sala.
+ */
+async function cartelera({ genero = '', desde = '', hasta = '' } = {}) {
   const primera = await pedir('/movie/now_playing', { page: '1', region: REGION })
   const total = Math.min(primera.total_pages || 1, 8)
   const resto = await Promise.all(
@@ -267,6 +273,11 @@ async function cartelera() {
   const vistos = new Set()
   const todas = [primera.results, ...resto].flat()
     .filter(x => enCartelera(x) && !vistos.has(x.id) && vistos.add(x.id))
+    .filter(x => !genero || (x.genre_ids || []).includes(Number(genero)))
+    .filter(x => {
+      const anio = (x.release_date || '').slice(0, 4)
+      return (!desde || anio >= desde) && (!hasta || anio <= hasta)
+    })
     .sort((a, b) => b.popularity - a.popularity)
   return limpiar(todas, 'movie')
 }
@@ -277,11 +288,13 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
   const filtrando = proveedores.length > 0 || genero || desde || hasta
   const aj = await notasAjustadas()
 
+  // va entera en la primera carga; las siguientes ya no traen nada.
+  // Las plataformas no aplican: es lo que hay en las salas
+  if (modo === 'cines' && esPeli) {
+    return pagina === 1 ? cartelera({ genero, desde, hasta }) : []
+  }
+
   if (!filtrando) {
-    if (modo === 'cines' && esPeli) {
-      // va entera en la primera carga; las siguientes ya no traen nada
-      return pagina === 1 ? cartelera() : []
-    }
     if (modo === 'tendencias') {
       const d = await pedir(`/trending/${esPeli ? 'movie' : 'tv'}/week`, base)
       return limpiar(filtrarBase(aj, d.results, esPeli), esPeli ? 'movie' : 'tv')
@@ -322,13 +335,6 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
     const hoy = new Date().toISOString().slice(0, 10)
     // si "hasta" ya pone un tope anterior, se respeta
     if (!hasta || `${hasta}-12-31` > hoy) p[`${campo}.lte`] = hoy
-  } else if (modo === 'cines' && esPeli) {
-    const hace = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)
-    const hoy = new Date().toISOString().slice(0, 10)
-    p['primary_release_date.gte'] = hace
-    p['primary_release_date.lte'] = hoy
-    p.with_release_type = '2|3'
-    p.sort_by = 'popularity.desc'
   } else {
     p.sort_by = 'popularity.desc'
   }

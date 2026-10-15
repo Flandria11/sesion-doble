@@ -973,11 +973,10 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
   })
 
   // Al elegir "En cines" quitamos las plataformas: son cosas distintas,
-  // una es la sala y la otra el streaming.
+  // una es la sala y la otra el streaming. Género y año sí se quedan
   const cambiarModo = cambiar(m => {
     setModo(m)
-    // en cartelera no aplicamos nada de esto: es lo que hay en las salas
-    if (m === 'cines') { setProvs([]); setGenero(''); setDesde(''); setHasta('') }
+    if (m === 'cines') setProvs([])
   })
 
   // Y al revés: si marcas una plataforma estando en un modo que no admite
@@ -1093,14 +1092,12 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
             {/* Plataformas, género, año... se ponen una vez y se dejan: van
                 plegados para que las carátulas salgan antes. El número
                 recuerda que hay algo puesto aunque no se vea. */}
-            {!ocultarPlataformas && (
-              <button className={`plegable${panel ? ' abierto' : ''}`}
-                onClick={() => setPanel(v => !v)} aria-expanded={panel}>
-                Filtrar
-                {nFiltros > 0 && <em>{nFiltros}</em>}
-                <span className="flecha">{panel ? '▴' : '▾'}</span>
-              </button>
-            )}
+            <button className={`plegable${panel ? ' abierto' : ''}`}
+              onClick={() => setPanel(v => !v)} aria-expanded={panel}>
+              Filtrar
+              {nFiltros > 0 && <em>{nFiltros}</em>}
+              <span className="flecha">{panel ? '▴' : '▾'}</span>
+            </button>
           </div>
 
           <div className="filtros">
@@ -1116,9 +1113,10 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
             </div>
           )}
 
-          {!ocultarPlataformas && panel && (
+          {panel && (
             <div className="panel-filtros">
-              {plats.length > 0 && (
+              {/* en cines no hay plataformas: es lo que hay en las salas */}
+              {!ocultarPlataformas && plats.length > 0 && (
                 <div className="fila-plataformas">
                   {/* la fila no tenía scrollbar ni pista alguna de que seguía
                       hacia la derecha: con ratón, sin arrastre táctil, no
