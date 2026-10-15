@@ -3008,11 +3008,31 @@ function Ajustes({ yo, nombres, parejas, pareja, email, onCambiarPareja, onRecar
 }
 
 /* ======================= mis pelis ======================= */
+/* ---- caja de búsqueda con su ✕ para vaciarla de golpe, como en Añadir ---- */
+function CajaBusqueda({ valor, onCambio, placeholder = 'Buscar por nombre…' }) {
+  return (
+    <span className="busca-caja">
+      <input className="busca" type="text" placeholder={placeholder}
+        value={valor} onChange={e => onCambio(e.target.value)} autoComplete="off" />
+      {valor && (
+        <button type="button" className="borrar-busca" aria-label="Borrar la búsqueda"
+          onClick={() => onCambio('')}>✕</button>
+      )}
+    </span>
+  )
+}
+
+// sin acentos ni mayúsculas: "sarria" encuentra "Sarrià"
+const sinAcentos = t => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const contiene = (titulo, q) => sinAcentos(titulo).includes(sinAcentos(q.trim()))
+
 function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGuardar, onOlvidar,
   descartada, motivoDescarte, onDescartar, onRecuperar, onComentar, codigo,
   todos, votos, descartes, yo, onVotarTitulo, puntuaciones, nombres }) {
   const [ficha, setFicha] = useState(null)
   const [pestana, setPestana] = useState('propuestas')
+  // buscador de Propuestas y Para mí (Historial lleva el suyo)
+  const [q, setQ] = useState('')
   const [editando, setEditando] = useState(null)
   const [texto, setTexto] = useState('')
 
@@ -3043,7 +3063,8 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
     const v = suVoto(p.id)
     return !v ? 0 : v === 'si' ? 1 : 2
   }
-  const ordenadas = [...propuestas].sort((a, b) => peso(a) - peso(b))
+  const ordenadas = propuestas.filter(p => contiene(p.titulo, q)).sort((a, b) => peso(a) - peso(b))
+  const misGuardados = guardados.filter(p => contiene(p.titulo, q))
   const pelis = ordenadas.filter(p => p.tipo !== 'tv')
   const series = ordenadas.filter(p => p.tipo === 'tv')
 
@@ -3079,11 +3100,11 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
 
       <div className="pestanas fina">
         <button className={pestana === 'propuestas' ? 'activo' : ''}
-          onClick={() => setPestana('propuestas')}>
+          onClick={() => { setPestana('propuestas'); setQ('') }}>
           Propuestas <em>{propuestas.length}</em>
         </button>
         <button className={pestana === 'mias' ? 'activo' : ''}
-          onClick={() => setPestana('mias')}>
+          onClick={() => { setPestana('mias'); setQ('') }}>
           Para mí <em>{guardados.length}</em>
         </button>
         <button className={pestana === 'historial' ? 'activo' : ''}
@@ -3095,20 +3116,26 @@ function Mias({ lista, suVoto, vistaJuntos, onQuitar, guardados, guardada, onGua
       {pestana === 'propuestas' && (
         <>
           <div className="ayuda">Lo que has propuesto y qué han dicho.</div>
+          {propuestas.length > 0 && <CajaBusqueda valor={q} onCambio={setQ} />}
           {propuestas.length === 0
             ? <div className="vacio"><b>Lista vacía</b>Ve a Añadir y busca la primera.</div>
-            : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
+            : ordenadas.length === 0
+              ? <div className="vacio"><b>Sin resultados</b>Ninguna propuesta con ese nombre.</div>
+              : <>{bloque('Películas', pelis)}{bloque('Series', series)}</>}
         </>
       )}
 
       {pestana === 'mias' && (
         <>
           <div className="ayuda">Solo para ti. Nadie más ve esta lista.</div>
+          {guardados.length > 0 && <CajaBusqueda valor={q} onCambio={setQ} />}
           {guardados.length === 0
             ? <div className="vacio"><b>Nada guardado</b>Usa «Para mí» en Estrenos o en la ficha de cualquier título.</div>
-            : (
+            : misGuardados.length === 0
+              ? <div className="vacio"><b>Sin resultados</b>Nada guardado con ese nombre.</div>
+              : (
               <div className="catalogo">
-                {guardados.map(p => (
+                {misGuardados.map(p => (
                   <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
                     <button className="lamina" onClick={() => setFicha(p)}
                       aria-label={`Ver información de ${p.titulo}`}>
@@ -3487,7 +3514,6 @@ function Historial({ todos, votos, descartes, yo, puntuaciones, nombres, onRecup
     : f.origen === 'juntos' && f.con.includes(conQuien)
   // Al buscar por nombre se mira en los dos apartados a la vez: quien
   // busca no tiene por qué acordarse de dónde la dejó
-  const sinAcentos = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   const buscando = sinAcentos(q.trim())
   const visibles = buscando
     ? fichas.filter(f => sinAcentos(f.titulo).includes(buscando))
@@ -3503,8 +3529,7 @@ function Historial({ todos, votos, descartes, yo, puntuaciones, nombres, onRecup
 
   return (
     <>
-      <input className="busca" type="text" placeholder="Buscar por nombre…"
-        value={q} onChange={e => setQ(e.target.value)} autoComplete="off" />
+      <CajaBusqueda valor={q} onCambio={setQ} />
 
       {!buscando && (
         <div className="filtros">
