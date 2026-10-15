@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import { cargarYT } from './lib/youtube'
-import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, disponibilidad, sinopsisDe, barajar } from './lib/tmdb'
+import { buscar, buscarPersonas, filmografia, explorar, estrenos, topValoradas, MODOS, ANOS, plataformas, generosLista, buscarTrailer, buscarTrailers, generos, dondeVerla, disponibilidad, sinopsisDe, cinesLista, comparable, barajar } from './lib/tmdb'
 
 /** Supabase manda el motivo repartido en varios campos; sin ellos un 400
  *  no dice nada. */
@@ -627,7 +627,7 @@ function Principal({ sesion, pareja, parejas, onCambiarPareja, onRecargarParejas
  * de React, para que sobrevivan a cambiar de pestaña. Si lo guardado no
  * tiene buena pinta (versión vieja, a medias), se usa lo de fábrica. */
 const filtrosGuardados = (() => {
-  const fabrica = { tipo: 'movie', modo: 'tendencias', provs: [], genero: '', desde: '', hasta: '' }
+  const fabrica = { tipo: 'movie', modo: 'tendencias', provs: [], genero: '', desde: '', hasta: '', cine: null }
   try {
     const g = JSON.parse(localStorage.getItem('sd:filtros') || 'null')
     if (!g || typeof g !== 'object') return fabrica
@@ -637,7 +637,9 @@ const filtrosGuardados = (() => {
       provs: Array.isArray(g.provs) ? g.provs.filter(x => typeof x === 'number') : [],
       genero: typeof g.genero === 'string' ? g.genero : '',
       desde: typeof g.desde === 'string' ? g.desde : '',
-      hasta: typeof g.hasta === 'string' ? g.hasta : ''
+      hasta: typeof g.hasta === 'string' ? g.hasta : '',
+      cine: g.cine && typeof g.cine.ruta === 'string' && typeof g.cine.nombre === 'string'
+        ? { ruta: g.cine.ruta, nombre: g.cine.nombre, ciudad: String(g.cine.ciudad || '') } : null
     }
   } catch {
     return fabrica
@@ -673,12 +675,16 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
   const [genero, setGenero] = useState(() => filtrosGuardados.genero)
   const [desde, setDesde] = useState(() => filtrosGuardados.desde)
   const [hasta, setHasta] = useState(() => filtrosGuardados.hasta)
+  // tu cine, para En cines: { ruta, nombre, ciudad } de public/cines.json.
+  // Solo cuenta en En cines (y en pelis): en los demás modos no pinta nada
+  const [cine, setCine] = useState(() => filtrosGuardados.cine)
+  const cineAplicado = modo === 'cines' && tipo === 'movie' && cine ? cine.ruta : ''
   useEffect(() => {
-    Object.assign(filtrosGuardados, { tipo, modo, provs, genero, desde, hasta })
+    Object.assign(filtrosGuardados, { tipo, modo, provs, genero, desde, hasta, cine })
     try {
-      localStorage.setItem('sd:filtros', JSON.stringify({ tipo, modo, provs, genero, desde, hasta }))
+      localStorage.setItem('sd:filtros', JSON.stringify({ tipo, modo, provs, genero, desde, hasta, cine }))
     } catch { /* navegación privada: se recuerdan igual mientras la app esté abierta */ }
-  }, [tipo, modo, provs, genero, desde, hasta])
+  }, [tipo, modo, provs, genero, desde, hasta, cine])
   const [pagina, setPagina] = useState(1)
 
   const [plats, setPlats] = useState([])
@@ -818,7 +824,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
           // se notaba en la espera
           const desdePag = proximaPaginaTmdb.current
           const tanda = await Promise.all(Array.from({ length: PAGINAS_A_LA_VEZ }, (_, k) =>
-            explorar({ tipo, modo, proveedores: provs, genero, desde, hasta, pagina: desdePag + k })))
+            explorar({ tipo, modo, proveedores: provs, genero, desde, hasta, cine: cineAplicado, pagina: desdePag + k })))
           vueltas += PAGINAS_A_LA_VEZ
           proximaPaginaTmdb.current += PAGINAS_A_LA_VEZ
           const r = tanda.flat()
@@ -850,14 +856,14 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
         setAgotado(agotadas)
         setError('')
       } catch (e) {
-        if (vivo) setError('No se ha podido consultar TMDB.')
+        if (vivo) setError(/^cartelera/.test(e.message) ? 'No se ha podido leer la cartelera de tu cine.' : 'No se ha podido consultar TMDB.')
       } finally {
         if (vivo) setCargando(false)
       }
     }, 220)
     return () => { vivo = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipo, modo, provs, genero, desde, hasta, pagina, buscado])
+  }, [tipo, modo, provs, genero, desde, hasta, cineAplicado, pagina, buscado])
 
   const estado = p => {
     const x = titulos.find(t => t.tmdb_id === p.tmdb_id && t.tipo === p.tipo)
@@ -1013,12 +1019,13 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
     setQ(v)
     if (v.trim().length < 2 && buscado.texto) { setBuscado({ texto: '', actor: porActor }); setPagina(1); setRes([]) }
   }
-  const hayFiltros = provs.length > 0 || genero || desde || hasta
+  const hayFiltros = provs.length > 0 || genero || desde || hasta || cineAplicado
   const limpiarFiltros = () => {
-    setProvs([]); setGenero(''); setDesde(''); setHasta('')
+    setProvs([]); setGenero(''); setDesde(''); setHasta(''); setCine(null)
     setPagina(1); setRes([])
   }
-  const nFiltros = provs.length + [genero, desde || hasta].filter(Boolean).length
+  const nFiltros = provs.length + [genero, desde || hasta, cineAplicado].filter(Boolean).length
+  const cambiarCine = cambiar(c => setCine(c))
 
   /**
    * Por defecto se esconde lo que ya has decidido: tus propuestas, lo que
@@ -1149,6 +1156,8 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
               )}
               {/* desplegables propios en vez de <select>: el nativo abría una
                   lista blanca que no pegaba nada con la app */}
+              {/* en cines, en vez de plataformas, el cine: lo que echa hoy */}
+              {ocultarPlataformas && <ElegirCine valor={cine} onCambio={cambiarCine} />}
               <Desplegable etiqueta="Género" valor={genero} onCambio={cambiarGenero}
                 opciones={[{ id: '', nombre: 'Todos' }, ...gens.map(g => ({ id: String(g.id), nombre: g.nombre }))]} />
               <div className="barra-filtros">
@@ -1220,6 +1229,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
         <div className="vacio">
           <b>Sin resultados</b>
           {res.length > 0 ? 'Ya has decidido sobre todas. Activa el interruptor para verlas.'
+            : explorando && cineAplicado && !genero && !desde && !hasta ? `${cine.nombre} no tiene sesiones en eCartelera ahora mismo.`
             : explorando ? 'Prueba a quitar algún filtro.' : 'Prueba con otro título.'}
         </div>
       )}
@@ -1232,6 +1242,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
         const marca = marcaDe(ficha)
         return (
           <Ficha p={ficha} puesta={!!visible} conNota={!e} enCartel={modo === 'cines' && explorando}
+            sesiones={cineAplicado && explorando ? ficha.sesiones : undefined}
             etiquetaPuesta={juntos ? 'Vista juntos' : visible === 'coincide' ? 'Coincidís' : 'Propuesta'}
             etiquetaBoton={e && e.tipo === 'suyo' ? 'Me apetece' : undefined}
             aviso={marca}
@@ -1321,6 +1332,68 @@ function LogosPlataforma({ p }) {
     <span className="plats-foto" ref={caja}>
       {lista.slice(0, 3).map(d => <img key={d.nombre} src={d.logo} alt={d.nombre} title={d.nombre} />)}
     </span>
+  )
+}
+
+/* ---- tu cine, en el panel de filtros de En cines ----
+ * Se busca por nombre o ciudad entre todos los de España (public/cines.json,
+ * de eCartelera). La lista se baja solo al abrirlo la primera vez.
+ */
+function ElegirCine({ valor, onCambio }) {
+  const [abierto, setAbierto] = useState(false)
+  const [texto, setTexto] = useState('')
+  const [cines, setCines] = useState(null)
+  const caja = useRef(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = e => { if (caja.current && !caja.current.contains(e.target)) setAbierto(false) }
+    document.addEventListener('pointerdown', fuera)
+    return () => document.removeEventListener('pointerdown', fuera)
+  }, [abierto])
+
+  useEffect(() => {
+    if (!abierto || cines) return
+    let vivo = true
+    cinesLista().then(l => vivo && setCines(l)).catch(() => vivo && setCines([]))
+    return () => { vivo = false }
+  }, [abierto, cines])
+
+  // todas las palabras tienen que estar, en el nombre, la ciudad o la provincia
+  const palabras = texto.split(' ').map(comparable).filter(Boolean)
+  const encontrados = !cines || !palabras.length ? []
+    : cines.filter(c => {
+      const donde = comparable(`${c.nombre} ${c.ciudad} ${c.provincia}`)
+      return palabras.every(w => donde.includes(w))
+    }).slice(0, 40)
+  const elegir = c => { onCambio(c); setAbierto(false); setTexto('') }
+
+  return (
+    <div className="desplegable elegir-cine" ref={caja}>
+      <button type="button" className={`plegable${abierto ? ' abierto' : ''}${valor ? ' puesto' : ''}`}
+        onClick={() => setAbierto(v => !v)} aria-expanded={abierto}>
+        <span className="etiqueta">Tu cine</span>
+        {valor ? valor.nombre : 'Todos'}
+        <span className="flecha">{abierto ? '▴' : '▾'}</span>
+      </button>
+      {abierto && (
+        <div className="opciones" role="listbox">
+          <input className="busca" type="text" value={texto} autoFocus autoComplete="off"
+            onChange={e => setTexto(e.target.value)} placeholder="Nombre del cine o ciudad" />
+          {valor && <button type="button" onClick={() => elegir(null)}>Todos los cines</button>}
+          {cines === null && <div className="ayuda">Cargando cines…</div>}
+          {cines && !palabras.length && <div className="ayuda">Escribe el nombre del cine o la ciudad.</div>}
+          {cines && palabras.length > 0 && !encontrados.length && <div className="ayuda">Ningún cine con ese nombre.</div>}
+          {encontrados.map(c => (
+            <button type="button" key={c.ruta} role="option" aria-selected={valor?.ruta === c.ruta}
+              className={valor?.ruta === c.ruta ? 'activo' : ''}
+              onClick={() => elegir({ ruta: c.ruta, nombre: c.nombre, ciudad: c.ciudad })}>
+              {c.nombre}<i>{c.ciudad}</i>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -2510,7 +2583,7 @@ function Donde({ d, titulo, enCartel }) {
   )
 }
 
-function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer, enCartel }) {
+function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer, enCartel, sesiones }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [reserva, setReserva] = useState({ de: null, texto: '' })
@@ -2580,7 +2653,20 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
             {aviso && <div className="aviso-ficha">{aviso}</div>}
-            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel} />}
+            {/* con tu cine elegido en En cines: sus sesiones de hoy, cada
+                una con su enlace para comprar la entrada */}
+            {sesiones && (
+              <div className="sesiones">
+                <span>{sesiones.length ? `Hoy en ${p.cine}` : `Hoy ya no quedan sesiones en ${p.cine}`}</span>
+                {sesiones.map(x => {
+                  const texto = `${x.hora}${x.formato ? ` · ${x.formato}` : ''}`
+                  return x.url
+                    ? <a key={x.url} href={x.url} target="_blank" rel="noreferrer">{texto}</a>
+                    : <b key={texto}>{texto}</b>
+                })}
+              </div>
+            )}
+            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel && !sesiones} />}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}

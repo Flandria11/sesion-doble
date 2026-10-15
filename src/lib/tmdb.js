@@ -266,26 +266,113 @@ const porGeneroYAnio = (lista, { genero = '', desde = '', hasta = '' }) => lista
   })
 
 /**
+ * Todo lo que TMDB da como en cartelera en España, sin cribar. Se guarda
+ * durante la sesión: lo usan la lista de En cines y el cruce con la
+ * cartelera de un cine concreto.
+ */
+let carteleraEnBruto = null
+function carteleraBruta() {
+  if (!carteleraEnBruto) {
+    carteleraEnBruto = (async () => {
+      const primera = await pedir('/movie/now_playing', { page: '1', region: REGION })
+      const total = Math.min(primera.total_pages || 1, 8)
+      const resto = await Promise.all(
+        Array.from({ length: total - 1 }, (_, i) =>
+          pedir('/movie/now_playing', { page: String(i + 2), region: REGION })
+            .then(d => d.results).catch(() => [])))
+      const vistos = new Set()
+      return [primera.results, ...resto].flat().filter(x => !vistos.has(x.id) && vistos.add(x.id))
+    })()
+    carteleraEnBruto.catch(() => { carteleraEnBruto = null })
+  }
+  return carteleraEnBruto
+}
+
+/**
  * Toda la cartelera de una vez (son pocas páginas), por popularidad. El
  * género y el año se aplican sobre ella: /discover no sabe qué está en
  * cartelera, y con él salían estrenos de los últimos dos meses que ya no
  * estaban en ninguna sala.
  */
 async function cartelera({ genero = '', desde = '', hasta = '' } = {}) {
-  const primera = await pedir('/movie/now_playing', { page: '1', region: REGION })
-  const total = Math.min(primera.total_pages || 1, 8)
-  const resto = await Promise.all(
-    Array.from({ length: total - 1 }, (_, i) =>
-      pedir('/movie/now_playing', { page: String(i + 2), region: REGION })
-        .then(d => d.results).catch(() => [])))
-  const vistos = new Set()
-  const todas = porGeneroYAnio([primera.results, ...resto].flat()
-    .filter(x => enCartelera(x) && !vistos.has(x.id) && vistos.add(x.id)), { genero, desde, hasta })
+  const todas = porGeneroYAnio((await carteleraBruta()).filter(enCartelera), { genero, desde, hasta })
     .sort((a, b) => b.popularity - a.popularity)
   return limpiar(todas, 'movie')
 }
 
-export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', desde = '', hasta = '', pagina = 1 } = {}) {
+/* ---------------- cines concretos (eCartelera) ---------------- */
+
+/** Los cines de España para elegir el tuyo (public/cines.json). */
+let cinesEnMemoria = null
+export function cinesLista() {
+  if (!cinesEnMemoria) {
+    cinesEnMemoria = fetch('/cines.json').then(r => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+    cinesEnMemoria.catch(() => { cinesEnMemoria = null })
+  }
+  return cinesEnMemoria
+}
+
+/** Lo que echa hoy un cine: { cine, pelis: [{ titulo, sesiones }] }. */
+async function carteleraDeCine(ruta) {
+  const r = await fetch(`/api/cartelera?cine=${encodeURIComponent(ruta)}`)
+  if (!r.ok) throw new Error(`cartelera ${r.status}`)
+  return r.json()
+}
+
+// Para cruzar los títulos de eCartelera con los de TMDB: sin acentos, sin
+// signos y sin las coletillas de versión ("VOSE", "3D"...), que eCartelera
+// a veces pone en el título
+// ("contra" y "vs." cuentan igual: "Coyote contra Acme" es "Coyote vs. Acme" en TMDB)
+export const comparable = t => (t || '').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\b(?:contra|versus)\b/g, 'vs')
+  .replace(/\((?:v\.?o\.?s?\.?e?\.?|3d|imax|atmos|4dx)[^)]*\)/g, '')
+  .replace(/\b(?:vose|3d|imax|4dx)\b/g, '')
+  .replace(/[^a-z0-9]/g, '')
+
+/**
+ * Las pelis que echa hoy un cine, como tarjetas de TMDB y con sus
+ * sesiones (p.sesiones) y el nombre del cine (p.cine). Cada título se
+ * busca primero en la cartelera de TMDB y, si no está (cambia el título
+ * en español, por ejemplo "Coyote contra Acme"), en el buscador de TMDB,
+ * quedándose con el resultado más reciente.
+ */
+async function peliculasDeCine(ruta, filtros) {
+  const [{ cine, pelis }, enSalas] = await Promise.all([carteleraDeCine(ruta), carteleraBruta()])
+  const porTitulo = new Map()
+  for (const x of enSalas) {
+    porTitulo.set(comparable(x.title), x)
+    if (!porTitulo.has(comparable(x.original_title))) porTitulo.set(comparable(x.original_title), x)
+  }
+  const haceDosAnios = String(new Date().getFullYear() - 2)
+  const encontradas = await Promise.all(pelis.map(async p => {
+    const yaEsta = porTitulo.get(comparable(p.titulo))
+    if (yaEsta) return { x: yaEsta, p }
+    try {
+      const d = await pedir('/search/movie', { query: p.titulo, region: REGION })
+      const r = d.results || []
+      const x = r.find(y => (y.release_date || '') >= haceDosAnios) || r[0]
+      return x ? { x, p } : null
+    } catch {
+      return null
+    }
+  }))
+  // una misma peli puede venir dos veces (doblada y en VOSE): se juntan
+  // sus sesiones, ordenadas por hora
+  const sesiones = new Map()
+  const crudas = []
+  for (const e of encontradas.filter(Boolean)) {
+    if (!sesiones.has(e.x.id)) { sesiones.set(e.x.id, []); crudas.push(e.x) }
+    sesiones.get(e.x.id).push(...e.p.sesiones)
+  }
+  return limpiar(porGeneroYAnio(crudas, filtros), 'movie').map(p => ({
+    ...p,
+    cine,
+    sesiones: sesiones.get(p.tmdb_id).sort((a, b) => a.hora.localeCompare(b.hora))
+  }))
+}
+
+export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedores = [], genero = '', desde = '', hasta = '', cine = '', pagina = 1 } = {}) {
   const esPeli = tipo !== 'tv'
   const base = { page: String(pagina) }
   const filtrando = proveedores.length > 0 || genero || desde || hasta
@@ -293,8 +380,10 @@ export async function explorar({ tipo = 'movie', modo = 'tendencias', proveedore
 
   // va entera en la primera carga; las siguientes ya no traen nada.
   // Las plataformas no aplican: es lo que hay en las salas
+  // con un cine elegido, solo lo que echa ese cine (de eCartelera)
   if (modo === 'cines' && esPeli) {
-    return pagina === 1 ? cartelera({ genero, desde, hasta }) : []
+    if (pagina !== 1) return []
+    return cine ? peliculasDeCine(cine, { genero, desde, hasta }) : cartelera({ genero, desde, hasta })
   }
 
   // Tendencias: con género o año se filtra aquí cada página (puede quedar

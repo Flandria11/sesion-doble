@@ -221,6 +221,13 @@ input::placeholder { color: #61539A; }
 }
 .desplegable .opciones button:hover { background: var(--terciopelo); }
 .desplegable .opciones button.activo { background: var(--ambar); color: var(--noche); font-weight: 800; }
+/* tu cine: buscador arriba y la ciudad al lado de cada uno */
+.elegir-cine { flex: none; width: 100%; }
+.elegir-cine .opciones { max-height: 320px; }
+.elegir-cine .opciones .busca { margin-bottom: 6px; }
+.elegir-cine .opciones .ayuda { margin: 6px 4px; }
+.elegir-cine .opciones button i { font-style: normal; color: var(--apagado); font-size: 11.5px; margin-left: 6px; }
+.elegir-cine .opciones button.activo i { color: var(--noche); }
 
 .mis-pelis .pestanas.fina button { padding: 5px; font-size: 11px; }
 .mis-pelis .pestanas.fina em { font-size: 9.5px; }
@@ -322,6 +329,14 @@ input::placeholder { color: #61539A; }
 }
 .donde span { font-size: 11.5px; color: var(--apagado); font-weight: 600; }
 .donde img { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; }
+/* sesiones de hoy en tu cine, en la ficha */
+.sesiones { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.sesiones span { width: 100%; font-size: 11px; color: var(--apagado); font-weight: 600; }
+.sesiones a, .sesiones b {
+  padding: 5px 10px; border-radius: 8px; text-decoration: none;
+  background: rgba(8, 4, 16, .55); border: 1px solid var(--ambar); color: var(--papel);
+  font-size: 12.5px; font-weight: 700;
+}
 .donde a.horarios {
   padding: 5px 11px; border-radius: 999px; text-decoration: none;
   border: 1px solid var(--ambar); color: var(--ambar);
