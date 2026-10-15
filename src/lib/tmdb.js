@@ -739,7 +739,9 @@ function detalle(tmdbId, tipo) {
     // las fechas de estreno solo existen en pelis: dicen si está en cines
     const promesa = pedir(`/${tipo === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
       append_to_response: tipo === 'tv' ? 'videos,watch/providers' : 'videos,watch/providers,release_dates',
-      include_video_language: 'es,en'
+      // español e inglés, y por si no hay, los idiomas originales más
+      // habituales: "Escape Room 2" (catalana) solo tiene tráiler en catalán
+      include_video_language: 'es,en,ca,eu,gl,fr,it,de,pt,ja,ko,null'
     })
     detalles.set(clave, promesa)
     // si falla, que se pueda volver a pedir
@@ -760,9 +762,11 @@ export function buscarTrailers(tmdbId, tipo) {
   const clave = `${tipo}-${tmdbId}`
   if (listas.has(clave)) return listas.get(clave)
   const promesa = (async () => {
-    // vienen juntos los dos idiomas: se separan para mirar antes el español
+    // vienen todos los idiomas juntos: se separan para mirar antes el español
     const videos = await detalle(tmdbId, tipo).then(d => d.videos?.results || []).catch(() => [])
-    const respuestas = ['es', 'en'].map(idioma => ({ results: videos.filter(v => v.iso_639_1 === idioma) }))
+    // y detrás, el resto de idiomas (el original de la peli, normalmente)
+    const idiomas = ['es', 'en', ...new Set(videos.map(v => v.iso_639_1).filter(l => l !== 'es' && l !== 'en'))]
+    const respuestas = idiomas.map(idioma => ({ results: videos.filter(v => v.iso_639_1 === idioma) }))
     const claves = []
     const nota = x => (x.type === 'Trailer' ? 0 : 2) + (DE_OTRO_PAIS.test(x.name || '') ? 1 : 0)
     // el español primero, luego el inglés: el orden del array lo mantiene
