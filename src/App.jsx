@@ -2613,7 +2613,7 @@ function SesionesCine({ p }) {
  * logos. Si no, se dice qué pasa: de pago (alquiler o compra) y dónde,
  * solo en cines o que ahora mismo no está en streaming.
  */
-function Donde({ d, titulo, enCartel }) {
+function Donde({ d, titulo, enCartel, sinHorarios }) {
   const logos = d.incluida.length ? d.incluida : d.pago
   const texto = d.incluida.length ? 'En'
     : d.pago.length ? (d.cines ? 'En cines · de pago en' : 'De pago en')
@@ -2621,8 +2621,9 @@ function Donde({ d, titulo, enCartel }) {
   // Horarios: TMDB no tiene salas ni sesiones, así que se abre Google, que
   // enseña los cines cercanos con las sesiones del día y dónde comprar.
   // enCartel es para lo que viene de "En cines" en Añadir: está en salas
-  // aunque a TMDB le falte la fecha de estreno en España
-  const horarios = titulo && (d.cines || enCartel)
+  // aunque a TMDB le falte la fecha de estreno en España. sinHorarios: con
+  // tu cine elegido ya salen sus sesiones, y el enlace a Google sobra
+  const horarios = titulo && !sinHorarios && (d.cines || enCartel)
   return (
     <div className="donde">
       <span>{texto}</span>
@@ -2710,7 +2711,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
             {/* con tu cine elegido en En cines: sus sesiones, cada una con
                 su enlace para comprar la entrada */}
             {conSesiones && <SesionesCine p={p} />}
-            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel && !conSesiones} />}
+            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel} sinHorarios={conSesiones} />}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}
