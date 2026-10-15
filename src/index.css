@@ -1163,7 +1163,6 @@ textarea::placeholder { color: #61539A; }
 }
 
 /* campo de comentario dentro de la ficha */
-.nota-corta { min-height: 62px; margin-top: 14px; font-size: 13.5px; }
 
 /* fila de campo + botón (unirse a un grupo) */
 .anadir { display: flex; gap: 8px; }
@@ -1269,12 +1268,8 @@ textarea::placeholder { color: #61539A; }
 .diapo.suelta .donde { margin-top: 10px; }
 .diapo.suelta .donde img { width: 24px; height: 24px; }
 .diapo.suelta .donde span { font-size: 10.5px; }
-/* una sola línea: height fijo porque Android pintaba el textarea más
-   alto que el min-height (le da su propio alto de dos filas) */
-.diapo.suelta .nota-corta {
-  margin-top: 8px; min-height: 0; height: 32px; resize: none;
-  font-size: 12.5px; line-height: 1.3; padding: 7px 11px;
-}
+/* el botoncito de comentario en la ficha: el mismo que en Ver */
+.diapo.suelta .chip-comentario { margin: 10px 0 0; }
 
 /* la barra ancha de siempre quedaba pesada aquí: una píldora centrada,
    más pequeña y con algo de sombra, en vez de un bloque de lado a lado */
@@ -1464,6 +1459,5 @@ textarea::placeholder { color: #61539A; }
    iOS, para no cambiar el aspecto en Android ni en el ordenador */
 @supports (-webkit-touch-callout: none) {
   textarea, select, input[type=text], input[type=email], input[type=password],
-  .nota-corta, .barra-filtros select { font-size: 16px; }
-  .diapo.suelta .nota-corta { font-size: 16px; height: 36px; padding: 7px 11px; }
+  .barra-filtros select { font-size: 16px; }
 }

@@ -2638,6 +2638,9 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
   const donde = dondeGuardado.de === `${p.tipo}-${p.tmdb_id}` ? dondeGuardado.d : null
   const [abierta, setAbierta] = useState(false)
   const [nota, setNota] = useState('')
+  // el comentario ya no va en una caja siempre abierta: un botoncito, como
+  // en Ver, que abre la ventana de comentario solo si lo tocas
+  const [comentando, setComentando] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -2703,9 +2706,15 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
             {conSesiones && <SesionesCine p={p} />}
             {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel} sinHorarios={conSesiones} />}
             {!ocultarBoton && conNota && !puesta && (
-              <textarea className="nota-corta" rows={1} value={nota}
-                onChange={e => setNota(e.target.value)} maxLength={200}
-                placeholder="Comentario (opcional)" />
+              <button type="button" className={`chip-comentario${nota ? ' con' : ''}`}
+                onClick={() => setComentando(true)}>
+                💬 {nota ? `“${nota}”` : 'Añadir comentario'}
+              </button>
+            )}
+            {comentando && (
+              <Comentario titulo={p.titulo} inicial={nota}
+                onCerrar={() => setComentando(false)}
+                onGuardar={t => { setNota(t); setComentando(false) }} />
             )}
             {/* Proponer va en la misma fila que el resto de botones: la
                 píldora aparte ocupaba una línea más y empujaba la sinopsis
