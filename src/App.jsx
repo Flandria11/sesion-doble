@@ -1231,7 +1231,7 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
         const miNota = juntos ? miNotaDe(e) : undefined
         const marca = marcaDe(ficha)
         return (
-          <Ficha p={ficha} puesta={!!visible} conNota={!e}
+          <Ficha p={ficha} puesta={!!visible} conNota={!e} enCartel={modo === 'cines' && explorando}
             etiquetaPuesta={juntos ? 'Vista juntos' : visible === 'coincide' ? 'Coincidís' : 'Propuesta'}
             etiquetaBoton={e && e.tipo === 'suyo' ? 'Me apetece' : undefined}
             aviso={marca}
@@ -2328,7 +2328,7 @@ function Reel({ titulos, yo, miVoto, onAdd, onVotar, onDeshacer, puntuaciones, o
                 <div className="tit">{p.titulo}</div>
                 <Sinopsis texto={p.sinopsis} abierta={abierta === clave}
                   onAlternar={() => setAbierta(a => (a === clave ? null : clave))} />
-                {dondes[clave] && <Donde d={dondes[clave]} />}
+                {dondes[clave] && <Donde d={dondes[clave]} titulo={p.titulo} />}
 
               </div>
             </Deslizable>
@@ -2486,20 +2486,31 @@ function useCerrarConAtras(onCerrar) {
  * logos. Si no, se dice qué pasa: de pago (alquiler o compra) y dónde,
  * solo en cines o que ahora mismo no está en streaming.
  */
-function Donde({ d }) {
+function Donde({ d, titulo, enCartel }) {
   const logos = d.incluida.length ? d.incluida : d.pago
   const texto = d.incluida.length ? 'En'
     : d.pago.length ? (d.cines ? 'En cines · de pago en' : 'De pago en')
     : d.cines ? 'Solo en cines' : 'Ahora no está en streaming en España'
+  // Horarios: TMDB no tiene salas ni sesiones, así que se abre Google, que
+  // enseña los cines cercanos con las sesiones del día y dónde comprar.
+  // enCartel es para lo que viene de "En cines" en Añadir: está en salas
+  // aunque a TMDB le falte la fecha de estreno en España
+  const horarios = titulo && (d.cines || enCartel)
   return (
     <div className="donde">
       <span>{texto}</span>
       {logos.map(x => <img key={x.nombre} src={x.logo} alt={x.nombre} title={x.nombre} />)}
+      {horarios && (
+        <a className="horarios" target="_blank" rel="noreferrer"
+          href={`https://www.google.com/search?q=${encodeURIComponent(`${titulo} horarios cines`)}`}>
+          🎟 Ver horarios ↗
+        </a>
+      )}
     </div>
   )
 }
 
-function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer }) {
+function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, acciones, conNota, aviso, onCerrar, onProponer, onDeshacer, enCartel }) {
   const [trailer, setTrailer] = useState(null)
   const [gen, setGen] = useState('')
   const [reserva, setReserva] = useState({ de: null, texto: '' })
@@ -2569,7 +2580,7 @@ function Ficha({ p, puesta, etiquetaPuesta, etiquetaBoton, ocultarBoton, accione
               es lo que sube el título y la sinopsis sin mover esto de abajo */}
           <div className="pie-ficha">
             {aviso && <div className="aviso-ficha">{aviso}</div>}
-            {donde && <Donde d={donde} />}
+            {donde && <Donde d={donde} titulo={p.titulo} enCartel={enCartel} />}
             {!ocultarBoton && conNota && !puesta && (
               <textarea className="nota-corta" rows={1} value={nota}
                 onChange={e => setNota(e.target.value)} maxLength={200}
