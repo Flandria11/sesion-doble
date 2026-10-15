@@ -1194,7 +1194,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
           const suya = e && e.tipo === 'suyo' && !miVoto(e.t.id)
           const yaVotada = e && e.tipo === 'suyo' && !suya
           const marca = marcaCorta(p)
-          const nota = [p.anio, p.tipo === 'tv' ? 'Serie' : 'Película'].filter(Boolean).join(' · ')
           return (
             <div className="tarjeta" key={`${p.tipo}-${p.tmdb_id}`}>
               <button className={`lamina${visible || fuera || yaVotada ? ' puesta' : ''}${suya ? ' suya' : ''}`}
@@ -1222,7 +1221,6 @@ function Anadir({ titulos, yo, nombres, miVoto, suVoto, onAdd, onVotar, onDeshac
               </button>
               <div className="rotulo">
                 <span className="nombre">{p.titulo}</span>
-                <i>{nota}</i>
               </div>
             </div>
           )
